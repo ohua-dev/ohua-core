@@ -70,7 +70,7 @@ type Errors = ()
 -- The compiler monad.
 -- Encapsulates the state necessary to generate bindings
 -- Allows IO actions.
--- In development this collects errors via a MonadWriter, in poduction this collection will
+-- In development this collects errors via a MonadWriter, in production this collection will
 -- be turned off and be replaced by an exception, as such error should technically not occur
 -- there
 newtype OhuaC a = OhuaC { runOhuaC' :: RWST CompilerEnv Errors CompilerState IO a } deriving (Functor, Applicative, Monad, MonadIO)
@@ -79,11 +79,11 @@ newtype OhuaC a = OhuaC { runOhuaC' :: RWST CompilerEnv Errors CompilerState IO 
 -- This class is intend to make it simpler to use functionality related to the ohua monad
 -- from an arbitrary monad
 --
--- The typical use case is that you want to implement a compiler pass but you need aditional
+-- The typical use case is that you want to implement a compiler pass but you need additional
 -- state or environment (see 'SSAM')
 -- You achieve this by wrapping 'OhuaC' in a transformer ('StateT' for instance).
 -- By implementing 'MonadOhua' (usually the implementation will be @lift@ or @lift .
--- unwrapMyCustomMonad@) you can use compiler functionality sich as 'generateBinding'
+-- unwrapMyCustomMonad@) you can use compiler functionality such as 'generateBinding'
 -- from your custom monad without using @lift@.
 class Monad m => MonadOhua m where
     liftOhua :: OhuaC a -> m a
