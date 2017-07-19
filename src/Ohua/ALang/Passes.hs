@@ -184,7 +184,10 @@ checkProgramValidity e = do
 
 
 normalize :: (MonadOhua m, MonadError Error m) => Expression -> m Expression
-normalize = reduceLambdas . letLift >=> ensureFinalLet . inlineReassignments
+normalize e = do
+    e' <- reduceLambdas (letLift e) >>= ensureFinalLet . inlineReassignments
+    checkProgramValidity e'
+    return e'
   where
     -- we repeat this step until a fix point is reached.
     -- this is necessary as lambdas may be input to lambdas,

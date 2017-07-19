@@ -78,11 +78,6 @@ runPasses expr = flip runOhuaC expr $ mkSSA >=> runExceptT . normalize
 
 type ALangCheck = Either String
 
-hasFinalLet :: Expression -> ALangCheck ()
-hasFinalLet (Let _ _ body) = hasFinalLet body
-hasFinalLet (Var _)        = return ()
-hasFinalLet _              = throwError "Final value is not a var"
-
 
 everyLetBindsCall :: Expression -> ALangCheck ()
 everyLetBindsCall (Let _ (Apply _ _) body) = everyLetBindsCall body
@@ -107,12 +102,11 @@ checkInvariants expr = do
     noNestedLets expr
     everyLetBindsCall expr
     hasFinalLet expr
-    hasFinalLet expr
     maybe (return ()) (throwError . show) $ isSSA expr
 
 prop_passes :: Expression -> Property
 prop_passes input = ioProperty $ do
-    !() <- return $ input `deepseq` ()
+    () <- return $ input `deepseq` ()
     transformed <- runPasses input
     return $ case transformed of
         Left msg -> succeeded { abort = True }
@@ -154,17 +148,9 @@ passesSpec =
         let lambdaStaysInput (Apply _ (Lambda _ (Lambda _ _))) = False
             lambdaStaysInput (Apply (Var (Sf _ _)) (Lambda _ _)) = True
             lambdaStaysInput (Apply (Var (Algo _)) (Lambda _ _)) = True
-            lambdaStaysInput (Let _ _ body) = lambdaStaysInput body
+            lambdaStaysInput (Let _ expr _) = lambdaStaysInput expr
             lambdaStaysInput (Apply _ body) = lambdaStaysInput body
             lambdaStaysInput _ = False
-
-            runPasses expr = flip runOhuaC expr $ mkSSA >=> \a -> runExceptT $
-                                    let r a = do
-                                            liftIO $ putStrLn $ showLambda a
-                                            n <- normalize a
-                                            if a == n then return n else r n
-                                    in r a
-
 
         it "Reduces lambdas as far as possible but does not remove them when argument" $
             runPasses lambda_with_app_as_arg `shouldSatisfyRet` either (const False) lambdaStaysInput

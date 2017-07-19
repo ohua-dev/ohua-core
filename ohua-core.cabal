@@ -21,31 +21,32 @@ flag debug
   default: False
 
 library
-  exposed-modules:     Ohua.IR
-                      , Ohua.Types
-                      , Ohua.LensClasses
-                      , Ohua.Monad
-                      , Ohua.IR.Functions
-                      , Ohua.ALang.Lang
-                      , Ohua.ALang.Show
-                      , Ohua.ALang.Passes
-                      , Ohua.ALang.Passes.SSA
-                      , Ohua.ALang.Util
-                      , Ohua.Util
-
+  exposed-modules:     
+      Ohua.IR
+    , Ohua.Types
+    , Ohua.LensClasses
+    , Ohua.Monad
+    , Ohua.IR.Functions
+    , Ohua.ALang.Lang
+    , Ohua.ALang.Show
+    , Ohua.ALang.Passes
+    , Ohua.ALang.Passes.SSA
+    , Ohua.ALang.Util
+    , Ohua.Util
   -- other-modules:
   -- other-extensions:
-  build-depends:       base >=4.8 && <4.9
-                      , transformers
-                      , microlens
-                      , microlens-mtl
-                      , unordered-containers
-                      , mtl
-                      , hashable
-                      , containers
-                      , extra
-                      , monad-loops
-                      , deepseq
+  build-depends:       
+      base >=4.8 && <4.9
+    , transformers
+    , microlens
+    , microlens-mtl
+    , unordered-containers
+    , mtl
+    , hashable
+    , containers
+    , extra
+    , monad-loops
+    , deepseq
   hs-source-dirs:      src
   default-language:    Haskell2010
   default-extensions:  
@@ -64,7 +65,10 @@ library
 executable ohua-test-exec
   main-is: Main.hs
   hs-source-dirs: .
-  build-depends: base >=4.8 && <4.9, ohua-core, mtl
+  build-depends: 
+      base >=4.8 && <4.9
+    , ohua-core
+    , mtl
   default-language: Haskell2010
 
 
@@ -72,12 +76,13 @@ test-suite ohua-tests
   main-is: Spec.hs
   other-modules:       PassesSpec
   hs-source-dirs:      test
-  build-depends:       base >=4.8 && <4.9
-                        , ohua-core
-                        , hspec
-                        , mtl
-                        , deepseq
-                        , QuickCheck
+  build-depends:       
+      base >=4.8 && <4.9
+    , ohua-core
+    , hspec
+    , mtl
+    , deepseq
+    , QuickCheck
   type:                exitcode-stdio-1.0
   default-language:    Haskell2010
 
