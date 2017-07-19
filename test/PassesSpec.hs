@@ -1,0 +1,171 @@
+-- |
+-- Module      : $Header$
+-- Description : Tests for transformation passes on the algorithm language
+-- Copyright   : (c) Justus Adam 2017. All Rights Reserved.
+-- License     : EPL-1.0
+-- Maintainer  : sebastian.ertel@gmail.com, dev@justus.science
+-- Stability   : experimental
+-- Portability : portable
+
+-- This source code is licensed under the terms described in the associated LICENSE.TXT file
+{-# LANGUAGE BangPatterns      #-}
+{-# LANGUAGE FlexibleContexts  #-}
+{-# LANGUAGE OverloadedStrings #-}
+module PassesSpec (passesSpec) where
+
+import           Control.DeepSeq
+import           Control.Monad.Except
+import           Data.Either
+import           Debug.Trace
+import           Ohua.ALang.Lang
+import           Ohua.ALang.Passes
+import           Ohua.ALang.Passes.SSA
+import           Ohua.ALang.Show
+import           Ohua.IR.Functions
+import           Ohua.Monad
+import           Ohua.Types
+import           Test.Hspec
+import           Test.Hspec.QuickCheck
+import           Test.QuickCheck
+import           Test.QuickCheck.Property as P
+
+
+instance Arbitrary Binding where
+    arbitrary = oneof $ map pure
+        [ "x", "y", "z", "a", "b", "c"
+        ]
+
+instance Arbitrary FnName where
+    arbitrary = oneof $ map pure [pmapName, pCollectName, smapIOName, flattenerName, seqName, idName]
+
+instance Arbitrary FnId where
+    arbitrary = FnId <$> arbitrary
+
+instance Arbitrary ResolvedSymbol where
+    arbitrary = oneof
+        [ Local <$> arbitrary
+        , Sf <$> arbitrary <*> arbitrary
+        , Algo <$> arbitrary
+        -- , pure $ Env $ error "host expr"
+        ]
+
+instance Arbitrary Assignment where
+    arbitrary = oneof [Direct <$> arbitrary, Destructure <$> arbitrary]
+
+instance Arbitrary a => Arbitrary (Expr a) where
+    arbitrary = sized expr
+      where
+        expr 0 = Var <$> arbitrary
+        expr n = oneof
+            [ liftM3 Let arbitrary nestExpr nestExpr
+            , liftM2 Apply nestExpr nestExpr
+            , liftM2 Lambda arbitrary nestExpr
+            , Var <$> arbitrary
+            ]
+          where
+            nestExpr = expr $ n `div` 2
+
+
+-- newtype ApplyOnlyExpr = ApplyOnlyExpr { unApplyOnlyExpr :: Expression } deriving (Eq, Show)
+
+-- instance Arbitrary ApplyOnlyExpr where
+--     arbitrary = ApplyOnlyExpr <$> sized tree
+--       where
+--         tree (_, values) 0 = Var $ Local
+
+
+runPasses expr = flip runOhuaC expr $ mkSSA >=> runExceptT . normalize
+
+type ALangCheck = Either String
+
+hasFinalLet :: Expression -> ALangCheck ()
+hasFinalLet (Let _ _ body) = hasFinalLet body
+hasFinalLet (Var _)        = return ()
+hasFinalLet _              = throwError "Final value is not a var"
+
+
+everyLetBindsCall :: Expression -> ALangCheck ()
+everyLetBindsCall (Let _ (Apply _ _) body) = everyLetBindsCall body
+everyLetBindsCall (Let _ _ _)              = throwError "Let without call"
+everyLetBindsCall _                        = return ()
+
+
+noNestedLets :: Expression -> ALangCheck ()
+noNestedLets (Let _ expr1 body) = noLets expr1 >> noNestedLets body
+noNestedLets _                  = return ()
+
+
+noLets :: Expression -> ALangCheck ()
+noLets (Let _ _ _)         = throwError "Found a let"
+noLets (Apply expr1 expr2) = noLets expr1 >> noLets expr2
+noLets (Lambda _ expr)     = noLets expr
+noLets _                   = return ()
+
+
+checkInvariants :: Expression -> ALangCheck ()
+checkInvariants expr = do
+    noNestedLets expr
+    everyLetBindsCall expr
+    hasFinalLet expr
+    hasFinalLet expr
+    maybe (return ()) (throwError . show) $ isSSA expr
+
+prop_passes :: Expression -> Property
+prop_passes input = ioProperty $ do
+    !() <- return $ input `deepseq` ()
+    transformed <- runPasses input
+    return $ case transformed of
+        Left msg -> succeeded { abort = True }
+        Right program ->
+            case checkInvariants program of
+                Left err -> failed { P.reason = err }
+                Right _  -> succeeded
+
+
+shouldSatisfyRet :: Show a => IO a -> (a -> Bool) -> Expectation
+shouldSatisfyRet action predicate = action >>= (`shouldSatisfy` predicate)
+
+rejects :: Expression -> Expectation
+rejects e = runPasses e `shouldSatisfyRet` isLeft
+
+doesn't_reject :: Expression -> Expectation
+doesn't_reject e = runPasses e `shouldSatisfyRet` isRight
+
+lambda_as_argument = Apply (Var (Sf smapName Nothing)) (Lambda "a" "a")
+
+bound_lambda_as_argument = Let "f" (Lambda "a" "a") (Apply "some/function" "f")
+
+calculated_lambda_as_argument = Let "f" (Lambda "a" "a") $ Let "z" (Lambda "a" "a") $ Let "g" (Apply "f" "z") $ (Apply "some/function" "g")
+
+lambda_with_app_as_arg = Apply "some/func" $ Apply (Lambda "a" (Lambda "b" "a")) "b"
+
+passesSpec =
+    describe "passes" $ do
+        prop "creates ir with the right invariants" prop_passes
+        it "does not reject a program with lambda as input to smap" $
+            doesn't_reject lambda_as_argument
+
+        it "doesn't reject a program where bound lambda is input" $
+            doesn't_reject bound_lambda_as_argument
+
+        it "doesn't reject a program where calculated lambda is input" $
+            doesn't_reject calculated_lambda_as_argument
+
+        let lambdaStaysInput (Apply _ (Lambda _ (Lambda _ _))) = False
+            lambdaStaysInput (Apply (Var (Sf _ _)) (Lambda _ _)) = True
+            lambdaStaysInput (Apply (Var (Algo _)) (Lambda _ _)) = True
+            lambdaStaysInput (Let _ _ body) = lambdaStaysInput body
+            lambdaStaysInput (Apply _ body) = lambdaStaysInput body
+            lambdaStaysInput _ = False
+
+            runPasses expr = flip runOhuaC expr $ mkSSA >=> \a -> runExceptT $
+                                    let r a = do
+                                            liftIO $ putStrLn $ showLambda a
+                                            n <- normalize a
+                                            if a == n then return n else r n
+                                    in r a
+
+
+        it "Reduces lambdas as far as possible but does not remove them when argument" $
+            runPasses lambda_with_app_as_arg `shouldSatisfyRet` either (const False) lambdaStaysInput
+

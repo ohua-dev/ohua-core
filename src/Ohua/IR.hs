@@ -9,19 +9,20 @@ Portability : portable
 
 This source code is licensed under the terms described in the associated LICENSE.TXT file.
 -}
-{-# LANGUAGE MagicHash, LambdaCase #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MagicHash  #-}
 module Ohua.IR where
 
-import Data.Hashable
-import Control.Arrow
-import Lens.Micro
+import           Control.Arrow
+import           Data.Function       (on)
+import           Data.Hashable
 import qualified Data.HashMap.Strict as HM
-import Data.Function (on)
-import Data.String
-import Ohua.LensClasses
-import Ohua.Types
-import Ohua.Util
-import Ohua.ALang.Lang
+import           Data.String
+import           Lens.Micro
+import           Ohua.ALang.Lang
+import           Ohua.LensClasses
+import           Ohua.Types
+import           Ohua.Util
 
 type IRFnId = FnId
 
@@ -39,8 +40,8 @@ class ToIRFnId a where
 instance ExtractBindings a => ExtractBindings [a] where extractBindings = concatMap extractBindings
 
 
-data Argument 
-    = ABinding !Binding 
+data Argument
+    = ABinding !Binding
     | AEnv !HostExpr
 
 _ABinding :: Prism' Argument Binding
@@ -51,13 +52,13 @@ _AEnv = prism' AEnv $ \case { AEnv a -> Just a; _ -> Nothing }
 
 instance Show Argument where
     show (ABinding b) = show b
-    show (AEnv o) = "fromEnv " ++ show o
+    show (AEnv o)     = "fromEnv " ++ show o
 instance Consumes Argument where
     consumes bnd (ABinding bnd0) = bnd == bnd0
-    consumes _ _ = False
-instance ExtractBindings Argument where 
+    consumes _ _                 = False
+instance ExtractBindings Argument where
     extractBindings (ABinding bnd) = [bnd]
-    extractBindings _ = []
+    extractBindings _              = []
 
 
 instance IsString Argument where fromString = ABinding . fromString
@@ -68,14 +69,14 @@ type Arguments = [Argument]
 type FnReturn = Assignment
 
 instance Returns FnReturn where
-    returns bnd (Direct bnd2) = bnd == bnd2
+    returns bnd (Direct bnd2)   = bnd == bnd2
     returns bnd (Destructure l) = bnd `elem` l
 
 
 data IRFn = IRFn
-    { irfnIdField :: !IRFnId
-    , irfnName :: !FnName
-    , irfnArguments :: !Arguments
+    { irfnIdField     :: !IRFnId
+    , irfnName        :: !FnName
+    , irfnArguments   :: !Arguments
     , irfnReturnField :: !FnReturn
     }
 
@@ -91,7 +92,7 @@ instance Returns IRFn where
     returns bnd fn = returns bnd (fn^.returnField)
 instance Consumes IRFn where
     consumes bnd fn = any (consumes bnd) (fn^.arguments)
-instance Eq IRFn where 
+instance Eq IRFn where
     (==) = (==) `on` (^.idField)
 instance ExtractBindings IRFn where extractBindings fn = extractBindings (fn^.arguments) ++ extractBindings (fn^.returnField)
 
@@ -104,8 +105,8 @@ type CtxtType = FnName
 
 data CtxtFrame = CtxtFrame
     { ctxtFrameFrameType :: !CtxtType
-    , ctxtFrameSourceFn :: !IRFnId
-    , ctxtFrameOutVar :: !Int
+    , ctxtFrameSourceFn  :: !IRFnId
+    , ctxtFrameOutVar    :: !Int
     } deriving (Show)
 
 instance HasFrameType CtxtFrame CtxtType where frameType = lens ctxtFrameFrameType (\s a -> s {ctxtFrameFrameType=a})

@@ -1,12 +1,3 @@
-flags:
-  ohua:
-    java: false
-user-message: ! 'Warning (added by new or init): Specified resolver could not satisfy
-  all dependencies. Some external packages have been added as dependencies.
-
-  You can suppress this message by removing it from stack.yaml
-
-'
 extra-package-dbs: []
 packages:
 - '.'

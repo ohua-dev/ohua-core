@@ -25,13 +25,13 @@ showLambda (Let assignment value body) = "let " ++ showAssigment assignment ++ "
 showLambda (Apply function argument) = showFunction function ++ " " ++ showArgument argument
 
 showFunction e@(Lambda _ _) = "(" ++ showLambda e ++ ")"
-showFunction e@(Let _ _ _) = "(" ++ showLambda e ++ ")"
-showFunction e = showLambda e
+showFunction e@(Let _ _ _)  = "(" ++ showLambda e ++ ")"
+showFunction e              = showLambda e
 
 showArgument e@(Lambda _ _) = "(" ++ showLambda e ++ ")"
-showArgument e@(Let _ _ _) = "(" ++ showLambda e ++ ")"
-showArgument e@(Apply _ _) = "(" ++ showLambda e ++ ")"
-showArgument e = showLambda e
+showArgument e@(Let _ _ _)  = "(" ++ showLambda e ++ ")"
+showArgument e@(Apply _ _)  = "(" ++ showLambda e ++ ")"
+showArgument e              = showLambda e
 
 showSymbol :: ResolvedSymbol -> String
 showSymbol (Local l) = show l

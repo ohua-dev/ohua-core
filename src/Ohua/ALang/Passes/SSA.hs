@@ -62,10 +62,7 @@ ssa (Var abstrBinding) = Var <$>
 ssa (Apply function argument) = Apply <$> ssa function <*> ssa argument
 ssa (Lambda argument body) = uncurry Lambda <$> handleAssignment argument (ssa body)
 ssa (Let assignment value body) = do
-    (ssaAssignment, (ssaValue, ssaBody)) <- handleAssignment assignment $ do
-        v <- ssa value
-        b <- ssa body
-        return (v, b)
+    (ssaAssignment, (ssaValue, ssaBody)) <- handleAssignment assignment $ (,) <$> ssa value <*> ssa body
     return $ Let ssaAssignment ssaValue ssaBody
 
 -- As you can see the destructuring makes writing some stuff quite difficult.

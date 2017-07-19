@@ -250,3 +250,15 @@ flattenAssign = extractBindings
 --                 [ Apply (Var (Sfn "functionB")) [Var (Local "y")]
 --                 , Apply (Var (Sfn "functionC")) [Var (Local "x"), Var (Local "z")]
 --                 ]))
+
+
+data DFBinding
+    = DFLocal Binding
+    | DFSf FnName (Maybe FnId)
+    | DFSFFlow FnName (Maybe FnId)
+    | DFAlgo FnName
+    | DFEnv HostExpr
+    deriving (Show, Eq)
+
+
+type DFExpression = Expr DFBinding

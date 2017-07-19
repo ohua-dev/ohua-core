@@ -88,7 +88,7 @@ inlineLambda (Apply v@(Var _) argument) = Apply v (inlineLambda argument)
 inlineLambda (Apply v@(Apply _ _) argument) = reduceLetCWith f (inlineLambda v)
   where
     f (Lambda assignment body) = Let assignment inlinedArg body
-    f v = Apply v inlinedArg
+    f v                        = Apply v inlinedArg
     inlinedArg = inlineLambda argument
 inlineLambda v@(Apply _ _) = reduceLetCWith inlineLambda v
 inlineLambda (Let name value body) = Let name (inlineLambda value) (inlineLambda body)
@@ -151,43 +151,36 @@ ensureFinalLet a = do
 
 -- assumes ssa for simplicity
 removeUnusedBindings :: Expression -> Expression
-removeUnusedBindings = fst . go
+removeUnusedBindings = fst . runWriter . go
   where
-    go :: Expression -> (Expression, HS.HashSet Binding)
-    go v@(Var (Local b)) = (v, HS.singleton b)
-    go v@(Var _) = (v, mempty)
-    go (Lambda bnd body) = first (Lambda bnd) $ go body
-    go (Apply e1 e2) = (Apply e1' e2', u1 `HS.union` u2)
-      where
-        (e1', u1) = go e1
-        (e2', u2) = go e2
-    go (Let bnds val body) = (newExpr, used)
-      where
-        (inner, bodyUsed) = go body
-        (valNew, valUsed) = go val
-        used = valUsed `HS.union` bodyUsed
-        newExpr
-            | not $ any (`HS.member` used) $ flattenAssign bnds = inner
-            | otherwise = Let bnds valNew inner
-
+    go :: MonadWriter (HS.HashSet Binding) m => Expression -> m Expression
+    go v@(Var (Local b)) = tell (HS.singleton b) >> return v
+    go v@(Var _) = return v
+    go (Lambda bnd body) = Lambda bnd <$> go body
+    go (Apply e1 e2) = Apply <$> go e1 <*> go e2
+    go (Let bnds val body) = do
+        (inner, used) <- listen $ go body
+        if not $ any (`HS.member` used) $ flattenAssign bnds then 
+            return inner
+        else 
+            Let bnds <$> go val <*> pure inner
 
 
 hasFinalLet :: MonadError String m => Expression -> m ()
-hasFinalLet (Let _ _ body) = hasFinalLet body
-hasFinalLet (Var (Local _))        = return ()
-hasFinalLet (Var _) = throwError "Non-local final var"
-hasFinalLet _              = throwError "Final value is not a var"
+hasFinalLet (Let _ _ body)  = hasFinalLet body
+hasFinalLet (Var (Local _)) = return ()
+hasFinalLet (Var _)         = throwError "Non-local final var"
+hasFinalLet _               = throwError "Final value is not a var"
 
 
 lamdasAreInputToHigherOrderFunctions :: MonadError Error m => Expression -> m ()
-lamdasAreInputToHigherOrderFunctions _ = return ()
+lamdasAreInputToHigherOrderFunctions _                         = return ()
 lamdasAreInputToHigherOrderFunctions (Apply v (Lambda _ body)) = undefined
 
 
 checkProgramValidity :: MonadError Error m => Expression -> m ()
 checkProgramValidity e = do
     hasFinalLet e
-
 
 
 normalize :: (MonadOhua m, MonadError Error m) => Expression -> m Expression
