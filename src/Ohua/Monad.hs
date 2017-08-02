@@ -15,7 +15,8 @@
 module Ohua.Monad
     ( OhuaC, runOhuaC
     , MonadOhua(liftOhua)
-    , recordError, generateBinding, generateBindingWith
+    , recordError, generateBinding, generateBindingWith, generateId
+    , MonadIO(..)
     ) where
 
 
@@ -33,13 +34,17 @@ import           Ohua.Types
 type Error = String
 
 data CompilerState = CompilerState
-    { conversionStateNameGenerator :: NameGenerator
+    { compilerStateNameGenerator :: NameGenerator
+    , compilerStateIdCounter     :: Int
     }
 data CompilerEnv -- empty for now, placeholder for when we might need an environment
 
 
 instance HasNameGenerator CompilerState NameGenerator where
-    nameGenerator = lens conversionStateNameGenerator $ \s a -> s { conversionStateNameGenerator = a }
+    nameGenerator = lens compilerStateNameGenerator $ \s a -> s { compilerStateNameGenerator = a }
+
+instance HasIdCounter CompilerState Int where
+    idCounter = lens compilerStateIdCounter $ \s a -> s { compilerStateIdCounter = a }
 
 data NameGenerator = NameGenerator
     { nameGeneratorTakenNames     :: HS.HashSet Binding
@@ -101,7 +106,7 @@ instance {-# OVERLAPPABLE #-} (MonadOhua m, MonadTrans t, Monad (t m)) => MonadO
 -- If there are any errors during the compilation they are reported together at the end
 runOhuaC :: (Expression -> OhuaC a) -> Expression -> IO a
 runOhuaC f tree = do
-    (val, errors) <- evalRWST (runOhuaC' (f tree)) (error "Ohua has no environment!") (CompilerState nameGen)
+    (val, errors) <- evalRWST (runOhuaC' (f tree)) (error "Ohua has no environment!") (CompilerState nameGen 0)
 #ifdef DEBUG
     case errors of
         []   -> return val
@@ -110,10 +115,10 @@ runOhuaC f tree = do
     return val
 #endif
   where
-    nameGen = mkNameGen tree
+    nameGen = initNameGen tree
 
-mkNameGen :: Expression -> NameGenerator
-mkNameGen t = NameGenerator taken
+initNameGen :: Expression -> NameGenerator
+initNameGen t = NameGenerator taken
     [ Binding $ char : maybe [] show num
     | num <- Nothing : map Just [(0 :: Integer)..]
     , char <- ['a'..'z']
@@ -136,3 +141,9 @@ generateBindingWith (Binding prefix) = liftOhua $ OhuaC $ do
     nameGenerator . takenNames %= HS.insert h
     return h
   where prefix' = prefix ++ "_"
+
+generateId :: MonadOhua m => m FnId
+generateId = liftOhua $ OhuaC $ do
+    idCounter += 1
+    FnId <$> use idCounter
+

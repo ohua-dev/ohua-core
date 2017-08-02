@@ -160,9 +160,9 @@ removeUnusedBindings = fst . runWriter . go
     go (Apply e1 e2) = Apply <$> go e1 <*> go e2
     go (Let bnds val body) = do
         (inner, used) <- listen $ go body
-        if not $ any (`HS.member` used) $ flattenAssign bnds then 
+        if not $ any (`HS.member` used) $ flattenAssign bnds then
             return inner
-        else 
+        else
             Let bnds <$> go val <*> pure inner
 
 

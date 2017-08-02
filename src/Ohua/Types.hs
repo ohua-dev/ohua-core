@@ -14,8 +14,11 @@ module Ohua.Types where
 import           Control.DeepSeq
 import           Data.Hashable
 import           Data.String
+import           Data.String
+import           GHC.Exts
 import           Lens.Micro
 import           Ohua.LensClasses
+import           Ohua.Util
 
 newtype FnId = FnId { unFnId :: Int } deriving (Eq, Ord)
 
@@ -66,3 +69,41 @@ symbolFromString s =
 class ExtractBindings a where
     extractBindings :: a -> [Binding]
 
+
+
+data Assignment
+    = Direct !Binding
+    | Destructure ![Binding]
+    deriving (Eq)
+
+instance Show Assignment where
+    show (Direct b)      = show b
+    show (Destructure d) = show d
+
+instance IsString Assignment where
+    fromString = Direct . fromString
+
+instance IsList Assignment where
+    type Item Assignment = Binding
+
+    fromList = Destructure
+    toList (Destructure l) = l
+    toList _               = error "Direct return is not a list"
+
+instance ExtractBindings Assignment where
+    extractBindings (Direct bnd)       = [bnd]
+    extractBindings (Destructure bnds) = bnds
+
+instance NFData Assignment where
+    rnf (Destructure ds) = rnf ds
+    rnf (Direct d)       = rnf d
+
+_Direct :: Prism' Assignment Binding
+_Direct = prism' Direct $ \case { Direct a -> Just a; _ -> Nothing }
+
+_Destructure :: Prism' Assignment [Binding]
+_Destructure = prism' Destructure $ \case { Destructure a -> Just a; _ -> Nothing }
+
+
+flattenAssign :: Assignment -> [Binding]
+flattenAssign = extractBindings

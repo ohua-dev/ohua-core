@@ -7,6 +7,7 @@ import           Ohua.ALang.Passes
 import           Ohua.ALang.Passes.SSA
 import           Ohua.ALang.Show
 import           Ohua.Monad
+import Ohua.Types
 
 
 expr =

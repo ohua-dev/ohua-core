@@ -193,3 +193,4 @@ language_extensions:
   - FlexibleInstances
   - TypeSynonymInstances
   - LambdaCase
+  - TupleSections

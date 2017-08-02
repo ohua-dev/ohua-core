@@ -27,3 +27,4 @@ class HasBindingSupplier s a | s -> a where bindingSupplier :: Lens' s a
 class HasIdSupplier s a | s -> a where idSupplier :: Lens' s a
 class HasOther s a | s -> a where other :: Lens' s a
 class HasNamespace s a | s -> a where namespace :: Lens' s a
+class HasIdCounter s a | s -> a where idCounter :: Lens' s a

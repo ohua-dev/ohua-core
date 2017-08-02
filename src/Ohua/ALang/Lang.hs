@@ -13,7 +13,6 @@ module Ohua.ALang.Lang where
 import           Control.DeepSeq
 import           Data.Function
 import           Data.String
-import           GHC.Exts
 import           Ohua.Types
 import           Ohua.Util
 
@@ -158,46 +157,7 @@ instance NFData a => NFData (Expr a) where
     rnf (Apply a b)  = rnf a `seq` rnf b
     rnf (Lambda a b) = rnf a `seq` rnf b
 
-
-data Assignment
-    = Direct !Binding
-    | Destructure ![Binding]
-    deriving (Eq)
-
-instance Show Assignment where
-    show (Direct b)      = show b
-    show (Destructure d) = show d
-
-instance IsString Assignment where
-    fromString = Direct . fromString
-
-instance IsList Assignment where
-    type Item Assignment = Binding
-
-    fromList = Destructure
-    toList (Destructure l) = l
-    toList _               = error "Direct return is not a list"
-
-instance ExtractBindings Assignment where
-    extractBindings (Direct bnd)       = [bnd]
-    extractBindings (Destructure bnds) = bnds
-
-instance NFData Assignment where
-    rnf (Destructure ds) = rnf ds
-    rnf (Direct d)       = rnf d
-
-_Direct :: Prism' Assignment Binding
-_Direct = prism' Direct $ \case { Direct a -> Just a; _ -> Nothing }
-
-_Destructure :: Prism' Assignment [Binding]
-_Destructure = prism' Destructure $ \case { Destructure a -> Just a; _ -> Nothing }
-
 type Expression = Expr ResolvedSymbol
-
-
-
-flattenAssign :: Assignment -> [Binding]
-flattenAssign = extractBindings
 
 
 -- (Sebastian) TODO: I think there needs to be a clear distinction between stateful functions and algos.
@@ -250,15 +210,3 @@ flattenAssign = extractBindings
 --                 [ Apply (Var (Sfn "functionB")) [Var (Local "y")]
 --                 , Apply (Var (Sfn "functionC")) [Var (Local "x"), Var (Local "z")]
 --                 ]))
-
-
-data DFBinding
-    = DFLocal Binding
-    | DFSf FnName (Maybe FnId)
-    | DFSFFlow FnName (Maybe FnId)
-    | DFAlgo FnName
-    | DFEnv HostExpr
-    deriving (Show, Eq)
-
-
-type DFExpression = Expr DFBinding

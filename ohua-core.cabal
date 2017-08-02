@@ -32,6 +32,8 @@ library
     , Ohua.ALang.Passes
     , Ohua.ALang.Passes.SSA
     , Ohua.ALang.Util
+    , Ohua.DFLang.Lang
+    , Ohua.DFLang.Passes
     , Ohua.Util
   -- other-modules:
   -- other-extensions:
@@ -58,6 +60,7 @@ library
     , FlexibleInstances
     , TypeSynonymInstances
     , LambdaCase
+    , TupleSections
   if flag(debug)
     cpp-options: -DDEBUG=1
 
