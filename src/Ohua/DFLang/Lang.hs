@@ -19,12 +19,13 @@
 module Ohua.DFLang.Lang where
 
 
+import           Data.Sequence
 import           Ohua.ALang.Lang
 import           Ohua.Types
 
 -- | A sequence of let statements with a terminating binding to be used as return value
 data DFExpr = DFExpr
-    { letExprs  :: [LetExpr]
+    { letExprs  :: Seq LetExpr
     , returnVar :: Binding
     }
     deriving Eq

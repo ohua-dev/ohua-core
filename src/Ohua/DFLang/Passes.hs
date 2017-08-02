@@ -16,10 +16,11 @@ module Ohua.DFLang.Passes where
 
 import           Control.Monad.Except
 import           Control.Monad.Writer
+import           Data.Foldable
 import qualified Data.HashMap.Strict  as HM
 import qualified Data.HashSet         as HS
-import qualified Data.HashSet         as HS
 import           Data.Maybe
+import           Data.Sequence        (Seq, (<|), (><), (|>))
 import           Ohua.ALang.Lang
 import           Ohua.DFLang.Lang     (DFExpr (..), DFFnRef (..), DFVar (..),
                                        LetExpr (..))
@@ -40,7 +41,8 @@ lowerALang expr = (\(var, exprs) -> DFExpr exprs var) <$> runWriterT (go expr)
         go rest
     go  _ = throwError "Expected `let` or binding"
 
-dispatchFnType :: (MonadOhua m, MonadError String m) => FnId -> Assignment -> [Expression] -> FnName -> m [LetExpr]
+dispatchFnType :: (MonadOhua m, MonadError String m)
+               => FnId -> Assignment -> [Expression] -> FnName -> m (Seq LetExpr)
 dispatchFnType fnId assign args fn =
     case fn of
         "com.ohua.lang/smap" -> do
@@ -49,9 +51,9 @@ dispatchFnType fnId assign args fn =
             identityId <- generateId
             coll <- expectVar collE
             pure
-                $ LetExpr fnId inVar (DFFunction "com.ohua.lang/smap-fun") [coll] Nothing
-                : letExprs lowered
-                ++ [LetExpr identityId assign (EmbedSf "com.ohua.lang/collect") [DFVar (returnVar lowered)] Nothing]
+                $ (LetExpr fnId inVar (DFFunction "com.ohua.lang/smap-fun") (return coll) Nothing
+                    <| letExprs lowered)
+                |> LetExpr identityId assign (EmbedSf "com.ohua.lang/collect") [DFVar (returnVar lowered)] Nothing
           where
             [Lambda inVar body, collE] = args
         -- TODO check if that "if" is actually the correct name
@@ -71,27 +73,30 @@ dispatchFnType fnId assign args fn =
             switchId <- generateId
 
             pure
-                $ LetExpr fnId (Destructure [thenVar, elseVar]) (DFFunction "com.ohua.lang/ifThenElse") [dfCond] Nothing
-                : tieContext thenVar (letExprs loweredThen)
-                ++ tieContext elseVar (letExprs loweredElse)
-                ++ [LetExpr switchId assign (DFFunction "com.ohua.lang/switch") [DFVar (returnVar loweredThen), DFVar (returnVar loweredElse)] Nothing]
+                $ (LetExpr fnId (Destructure [thenVar, elseVar])
+                    (DFFunction "com.ohua.lang/ifThenElse") [dfCond] Nothing
+                    <| tieContext thenVar (letExprs loweredThen)
+                    >< tieContext elseVar (letExprs loweredElse))
+                |> LetExpr switchId assign (DFFunction "com.ohua.lang/switch")
+                    [DFVar (returnVar loweredThen), DFVar (returnVar loweredElse)]
+                    Nothing
           where
             [condition, Lambda thenVar thenBody, Lambda elseVar elseBody] = args
-        _ -> (\args' -> [LetExpr fnId assign (EmbedSf fn) args' Nothing]) <$> mapM expectVar args
+        _ -> (\args' -> return $ LetExpr fnId assign (EmbedSf fn) args' Nothing) <$> mapM expectVar args
 
 
-tieContext :: Binding -> [LetExpr] -> [LetExpr]
-tieContext ctxSource exprs = map go exprs
+tieContext :: Binding -> Seq LetExpr -> Seq LetExpr
+tieContext ctxSource exprs = fmap go exprs
   where
     bounds = findBoundVars exprs
     go e | any isBoundArg (callArguments e) = e
     go e = e { contextArg = Just ctxSource }
     isBoundArg (DFVar v) | v `HS.member` bounds = True
-    isBoundArg _ = False
+    isBoundArg _         = False
 
 
-findBoundVars :: [LetExpr] -> HS.HashSet Binding
-findBoundVars =  HS.fromList . concat . map (flattenAssign . returnAssignment)
+findBoundVars :: (Seq LetExpr) -> HS.HashSet Binding
+findBoundVars =  HS.fromList . fold . fmap (flattenAssign . returnAssignment)
 
 
 replicateFreeVars :: (MonadOhua m, MonadError String m) => Binding -> [Binding] -> [LetExpr] -> m [LetExpr]
