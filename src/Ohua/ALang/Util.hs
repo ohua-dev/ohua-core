@@ -12,20 +12,29 @@ module Ohua.ALang.Util where
 
 import           Ohua.ALang.Lang
 import           Ohua.Types
+import Data.Functor.Identity
+
 
 substitute :: Binding -> Expression -> Expression -> Expression
-substitute var val e =
-    case e of
-        Var (Local v)
-            | var == v -> val
-            | otherwise -> e
-        Var _ -> e
-        Apply expr1 expr2 -> Apply (recurse expr1) (recurse expr2)
-        Let bnd expr1 expr2
-            | var `elem` flattenAssign bnd -> e
-            | otherwise -> Let bnd (recurse expr1) (recurse expr2)
-        Lambda assignment body
-            | var `elem` flattenAssign assignment -> body
-            | otherwise -> Lambda assignment (recurse body)
+-- Postwalk avoids an infinite recursion in a case where `val` uses a `var` binding.
+-- This should never happen but might if this this invariant is violated for some reason
+-- and the violation is not caught.
+substitute var val = runIdentity . lrPostwalkExpr f
   where
-    recurse = substitute var val
+    f (Var (Local v)) | var == v = return val
+    f e = return e
+-- substitute var val e =
+--     case e of
+--         Var (Local v)
+--             | var == v -> val
+--             | otherwise -> e
+--         Var _ -> e
+--         Apply expr1 expr2 -> Apply (recurse expr1) (recurse expr2)
+--         Let bnd expr1 expr2
+--             | var `elem` flattenAssign bnd -> e
+--             | otherwise -> Let bnd (recurse expr1) (recurse expr2)
+--         Lambda assignment body
+--             | var `elem` flattenAssign assignment -> body
+--             | otherwise -> Lambda assignment (recurse body)
+--   where
+--     recurse = substitute var val

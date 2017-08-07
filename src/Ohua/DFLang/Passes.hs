@@ -11,16 +11,19 @@
 --
 -- Passes required to transform an expression in ALang into an expression in DFLang.
 --
+{-# LANGUAGE CPP #-}
 module Ohua.DFLang.Passes where
 
 
 import           Control.Monad.Except
 import           Control.Monad.Writer
+import           Control.Monad.State
 import           Data.Foldable
 import qualified Data.HashMap.Strict  as HM
 import qualified Data.HashSet         as HS
 import           Data.Maybe
 import           Data.Sequence        (Seq, (<|), (><), (|>))
+import qualified Data.Sequence as S
 import           Ohua.ALang.Lang
 import           Ohua.DFLang.Lang     (DFExpr (..), DFFnRef (..), DFVar (..),
                                        LetExpr (..))
@@ -28,13 +31,31 @@ import qualified Ohua.DFLang.Lang     as DFLang
 import           Ohua.Monad
 import           Ohua.Types
 
-lowerALang :: (MonadOhua m, MonadError String m) => Expression -> m DFExpr
-lowerALang expr = (\(var, exprs) -> DFExpr exprs var) <$> runWriterT (go expr)
+
+checkSSA :: (Foldable f, MonadError String m) => f LetExpr -> m ()
+checkSSA = flip evalStateT mempty . mapM_ go
   where
-    go  (Var bnd) =
-        case bnd of
-            Local bnd -> return bnd
-            _         -> throwError "Non local return binding"
+    go le = do
+        defined <- get
+        let produced = flattenAssign (returnAssignment le)
+        case msum $ map (\a -> if HS.member a defined then Just a else Nothing) produced of
+            Just b -> throwError $ "Rebinding of " ++ show b
+            Nothing -> return ()
+        modify (addAll produced)
+    
+    addAll add set = foldr' HS.insert set add
+
+
+lowerALang :: (MonadOhua m, MonadError String m) => Expression -> m DFExpr
+lowerALang expr = do 
+    (var, exprs) <- runWriterT (go expr)
+#ifdef DEBUG
+    checkSSA exprs
+#endif
+    return $ DFExpr exprs var
+  where
+    go  (Var (Local bnd)) = return bnd
+    go  (Var _) = throwError "Non local return binding"
     go  (Let assign expr rest) = do
         (fn, fnId, args) <- handleApplyExpr expr
         tell =<< dispatchFnType fnId assign args fn
@@ -59,11 +80,9 @@ dispatchFnType fnId assign args fn =
         -- TODO check if that "if" is actually the correct name
         "com.ohua.lang/if" -> do
             dfCond <- case condition of
-                Var var ->
-                    case var of
-                        Local b -> return $ DFVar b
-                        Env e -> return $ DFEnvVar e
-                        _ -> throwError "Algo and sfref not allowed as condition"
+                Var (Local b) -> return $ DFVar b
+                Var (Env e) -> return $ DFEnvVar e
+                Var _ -> throwError "Algo and sfref not allowed as condition"
                 _ -> throwError "Expected var as condition"
             loweredThen <- lowerALang thenBody
             loweredElse <- lowerALang elseBody
@@ -91,20 +110,20 @@ tieContext ctxSource exprs = fmap go exprs
     bounds = findBoundVars exprs
     go e | any isBoundArg (callArguments e) = e
     go e = e { contextArg = Just ctxSource }
-    isBoundArg (DFVar v) | v `HS.member` bounds = True
+    isBoundArg (DFVar v) = v `HS.member` bounds
     isBoundArg _         = False
 
 
-findBoundVars :: (Seq LetExpr) -> HS.HashSet Binding
+findBoundVars :: Seq LetExpr -> HS.HashSet Binding
 findBoundVars =  HS.fromList . fold . fmap (flattenAssign . returnAssignment)
 
 
-replicateFreeVars :: (MonadOhua m, MonadError String m) => Binding -> [Binding] -> [LetExpr] -> m [LetExpr]
+replicateFreeVars :: (MonadOhua m, MonadError String m) => Binding -> [Binding] -> Seq LetExpr -> m (Seq LetExpr)
 replicateFreeVars countSource_ initialBindings exprs = do
     (replicators, replications) <- unzip <$> mapM mkReplicator freeVars
-    pure $ replicators ++ map (renameWith $ HM.fromList $ zip freeVars replications) exprs
+    pure $ S.fromList replicators >< fmap (renameWith $ HM.fromList $ zip freeVars replications) exprs
   where
-    boundVars = HS.fromList $ concat $ map (flattenAssign . returnAssignment) exprs
+    boundVars = findBoundVars exprs
 
     freeVars = HS.toList $ HS.fromList $ concatMap (mapMaybe f . callArguments) exprs
 
@@ -122,20 +141,16 @@ replicateFreeVars countSource_ initialBindings exprs = do
 handleApplyExpr :: (MonadOhua m, MonadError String m) => Expression -> m (FnName, FnId, [Expression])
 handleApplyExpr (Apply fn arg) = go fn [arg]
   where
-    go (Var var) args =
-        case var of
-            Sf fn id -> (fn, , args) <$> maybe generateId return id
+    go (Var (Sf fn id)) args = (fn, , args) <$> maybe generateId return id
             -- reject algos for now
-            _        -> throwError "Expected Sf Var"
-    go (Apply fn arg) args = go fn (arg:args)
-    go _ _ = throwError "Expected Apply or Var"
+    go (Var _) args          = throwError "Expected Sf Var"
+    go (Apply fn arg) args   = go fn (arg:args)
+    go _ _                   = throwError "Expected Apply or Var"
 handleApplyExpr _ = throwError "Expected apply"
 
 
 expectVar :: MonadError String m => Expression -> m DFVar
-expectVar (Var v) =
-    case v of
-        Local bnd -> pure $ DFVar bnd
-        Env i     -> pure $ DFEnvVar i
-        _         -> throwError "Var must be local or env"
-expectVar _ = throwError "Argument must be var"
+expectVar (Var (Local bnd)) = pure $ DFVar bnd
+expectVar (Var (Env i))     = pure $ DFEnvVar i
+expectVar (Var _)           = throwError "Var must be local or env"
+expectVar _                 = throwError "Argument must be var"
