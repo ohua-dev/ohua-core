@@ -10,9 +10,9 @@
 -- This source code is licensed under the terms described in the associated LICENSE.TXT file
 module Ohua.ALang.Util where
 
+import           Data.Functor.Identity
 import           Ohua.ALang.Lang
 import           Ohua.Types
-import Data.Functor.Identity
 
 
 substitute :: Binding -> Expression -> Expression -> Expression
@@ -22,7 +22,7 @@ substitute :: Binding -> Expression -> Expression -> Expression
 substitute var val = runIdentity . lrPostwalkExpr f
   where
     f (Var (Local v)) | var == v = return val
-    f e = return e
+    f e               = return e
 -- substitute var val e =
 --     case e of
 --         Var (Local v)

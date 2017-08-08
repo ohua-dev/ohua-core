@@ -16,14 +16,14 @@ module Ohua.DFLang.Passes where
 
 
 import           Control.Monad.Except
-import           Control.Monad.Writer
 import           Control.Monad.State
+import           Control.Monad.Writer
 import           Data.Foldable
 import qualified Data.HashMap.Strict  as HM
 import qualified Data.HashSet         as HS
 import           Data.Maybe
 import           Data.Sequence        (Seq, (<|), (><), (|>))
-import qualified Data.Sequence as S
+import qualified Data.Sequence        as S
 import           Ohua.ALang.Lang
 import           Ohua.DFLang.Lang     (DFExpr (..), DFFnRef (..), DFVar (..),
                                        LetExpr (..))
@@ -39,15 +39,15 @@ checkSSA = flip evalStateT mempty . mapM_ go
         defined <- get
         let produced = flattenAssign (returnAssignment le)
         case msum $ map (\a -> if HS.member a defined then Just a else Nothing) produced of
-            Just b -> throwError $ "Rebinding of " ++ show b
+            Just b  -> throwError $ "Rebinding of " ++ show b
             Nothing -> return ()
         modify (addAll produced)
-    
+
     addAll add set = foldr' HS.insert set add
 
 
 lowerALang :: (MonadOhua m, MonadError String m) => Expression -> m DFExpr
-lowerALang expr = do 
+lowerALang expr = do
     (var, exprs) <- runWriterT (go expr)
 #ifdef DEBUG
     checkSSA exprs
