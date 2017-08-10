@@ -12,6 +12,7 @@ module Ohua.ALang.Passes where
 
 
 import           Control.Monad.Except
+import           Control.Monad.State
 import           Control.Monad.Writer
 import qualified Data.HashSet         as HS
 import           Ohua.ALang.Lang
@@ -164,6 +165,17 @@ hasFinalLet (Var _)         = throwError "Non-local final var"
 hasFinalLet _               = throwError "Final value is not a var"
 
 
+noDuplicateIds :: MonadError String m => Expression -> m ()
+noDuplicateIds = void . flip runStateT mempty . lrPrewalkExpr go
+  where
+    go e@(Var (Sf _ (Just id))) = do
+        s <- get
+        when (id `HS.member` s) $ throwError $ "Duplicate id " ++ show id
+        modify (HS.insert id)
+        return e
+    go e = return e
+
+
 lamdasAreInputToHigherOrderFunctions :: MonadError Error m => Expression -> m ()
 lamdasAreInputToHigherOrderFunctions _                         = return ()
 lamdasAreInputToHigherOrderFunctions (Apply v (Lambda _ body)) = undefined
@@ -172,6 +184,7 @@ lamdasAreInputToHigherOrderFunctions (Apply v (Lambda _ body)) = undefined
 checkProgramValidity :: MonadError Error m => Expression -> m ()
 checkProgramValidity e = do
     hasFinalLet e
+    noDuplicateIds e
 
 
 normalize :: (MonadOhua m, MonadError Error m) => Expression -> m Expression
