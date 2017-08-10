@@ -1,7 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Ohua.IR.Functions where
 
-import           Ohua.IR
 import           Ohua.Types
 
 packagerName, oneToNName, collectName, idName, pmapName, pCollectName, smapName, smapIOName, chunkName, flattenerName, sizeName, selectName, algoOutName, seqName :: FnName

@@ -14,7 +14,6 @@ module Ohua.Types where
 import           Control.DeepSeq
 import           Data.Hashable
 import           Data.String
-import           Data.String
 import           GHC.Exts
 import           Lens.Micro
 import           Ohua.LensClasses
@@ -68,11 +67,12 @@ symbolFromString s =
         (ns, '/':name)
             | '/' `elem` name -> Left "Too many '/' delimiters found."
             | otherwise -> Right $ Left $ FnName ns name
+        _ -> error "Leading slash expected after `break`"
 
 
 class ExtractBindings a where
     extractBindings :: a -> [Binding]
-
+instance ExtractBindings a => ExtractBindings [a] where extractBindings = concatMap extractBindings
 
 
 data Assignment

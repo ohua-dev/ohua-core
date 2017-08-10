@@ -20,11 +20,8 @@ module Ohua.Monad
     ) where
 
 
-import           Control.Arrow
 import           Control.Monad.RWS.Strict
-import           Control.Monad.State
 import qualified Data.HashSet             as HS
-import           Data.List
 import           Lens.Micro
 import           Lens.Micro.Mtl
 import           Ohua.ALang.Lang

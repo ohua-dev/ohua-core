@@ -13,9 +13,7 @@ This source code is licensed under the terms described in the associated LICENSE
 {-# LANGUAGE MagicHash  #-}
 module Ohua.IR where
 
-import           Control.Arrow
 import           Data.Function       (on)
-import           Data.Hashable
 import qualified Data.HashMap.Strict as HM
 import           Data.String
 import           Lens.Micro
@@ -26,6 +24,7 @@ import           Ohua.Util
 
 type IRFnId = FnId
 
+unIRFnId :: IRFnId -> Int
 unIRFnId = unFnId
 
 class Consumes a where
@@ -36,8 +35,6 @@ class Returns a where
 
 class ToIRFnId a where
     toIRFnId :: a -> IRFnId
-
-instance ExtractBindings a => ExtractBindings [a] where extractBindings = concatMap extractBindings
 
 
 data Argument

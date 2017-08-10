@@ -14,6 +14,7 @@ import qualified Data.Map.Strict                   as Map
 import           Data.Maybe
 import           Debug.Trace
 import           Ohua.ALang.Lang
+import           Ohua.DFGraph
 import           Ohua.DFLang.Lang
 import           Ohua.DFLang.Passes
 import           Ohua.Monad

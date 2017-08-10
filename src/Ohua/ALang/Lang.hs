@@ -11,10 +11,8 @@
 module Ohua.ALang.Lang where
 
 import           Control.DeepSeq
-import           Data.Function
 import           Data.String
 import           Ohua.Types
-import           Ohua.Util
 
 -- bindingType is the type of general bindings
 -- Binding is the type for function arguments and `let`s etc which we know to always be local
@@ -80,7 +78,7 @@ lrPrewalkExpr f e = f e >>= \case
 lrPostwalkExpr :: Monad m => (Expr b -> m (Expr b)) -> Expr b -> m (Expr b)
 lrPostwalkExpr f (Let assign val body) = f =<< Let assign <$> lrPostwalkExpr f val <*> lrPostwalkExpr f body
 lrPostwalkExpr f (Apply fn arg) = f =<< Apply <$> lrPostwalkExpr f fn <*> lrPostwalkExpr f arg
-lrPostwalkExpr f (Lambda assign body) = f =<< lrPostwalkExpr f body
+lrPostwalkExpr f (Lambda assign body) = f . Lambda assign =<< lrPostwalkExpr f body
 lrPostwalkExpr _ e = return e
 
 -- (Sebastian) TODO: In Clojure, every variable/binding, even local ones, are namespaced. Should we go down this path too, i.e., change Binding to take FnReference/Reference?

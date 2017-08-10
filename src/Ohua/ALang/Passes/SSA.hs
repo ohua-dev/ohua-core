@@ -52,6 +52,7 @@ ssaRename oldBnd cont = do
 mkSSA :: MonadOhua m => Expression -> m Expression
 mkSSA = liftOhua . flip runReaderT (LocalScope mempty) . runSSAM . ssa
 
+flattenTuple :: (a, ([a], b)) -> ([a], b)
 flattenTuple (a, (as, r)) = (a:as, r)
 
 ssa :: Expression -> SSAM Expression
@@ -91,4 +92,4 @@ isSSA = either Just (const Nothing) . flip evalState mempty . runExceptT . go
     go (Lambda assignment body) = do
         mapM_ failOrInsert $ flattenAssign assignment
         go body
-    go (Var a) = return ()
+    go (Var _) = return ()

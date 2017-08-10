@@ -34,6 +34,7 @@ library
     , Ohua.ALang.Util
     , Ohua.DFLang.Lang
     , Ohua.DFLang.Passes
+    , Ohua.DFGraph
     , Ohua.Util
   -- other-modules:
   -- other-extensions:

@@ -24,10 +24,12 @@ showLambda (Lambda arg body) = "λ " ++ showAssigment arg ++ ". " ++ showLambda 
 showLambda (Let assignment value body) = "let " ++ showAssigment assignment ++ " = " ++ showLambda value ++ " in " ++ showLambda body
 showLambda (Apply function argument) = showFunction function ++ " " ++ showArgument argument
 
+showFunction :: Expression -> String
 showFunction e@(Lambda _ _) = "(" ++ showLambda e ++ ")"
 showFunction e@(Let _ _ _)  = "(" ++ showLambda e ++ ")"
 showFunction e              = showLambda e
 
+showArgument :: Expression -> String
 showArgument e@(Lambda _ _) = "(" ++ showLambda e ++ ")"
 showArgument e@(Let _ _ _)  = "(" ++ showLambda e ++ ")"
 showArgument e@(Apply _ _)  = "(" ++ showLambda e ++ ")"

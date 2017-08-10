@@ -27,7 +27,6 @@ import qualified Data.Sequence        as S
 import           Ohua.ALang.Lang
 import           Ohua.DFLang.Lang     (DFExpr (..), DFFnRef (..), DFVar (..),
                                        LetExpr (..))
-import qualified Ohua.DFLang.Lang     as DFLang
 import           Ohua.Monad
 import           Ohua.Types
 
@@ -87,8 +86,6 @@ dispatchFnType fnId assign args fn =
             loweredThen <- lowerALang thenBody
             loweredElse <- lowerALang elseBody
 
-            thenVar <- generateBindingWith "then"
-            elseVar <- generateBindingWith "else"
             switchId <- generateId
 
             pure
@@ -100,7 +97,7 @@ dispatchFnType fnId assign args fn =
                     [DFVar (returnVar loweredThen), DFVar (returnVar loweredElse)]
                     Nothing
           where
-            [condition, Lambda thenVar thenBody, Lambda elseVar elseBody] = args
+            [condition, Lambda (Direct thenVar) thenBody, Lambda (Direct elseVar) elseBody] = args
         "com.ohua.lang/seq" -> undefined
         _ -> (\args' -> return $ LetExpr fnId assign (EmbedSf fn) args' Nothing) <$> mapM expectVar args
 
@@ -124,7 +121,7 @@ replicateFreeVars countSource_ initialBindings exprs = do
     (replicators, replications) <- unzip <$> mapM mkReplicator freeVars
     pure $ S.fromList replicators >< fmap (renameWith $ HM.fromList $ zip freeVars replications) exprs
   where
-    boundVars = findBoundVars exprs
+    boundVars = findBoundVars exprs `mappend` HS.fromList initialBindings
 
     freeVars = HS.toList $ HS.fromList $ concatMap (mapMaybe f . callArguments) exprs
 
@@ -136,7 +133,7 @@ replicateFreeVars countSource_ initialBindings exprs = do
     mkReplicator var = do
         id <- generateId
         newVar <- generateBindingWith var
-        pure (LetExpr id (Direct newVar) (DFFunction "com.ohua.lang/one-to-n") [DFVar var] Nothing, newVar)
+        pure (LetExpr id (Direct newVar) (DFFunction "com.ohua.lang/one-to-n") [DFVar countSource_, DFVar var] Nothing, newVar)
 
 
 handleApplyExpr :: (MonadOhua m, MonadError String m) => Expression -> m (FnName, FnId, [Expression])
@@ -144,7 +141,7 @@ handleApplyExpr (Apply fn arg) = go fn [arg]
   where
     go (Var (Sf fn id)) args = (fn, , args) <$> maybe generateId return id
             -- reject algos for now
-    go (Var _) args          = throwError "Expected Sf Var"
+    go (Var _) _             = throwError "Expected Sf Var"
     go (Apply fn arg) args   = go fn (arg:args)
     go _ _                   = throwError "Expected Apply or Var"
 handleApplyExpr _ = throwError "Expected apply"
@@ -156,64 +153,3 @@ expectVar (Var (Env i))     = pure $ DFEnvVar i
 expectVar (Var _)           = throwError "Var must be local or env"
 expectVar _                 = throwError "Argument must be var"
 
-
-data Operator = Operator
-    { operatorId   :: FnId
-    , operatorType :: FnName
-    }
-
-
-data Target = Target
-    { operator :: FnId
-    , index    :: Int
-    }
-
-
-data Arc
-    = Arc
-        { source :: Target
-        , target :: Target
-        }
-    | EnvArc
-        { target    :: Target
-        , envSource :: HostExpr
-        }
-
-
-data OutGraph = OutGraph
-    { operators :: [Operator]
-    , arcs      :: [Arc]
-    }
-
-
-
-toGraph :: DFExpr -> OutGraph
-toGraph (DFExpr lets var) = OutGraph ops arcs
-  where
-    ops = map toOp $ toList lets
-    toOp e = Operator (callSiteId e) (deRef e)
-
-    deRef = (\case DFFunction n -> n; EmbedSf n -> n) . functionRef
-
-    sources =
-        HM.fromList
-        $ toList lets
-            >>= \l ->
-                    [ (var, Target (callSiteId l) index)
-                    | (var, index) <- case returnAssignment l of
-                                        Direct v         -> [(v, -1)]
-                                        Destructure vars -> zip vars [0..]
-                    ]
-
-    arcs = concatMap toArc (toList lets)
-
-    toArc l =
-        [ case arg of
-            DFVar v -> Arc source target
-              where
-                source = fromMaybe (error "Undefined Binding") (HM.lookup v sources)
-            DFEnvVar envExpr -> EnvArc target envExpr
-        | (arg, index) <- maybe id ((:) . (,-1) . DFVar) (contextArg l) -- prepend (ctxBinding, -1) if there is a context arc
-                            $ zip (callArguments l) [0..]
-        , let target = Target (callSiteId l) index
-        ]

@@ -11,21 +11,12 @@
 module Ohua.ALang.Passes where
 
 
-import           Control.Arrow
 import           Control.Monad.Except
-import           Control.Monad.Reader
-import           Control.Monad.State
 import           Control.Monad.Writer
-import qualified Data.HashMap.Strict  as HM
 import qualified Data.HashSet         as HS
-import           Data.Maybe           (fromMaybe)
-import           Lens.Micro
-import           Lens.Micro.Mtl
 import           Ohua.ALang.Lang
 import           Ohua.ALang.Util
-import           Ohua.IR              hiding (Destructure, Direct)
 import           Ohua.IR.Functions
-import           Ohua.LensClasses
 import           Ohua.Monad
 import           Ohua.Types
 
@@ -131,10 +122,10 @@ letLift v = v
 
 
 inlineReassignments :: Expression -> Expression
-inlineReassignments (Let assign val@(Var v) body) =
+inlineReassignments (Let assign val@(Var _) body) =
     case assign of
         Direct bnd2 -> inlineReassignments $ substitute bnd2 val body
-        Destructure bnds -> Let assign (Apply (Var (Sf idName Nothing)) val) $ inlineReassignments body
+        Destructure _ -> Let assign (Apply (Var (Sf idName Nothing)) val) $ inlineReassignments body
 inlineReassignments (Let assign val body) = Let assign val $ inlineReassignments body
 inlineReassignments (Apply e1 e2) = Apply (inlineReassignments e1) (inlineReassignments e2)
 inlineReassignments (Lambda assign e) = Lambda assign $ inlineReassignments e
