@@ -22,6 +22,10 @@ import           Ohua.Util
 
 newtype FnId = FnId { unFnId :: Int } deriving (Eq, Ord)
 
+-- Only here so we can write literals and have them convert automatically
+instance Num FnId where
+    fromInteger = FnId . fromInteger
+
 instance Show FnId where
     show = show . unFnId
 instance Hashable FnId where hashWithSalt s = hashWithSalt s . unFnId

@@ -1,8 +1,11 @@
 
 
 import           PassesSpec
+import qualified DFLowering
 import           Test.Hspec
 
 
 
-main = hspec passesSpec
+main = hspec $ do
+    passesSpec
+    DFLowering.spec

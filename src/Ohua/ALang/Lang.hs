@@ -24,6 +24,8 @@ import           Ohua.Util
 
 newtype HostExpr = HostExpr { unwrapHostExpr :: Int } deriving (Show, Eq, Ord)
 
+-- Only exists to allow literal integers to be interpreted as host expressions
+instance Num HostExpr where fromInteger = HostExpr . fromInteger
 
 -- (Sebastian) can we treat opaque JVM objects here somehow?
 -- (Justus) Several. Well have to discus what the best option is at some point,
