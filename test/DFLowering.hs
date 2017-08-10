@@ -1,20 +1,24 @@
-{-# LANGUAGE OverloadedStrings, OverloadedLists, StandaloneDeriving, ExplicitForAll, ScopedTypeVariables #-}
+{-# LANGUAGE ExplicitForAll      #-}
+{-# LANGUAGE OverloadedLists     #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE StandaloneDeriving  #-}
 module DFLowering where
 
-import Test.Hspec
-import Ohua.ALang.Lang
-import Ohua.DFLang.Lang
-import Ohua.DFLang.Passes
-import Data.Graph.Inductive.Graph
-import Data.Graph.Inductive.PatriciaTree
-import Ohua.Types
-import Data.Function
-import Ohua.Monad
-import Control.Monad.Except
-import qualified Data.Map.Strict as Map
-import Data.Maybe
-import Control.Arrow
-import Debug.Trace
+import           Control.Arrow
+import           Control.Monad.Except
+import           Data.Function
+import           Data.Graph.Inductive.Graph
+import           Data.Graph.Inductive.PatriciaTree
+import qualified Data.Map.Strict                   as Map
+import           Data.Maybe
+import           Debug.Trace
+import           Ohua.ALang.Lang
+import           Ohua.DFLang.Lang
+import           Ohua.DFLang.Passes
+import           Ohua.Monad
+import           Ohua.Types
+import           Test.Hspec
 
 
 newtype OhuaGrGraph = OhuaGrGraph { unGr :: Gr FnName (Int, Int) } deriving Eq
@@ -22,7 +26,7 @@ newtype OhuaGrGraph = OhuaGrGraph { unGr :: Gr FnName (Int, Int) } deriving Eq
 instance Show OhuaGrGraph where
     show = prettify . unGr
 
--- To handle env args i generate one new node which is source for all env args. 
+-- To handle env args i generate one new node which is source for all env args.
 -- The source index is the env arc number
 toFGLGraph :: OutGraph -> OhuaGrGraph
 toFGLGraph (OutGraph ops arcs) = OhuaGrGraph $ mkGraph nodes edges
@@ -30,12 +34,11 @@ toFGLGraph (OutGraph ops arcs) = OhuaGrGraph $ mkGraph nodes edges
     regularNodes = map (\(Operator id type_) -> (unFnId id, type_)) ops
 
     envId = succ $ maximum $ map fst regularNodes -- one fresh id for an env node
-    sinkId = succ envId
 
     nodes = (envId, "com.ohua.internal/env") : regularNodes
 
-    edges = map toEdge arcs 
-    
+    edges = map toEdge arcs
+
     toEdge (Arc s t) = (unFnId $ operator s, unFnId $ operator t, (index s, index t))
     toEdge (EnvArc t a) = (envId, unFnId $ operator t, (unwrapHostExpr a, index t))
 
@@ -47,7 +50,7 @@ shouldSatisfyRet action predicate = action >>= (`shouldSatisfy` predicate)
 
 smapLowering :: Spec
 smapLowering = describe "lowering smap constructs" $ do
-    let sourceExpr = 
+    let sourceExpr =
             Let "coll" ("com.ohua.lang/id" `Apply` (Var $ Env 0)) $
             Let "x" ("com.ohua.lang/smap" `Apply` (Lambda "y" (Let "z" (Apply "some.module/inc" "y") "z")) `Apply` "coll")
             "x"
@@ -60,30 +63,30 @@ smapLowering = describe "lowering smap constructs" $ do
             "x"
     let runLowering = runOhuaC (fmap (either error id) . runExceptT . lowerALang)
     let shouldLowerTo :: Expression -> DFExpr -> Expectation
-        shouldLowerTo input expected = 
+        shouldLowerTo input expected =
             fmap (toFGLGraph . toGraph) (runLowering input) `shouldSatisfyRet` (isIsomorphic (unGr $ toFGLGraph $ toGraph expected) . unGr)
     it "correctly lowers an smap statment" $
         sourceExpr `shouldLowerTo` targetExpr
-        
+
 
 spec :: Spec
 spec = do
     smapLowering
- 
+
 
 isIsomorphic :: (Eq a, Ord b) => Gr a b -> Gr a b -> Bool
 isIsomorphic gr1 gr2 | order gr1 /= order gr2 || size gr1 /= size gr2 = False
 isIsomorphic gr1 gr2 = go (nodes gr1) [] [] mempty
   where
-    go rest gr1Selected gr2Selected mapping = 
-        gr1Subgr == rename mapping (subgraph gr2Selected gr2) 
+    go rest gr1Selected gr2Selected mapping =
+        gr1Subgr == rename mapping (subgraph gr2Selected gr2)
         && descend rest
-      where 
+      where
         gr1Subgr = subgraph gr1Selected gr1
         descend [] = gr1Subgr == gr1
         descend (x:xs) = any selectX (nodes gr2)
           where selectX k = go xs (x:gr1Selected) (k:gr2Selected) (Map.insert k x mapping)
-    
+
     rename mapping gr = mkGraph ns es
       where
         ns = map (first newName) (labNodes gr)

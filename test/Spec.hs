@@ -1,7 +1,7 @@
 
 
-import           PassesSpec
 import qualified DFLowering
+import           PassesSpec
 import           Test.Hspec
 
 

@@ -158,32 +158,32 @@ expectVar _                 = throwError "Argument must be var"
 
 
 data Operator = Operator
-    { operatorId :: FnId
+    { operatorId   :: FnId
     , operatorType :: FnName
     }
 
 
 data Target = Target
     { operator :: FnId
-    , index :: Int
+    , index    :: Int
     }
 
 
-data Arc 
-    = Arc 
+data Arc
+    = Arc
         { source :: Target
         , target :: Target
         }
-    | EnvArc 
-        { target :: Target
+    | EnvArc
+        { target    :: Target
         , envSource :: HostExpr
         }
 
 
 data OutGraph = OutGraph
     { operators :: [Operator]
-    , arcs :: [Arc]
-    } 
+    , arcs      :: [Arc]
+    }
 
 
 
@@ -195,20 +195,20 @@ toGraph (DFExpr lets var) = OutGraph ops arcs
 
     deRef = (\case DFFunction n -> n; EmbedSf n -> n) . functionRef
 
-    sources = 
-        HM.fromList 
+    sources =
+        HM.fromList
         $ toList lets
-            >>= \l -> 
-                    [ (var, Target (callSiteId l) index) 
-                    | (var, index) <- case returnAssignment l of 
-                                        Direct v -> [(v, -1)]
+            >>= \l ->
+                    [ (var, Target (callSiteId l) index)
+                    | (var, index) <- case returnAssignment l of
+                                        Direct v         -> [(v, -1)]
                                         Destructure vars -> zip vars [0..]
                     ]
 
     arcs = concatMap toArc (toList lets)
 
-    toArc l = 
-        [ case arg of 
+    toArc l =
+        [ case arg of
             DFVar v -> Arc source target
               where
                 source = fromMaybe (error "Undefined Binding") (HM.lookup v sources)
