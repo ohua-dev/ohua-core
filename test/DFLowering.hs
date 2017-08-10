@@ -73,17 +73,19 @@ spec = do
 
 isIsomorphic :: (Eq a, Ord b) => Gr a b -> Gr a b -> Bool
 isIsomorphic gr1 gr2 | order gr1 /= order gr2 || size gr1 /= size gr2 = False
-isIsomorphic gr1 gr2 = go (nodes gr1) mempty
+isIsomorphic gr1 gr2 = go (nodes gr1) [] [] mempty
   where
-    go [] mapping | not $ subgraph (Map.elems mapping) gr1 == gr1 = False
-    go rest mapping = 
-        subgraph (Map.elems mapping) gr1 == rename mapping (subgraph (Map.keys mapping) gr2) 
-        && case rest of
-                [] -> True
-                (x:xs) -> any (go xs . (\k -> Map.insert k x mapping)) (nodes gr2)
+    go rest gr1Selected gr2Selected mapping = 
+        gr1Subgr == rename mapping (subgraph gr2Selected gr2) 
+        && descend rest
+      where 
+        gr1Subgr = subgraph gr1Selected gr1
+        descend [] = gr1Subgr == gr1
+        descend (x:xs) = any selectX (nodes gr2)
+          where selectX k = go xs (x:gr1Selected) (k:gr2Selected) (Map.insert k x mapping)
     
     rename mapping gr = mkGraph ns es
       where
         ns = map (first newName) (labNodes gr)
         es = map (\(a, b, c) -> (newName a, newName b, c)) (labEdges gr)
-        newName node = fromMaybe (error $ "missing mapping for node " ++ show node) $ Map.lookup node mapping
+        newName node = fromMaybe (error $ "Invariant broken: missing mapping for node " ++ show node) $ Map.lookup node mapping
