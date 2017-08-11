@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns        #-}
 {-# LANGUAGE ExplicitForAll      #-}
 {-# LANGUAGE OverloadedLists     #-}
 {-# LANGUAGE OverloadedStrings   #-}
@@ -74,19 +75,20 @@ spec :: Spec
 spec = do
     smapLowering
 
-
 isIsomorphic :: (Eq a, Ord b) => Gr a b -> Gr a b -> Bool
-isIsomorphic gr1 gr2 | order gr1 /= order gr2 || size gr1 /= size gr2 = False
-isIsomorphic gr1 gr2 = go (nodes gr1) [] [] mempty
+isIsomorphic gr1 gr2 = isJust $ isomorphicMapping gr1 gr2
+
+isomorphicMapping :: (Eq a, Ord b) => Gr a b -> Gr a b -> Maybe (Map.Map Int Int)
+isomorphicMapping gr1 gr2 | order gr1 /= order gr2 || size gr1 /= size gr2 = Nothing
+isomorphicMapping gr1 gr2 = go (nodes gr1) [] [] mempty
   where
-    go rest gr1Selected gr2Selected mapping =
-        gr1Subgr == rename mapping (subgraph gr2Selected gr2)
-        && descend rest
+    go rest !gr1Selected !gr2Selected !mapping | gr1Subgr == rename mapping (subgraph gr2Selected gr2) = descend rest
       where
         gr1Subgr = subgraph gr1Selected gr1
-        descend [] = gr1Subgr == gr1
-        descend (x:xs) = any selectX (nodes gr2)
+        descend [] | gr1Subgr == gr1 = Just mapping
+        descend (x:xs) = msum $ map selectX (nodes gr2)
           where selectX k = go xs (x:gr1Selected) (k:gr2Selected) (Map.insert k x mapping)
+    go _ _ _ _ = Nothing
 
     rename mapping gr = mkGraph ns es
       where
