@@ -33,12 +33,12 @@ pipeline e
 #endif
     >>= lowerALang
 #ifdef DEBUG
-    >>= \e -> Ohua.DFLang.Passes.checkSSA e >> return e
+    >>= \e -> Ohua.DFLang.Passes.checkSSAExpr e >> return e
 #endif
     >>= Ohua.DFLang.Optimizations.runOptimizations
 
 #ifdef DEBUG
-    >>= \e -> Ohua.DFLang.Passes.checkSSA e >> return e
+    >>= \e -> Ohua.DFLang.Passes.checkSSAExpr e >> return e
 #endif
     -- Comment: I use `<&>` (aka `fmap`) here because `toGraph` does not run in a monad
     <&> toGraph

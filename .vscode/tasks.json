@@ -14,7 +14,9 @@
             "taskName": "build",
             "command": "stack",
             "args": [
-                "build"
+                "build",
+                "--flag",
+                "ohua-core:debug"
             ],
             "type": "shell",
             "group": "build",
@@ -22,26 +24,31 @@
                 {
                     "owner": "haskell",
                     "fileLocation": "absolute",
-                    "pattern": {
-                        // parse errors
-                        "regexp": "(.+?):(\\d+):(\\d+):\\s+(.+)",
-                        "file": 1,
-                        "line": 2,
-                        "column": 3,
-                        "message": 4
-                    }
+                    "pattern": [
+                        {
+                            // warnings
+                            "regexp": "(.+?):(\\d+):(\\d+):\\s(Warning):\\s*$",
+                            "file": 1,
+                            "line": 2,
+                            "column": 3,
+                            "severity": 4
+                        },
+                        {
+                            "regexp": "^\\s+(.+)",
+                            "message": 1
+                        }
+                    ]
                 },
                 {
                     "owner": "haskell",
                     "fileLocation": "absolute",
                     "pattern": [
                         {
-                            // parse errors
-                            "regexp": "(.+?):(\\d+):(\\d+):(?:\\s(Warning):)?\\s*$",
+                            // regular errors
+                            "regexp": "(.+?):(\\d+):(\\d+):\\s*$",
                             "file": 1,
                             "line": 2,
-                            "column": 3,
-                            "severity": 4
+                            "column": 3
                         },
                         {
                             "regexp": "^\\s+(.+)",

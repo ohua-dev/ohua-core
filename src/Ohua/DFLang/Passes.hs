@@ -57,6 +57,10 @@ checkSSA = flip evalStateT mempty . mapM_ go
     addAll add set = foldr' HS.insert set add
 
 
+checkSSAExpr :: MonadError String m => DFExpr -> m ()
+checkSSAExpr (DFExpr l _) = checkSSA l
+
+
 lowerALang :: (MonadOhua m, MonadError String m) => Expression -> m DFExpr
 lowerALang expr = do
     (var, exprs) <- runWriterT (go expr)
