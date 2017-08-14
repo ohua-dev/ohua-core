@@ -76,7 +76,10 @@ dispatchFnType fnId assign args fn =
                 |> LetExpr identityId assign (EmbedSf "com.ohua.lang/collect") [DFVar (returnVar lowered)] Nothing
           where
             [Lambda inVar body, collE] = args
-        -- TODO check if that "if" is actually the correct name
+        -- TODO check if that "if" is actually the correct name -> if not then we will rename it to be exactly this one!
+        -- TODO variable scoping.
+        -- TBD: should this be a concept with its on pass. then a context needs to define its own scope ops. as a result:
+        -- this needs to become a type which defines these details specifically.
         "com.ohua.lang/if" -> do
             dfCond <- case condition of
                 Var (Local b) -> return $ DFVar b
@@ -152,4 +155,3 @@ expectVar (Var (Local bnd)) = pure $ DFVar bnd
 expectVar (Var (Env i))     = pure $ DFEnvVar i
 expectVar (Var _)           = throwError "Var must be local or env"
 expectVar _                 = throwError "Argument must be var"
-

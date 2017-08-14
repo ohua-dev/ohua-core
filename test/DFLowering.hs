@@ -49,6 +49,15 @@ toFGLGraph (OutGraph ops arcs) = OhuaGrGraph $ mkGraph nodes edges
 shouldSatisfyRet :: Show a => IO a -> (a -> Bool) -> Expectation
 shouldSatisfyRet action predicate = action >>= (`shouldSatisfy` predicate)
 
+compileLowering :: Expression -> DFExpr -> String -> Spec
+compileLowering sourceExpr targetExpr statementType = do
+    let runLowering = runOhuaC (fmap (either error id) . runExceptT . lowerALang)
+    let shouldLowerTo :: Expression -> DFExpr -> Expectation
+        shouldLowerTo input expected =
+            fmap (toFGLGraph . toGraph) (runLowering input) `shouldSatisfyRet` (isIsomorphic (unGr $ toFGLGraph $ toGraph expected) . unGr)
+    it ("correctly lowers an " ++ statementType ++ " statement") $
+        sourceExpr `shouldLowerTo` targetExpr
+
 
 smapLowering :: Spec
 smapLowering = describe "lowering smap constructs" $ do
@@ -70,10 +79,31 @@ smapLowering = describe "lowering smap constructs" $ do
     it "correctly lowers an smap statment" $
         sourceExpr `shouldLowerTo` targetExpr
 
+smapSpec :: Spec
+smapSpec = smapLowering
 
-spec :: Spec
-spec = do
-    smapLowering
+ifLowering :: Spec
+ifLowering = describe "lowering conditionals" $ do
+    let sourceExpr =
+          Let "a" ("com.ohua.lang/id" `Apply` (Var $ Env 0)) $
+          Let "b" ("com.ohua.lang/id" `Apply` (Var $ Env 1)) $
+          Let "c" ("com.ohua.lang/id" `Apply` (Var $ Env 2)) $
+          Let "z" (Apply (Apply (Apply "com.ohua.lang/if" "c") (Lambda "then" (Apply (Apply "some-ns/+" "a") "b"))) (Lambda "else" (Apply (Apply "some-ns/-" "a") "b")))
+          "z"
+    let targetExpr = DFExpr
+          [ LetExpr 0 "a" (EmbedSf "com.ohua.lang/id") [DFEnvVar (HostExpr 0)] Nothing
+          , LetExpr 1 "b" (EmbedSf "com.ohua.lang/id") [DFEnvVar (HostExpr 1)] Nothing
+          , LetExpr 2 "c" (EmbedSf "com.ohua.lang/id") [DFEnvVar (HostExpr 2)] Nothing
+          , LetExpr 3 "s" (DFFunction "com.ohua.lang/ifThenElse") [DFVar "c"] Nothing
+          , LetExpr 4 "d" (EmbedSf "some-ns/+") [DFVar "a", DFVar "b"] Nothing
+          , LetExpr 5 "e" (EmbedSf "some-ns/-") [DFVar "a", DFVar "b"] Nothing
+          , LetExpr 6 "z" (DFFunction "com.ohua.lang/switch") [DFVar "s", DFVar "d", DFVar "e"] Nothing
+          ]
+          "z"
+    compileLowering sourceExpr targetExpr "if"
+
+ifSpec :: Spec
+ifSpec = ifLowering
 
 isIsomorphic :: (Eq a, Ord b) => Gr a b -> Gr a b -> Bool
 isIsomorphic gr1 gr2 = isJust $ isomorphicMapping gr1 gr2

@@ -40,12 +40,11 @@ data LetExpr = LetExpr
     deriving Eq
 
 data DFFnRef
-    = DFFunction FnName
-    | EmbedSf FnName
+    = DFFunction FnName -- a build-in function of DFLang
+    | EmbedSf FnName -- an generic dataflow function that wraps a stateful function call
     deriving Eq
 
 data DFVar
     = DFEnvVar HostExpr
     | DFVar Binding
     deriving Eq
-
