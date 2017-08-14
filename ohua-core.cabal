@@ -22,7 +22,8 @@ flag debug
 
 library
   exposed-modules:     
-      Ohua.IR
+      Ohua.Compile
+    , Ohua.IR
     , Ohua.Types
     , Ohua.LensClasses
     , Ohua.Monad
@@ -31,9 +32,11 @@ library
     , Ohua.ALang.Show
     , Ohua.ALang.Passes
     , Ohua.ALang.Passes.SSA
+    , Ohua.ALang.Optimizations
     , Ohua.ALang.Util
     , Ohua.DFLang.Lang
     , Ohua.DFLang.Passes
+    , Ohua.DFLang.Optimizations
     , Ohua.DFGraph
     , Ohua.Util
   -- other-modules:

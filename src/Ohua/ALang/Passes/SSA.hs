@@ -49,8 +49,8 @@ ssaRename oldBnd cont = do
     newBnd <- generateBindingWith oldBnd
     SSAM $ (newBnd,) <$> local (LocalScope . HM.insert oldBnd newBnd . unLocalScope) (runSSAM cont)
 
-mkSSA :: MonadOhua m => Expression -> m Expression
-mkSSA = liftOhua . flip runReaderT (LocalScope mempty) . runSSAM . ssa
+performSSA :: MonadOhua m => Expression -> m Expression
+performSSA = liftOhua . flip runReaderT (LocalScope mempty) . runSSAM . ssa
 
 flattenTuple :: (a, ([a], b)) -> ([a], b)
 flattenTuple (a, (as, r)) = (a:as, r)
@@ -93,3 +93,9 @@ isSSA = either Just (const Nothing) . flip evalState mempty . runExceptT . go
         mapM_ failOrInsert $ flattenAssign assignment
         go body
     go (Var _) = return ()
+
+
+checkSSA :: MonadError String m => Expression -> m ()
+checkSSA = maybe (return ()) (throwError . mkMsg) . isSSA
+  where
+    mkMsg bnd = "Redefinition of binding " ++ show bnd
