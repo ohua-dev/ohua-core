@@ -1,10 +1,10 @@
 module Ohua.ALang.Optimizations where
 
 
-import Ohua.Monad
-import Control.Monad.Except
-import Ohua.ALang.Lang
-import Ohua.ALang.Passes
+import           Control.Monad.Except
+import           Ohua.ALang.Lang
+import           Ohua.ALang.Passes
+import           Ohua.Monad
 
 
 runOptimizations :: (MonadError String m, MonadOhua m) => Expression -> m Expression

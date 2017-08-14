@@ -11,7 +11,7 @@
 --
 -- Passes required to transform an expression in ALang into an expression in DFLang.
 --
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP             #-}
 {-# LANGUAGE OverloadedLists #-}
 module Ohua.DFLang.Passes where
 
@@ -25,18 +25,18 @@ import qualified Data.HashSet         as HS
 import           Data.Maybe
 import           Data.Sequence        (Seq, (<|), (><), (|>))
 import qualified Data.Sequence        as S
+import           Lens.Micro
 import           Ohua.ALang.Lang
 import           Ohua.DFLang.Lang     (DFExpr (..), DFFnRef (..), DFVar (..),
                                        LetExpr (..))
 import           Ohua.Monad
 import           Ohua.Types
-import Lens.Micro
 
 
 type Pass m = FnName -> FnId -> Assignment -> [Expression] -> m (Seq LetExpr)
 
 passes :: (MonadOhua m, MonadError String m) => HM.HashMap FnName (Pass m)
-passes = 
+passes =
     [ ("com.ohua.lang/smap", lowerSmap)
     , ("com.ohua.lang/if", lowerIf) -- TODO check if that "if" is actually the correct name
     , ("com.ohua.lang/seq", lowerSeq)
@@ -96,9 +96,9 @@ lowerIf :: (MonadOhua m, MonadError String m) => Pass m
 lowerIf _ fnId assign args = do
     dfCond <- case condition of
         Var (Local b) -> return $ DFVar b
-        Var (Env e) -> return $ DFEnvVar e
-        Var _ -> throwError "Algo and sfref not allowed as condition"
-        _ -> throwError "Expected var as condition"
+        Var (Env e)   -> return $ DFEnvVar e
+        Var _         -> throwError "Algo and sfref not allowed as condition"
+        _             -> throwError "Expected var as condition"
     loweredThen <- lowerALang thenBody
     loweredElse <- lowerALang elseBody
 

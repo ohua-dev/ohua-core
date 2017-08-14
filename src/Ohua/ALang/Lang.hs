@@ -29,7 +29,6 @@ instance Num HostExpr where fromInteger = HostExpr . fromInteger
 -- (Justus) Several. Well have to discus what the best option is at some point,
 --          because the concrete type of the host expression depends on the backend.
 
-
 -- some types for `bindingType`
 
 type RawSymbol = HostExpr

@@ -10,17 +10,20 @@
 -- This source code is licensed under the terms described in the associated LICENSE.TXT file
 {-# LANGUAGE CPP                        #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE Rank2Types                 #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE UndecidableInstances       #-}
 module Ohua.Monad
-    ( OhuaC, runOhuaC
-    , MonadOhua(liftOhua)
+    ( OhuaT, runOhuaC
+    , MonadOhua(modifyState, getState, recordError)
     , recordError, generateBinding, generateBindingWith, generateId
     , MonadIO(..)
     ) where
 
 
 import           Control.Monad.RWS.Strict
+import           Control.Monad.Trans
+import           Data.Functor.Identity
 import qualified Data.HashSet             as HS
 import           Lens.Micro
 import           Lens.Micro.Mtl
@@ -34,8 +37,7 @@ data CompilerState = CompilerState
     { compilerStateNameGenerator :: NameGenerator
     , compilerStateIdCounter     :: Int
     }
-data CompilerEnv -- empty for now, placeholder for when we might need an environment
-
+data CompilerEnv
 
 instance HasNameGenerator CompilerState NameGenerator where
     nameGenerator = lens compilerStateNameGenerator $ \s a -> s { compilerStateNameGenerator = a }
@@ -53,15 +55,6 @@ instance HasTakenNames NameGenerator (HS.HashSet Binding) where
 instance HasSimpleNameList NameGenerator [Binding] where
     simpleNameList = lens nameGeneratorSimpleNameList $ \s a -> s { nameGeneratorSimpleNameList = a }
 
-recordError :: MonadOhua m => Error -> m ()
-#ifdef DEBUG
--- If we are in debug mode then record the error and forge on
-recordError err = liftOhua $ OhuaC $ tell [err]
-#else
--- If we are in production just throw an exception
-recordError = error
-#endif
-
 -- Only collect errors in debug mode
 #ifdef DEBUG
 type Errors = [Error]
@@ -75,7 +68,7 @@ type Errors = ()
 -- In development this collects errors via a MonadWriter, in production this collection will
 -- be turned off and be replaced by an exception, as such error should technically not occur
 -- there
-newtype OhuaC a = OhuaC { runOhuaC' :: RWST CompilerEnv Errors CompilerState IO a } deriving (Functor, Applicative, Monad, MonadIO)
+newtype OhuaT m a = OhuaT { runOhuaC' :: RWST CompilerEnv Errors CompilerState m a } deriving (Functor, Applicative, Monad, MonadIO, MonadTrans)
 
 -- Convenience typeclass.
 -- This class is intend to make it simpler to use functionality related to the ohua monad
@@ -88,20 +81,35 @@ newtype OhuaC a = OhuaC { runOhuaC' :: RWST CompilerEnv Errors CompilerState IO 
 -- unwrapMyCustomMonad@) you can use compiler functionality such as 'generateBinding'
 -- from your custom monad without using @lift@.
 class Monad m => MonadOhua m where
-    liftOhua :: OhuaC a -> m a
+    recordError :: Error -> m ()
+    modifyState :: (CompilerState -> CompilerState) -> m ()
+    getState :: m CompilerState
 
-instance MonadOhua OhuaC where
-    liftOhua = id
+instance Monad m => MonadOhua (OhuaT m) where
+#ifdef DEBUG
+    -- If we are in debug mode then record the error and forge on
+    recordError err = OhuaT $ tell [err]
+#else
+    -- If we are in production just throw an exception
+    recordError = error
+#endif
+    modifyState = OhuaT . modify
+    getState = OhuaT get
 
 -- A bit of magic to make every `MonadTrans` instance also a `MonadOhua` instance
 instance {-# OVERLAPPABLE #-} (MonadOhua m, MonadTrans t, Monad (t m)) => MonadOhua (t m) where
-    liftOhua = (lift :: m a -> t m a) . liftOhua
+    recordError = lift . recordError
+    modifyState = lift . modifyState
+    getState = lift getState
 
+
+fromState :: MonadOhua m => Lens' CompilerState a -> m a
+fromState l = (^. l) <$> getState
 
 -- | Run a compiler
 -- Creates the state from the tree being passed in
 -- If there are any errors during the compilation they are reported together at the end
-runOhuaC :: (Expression -> OhuaC a) -> Expression -> IO a
+runOhuaC :: Monad m => (Expression -> OhuaT m a) -> Expression -> m a
 runOhuaC f tree = do
     (val, errors) <- evalRWST (runOhuaC' (f tree)) (error "Ohua has no environment!") (CompilerState nameGen 0)
 #ifdef DEBUG
@@ -124,23 +132,23 @@ initNameGen t = NameGenerator taken
     taken = HS.fromList $ extractBindings t
 
 generateBinding :: MonadOhua m => m Binding
-generateBinding = liftOhua $ OhuaC $ do
-    taken <- use $ nameGenerator . takenNames
-    (h:t) <- dropWhile (`HS.member` taken) <$> use (nameGenerator . simpleNameList)
-    nameGenerator . simpleNameList .= t
-    nameGenerator . takenNames %= HS.insert h
+generateBinding = do
+    taken <- fromState $ nameGenerator . takenNames
+    (h:t) <- dropWhile (`HS.member` taken) <$> fromState (nameGenerator . simpleNameList)
+    modifyState $ nameGenerator . simpleNameList .~ t
+    modifyState $ nameGenerator . takenNames %~ HS.insert h
     return h
 
 generateBindingWith :: MonadOhua m => Binding -> m Binding
-generateBindingWith (Binding prefix) = liftOhua $ OhuaC $ do
-    taken <- use $ nameGenerator . takenNames
+generateBindingWith (Binding prefix) = do
+    taken <- fromState $ nameGenerator . takenNames
     let (h:_) = dropWhile (`HS.member` taken) $ map (Binding . (prefix' ++) . show) [0..]
-    nameGenerator . takenNames %= HS.insert h
+    modifyState $ nameGenerator . takenNames %~ HS.insert h
     return h
   where prefix' = prefix ++ "_"
 
 generateId :: MonadOhua m => m FnId
-generateId = liftOhua $ OhuaC $ do
-    idCounter += 1
-    FnId <$> use idCounter
+generateId = do
+    modifyState $ idCounter %~ succ
+    FnId <$> fromState idCounter
 
