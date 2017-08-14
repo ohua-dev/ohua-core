@@ -4,11 +4,17 @@
     "version": "2.0.0",
     "tasks": [
         {
+            "taskName": "test",
+            "command": "stack",
+            "args": [
+                "test"
+            ]
+        },
+        {
             "taskName": "build",
             "command": "stack",
             "args": [
-                "build",
-                "--test"
+                "build"
             ],
             "type": "shell",
             "group": "build",
