@@ -32,6 +32,8 @@ import           Ohua.DFLang.Lang     (DFExpr (..), DFFnRef (..), DFVar (..),
 import           Ohua.Monad
 import           Ohua.Types
 
+import           Debug.Trace
+
 
 type Pass m = FnName -> FnId -> Assignment -> [Expression] -> m (Seq LetExpr)
 
@@ -75,7 +77,7 @@ lowerALang expr = do
         (fn, fnId, args) <- handleApplyExpr expr
         tell =<< dispatchFnType fn fnId assign args
         go rest
-    go  _ = throwError "Expected `let` or binding"
+    go  x = traceShow x $ throwError "Expected `let` or binding"
 
 
 dispatchFnType :: (MonadOhua m, MonadError String m) => Pass m
@@ -167,10 +169,10 @@ handleApplyExpr (Apply fn arg) = go fn [arg]
   where
     go (Var (Sf fn id)) args = (fn, , args) <$> maybe generateId return id
             -- reject algos for now
-    go (Var _) _             = throwError "Expected Sf Var"
+    go (Var v) _             = throwError $ "Expected Sf Var but got: Sf " ++ show v -- FIXME there should be a special type of error here that takes the string and a value
     go (Apply fn arg) args   = go fn (arg:args)
-    go _ _                   = throwError "Expected Apply or Var"
-handleApplyExpr _ = throwError "Expected apply"
+    go x _                   = throwError $ "Expected Apply or Var but got: " ++ show x
+handleApplyExpr g = throwError $ "Expected apply but got: " ++ show g
 
 
 expectVar :: MonadError String m => Expression -> m DFVar

@@ -49,12 +49,15 @@ toFGLGraph (OutGraph ops arcs) = OhuaGrGraph $ mkGraph nodes edges
 shouldSatisfyRet :: Show a => IO a -> (a -> Bool) -> Expectation
 shouldSatisfyRet action predicate = action >>= (`shouldSatisfy` predicate)
 
-compileLowering :: Expression -> DFExpr -> String -> Spec
-compileLowering sourceExpr targetExpr statementType = do
+traceGr :: OhuaGrGraph -> OhuaGrGraph
+traceGr g = trace (prettify $ unGr g) g
+
+lowerAndValidate :: Expression -> DFExpr -> String -> Spec
+lowerAndValidate sourceExpr targetExpr statementType = do
     let runLowering = runOhuaC (fmap (either error id) . runExceptT . lowerALang)
     let shouldLowerTo :: Expression -> DFExpr -> Expectation
         shouldLowerTo input expected =
-            fmap (toFGLGraph . toGraph) (runLowering input) `shouldSatisfyRet` (isIsomorphic (unGr $ toFGLGraph $ toGraph expected) . unGr)
+            fmap (traceGr . toFGLGraph . toGraph) (runLowering input) `shouldSatisfyRet` (isIsomorphic (unGr $ toFGLGraph $ toGraph expected) . unGr)
     it ("correctly lowers an " ++ statementType ++ " statement") $
         sourceExpr `shouldLowerTo` targetExpr
 
@@ -72,12 +75,7 @@ smapLowering = describe "lowering smap constructs" $ do
             , LetExpr 3 "x" (DFFunction "com.ohua.lang/collect") [DFVar "z"] Nothing
             ]
             "x"
-    let runLowering = runOhuaC (fmap (either error id) . runExceptT . lowerALang)
-    let shouldLowerTo :: Expression -> DFExpr -> Expectation
-        shouldLowerTo input expected =
-            fmap (toFGLGraph . toGraph) (runLowering input) `shouldSatisfyRet` (isIsomorphic (unGr $ toFGLGraph $ toGraph expected) . unGr)
-    it "correctly lowers an smap statment" $
-        sourceExpr `shouldLowerTo` targetExpr
+    lowerAndValidate sourceExpr targetExpr "smap"
 
 smapSpec :: Spec
 smapSpec = smapLowering
@@ -88,7 +86,11 @@ ifLowering = describe "lowering conditionals" $ do
           Let "a" ("com.ohua.lang/id" `Apply` (Var $ Env 0)) $
           Let "b" ("com.ohua.lang/id" `Apply` (Var $ Env 1)) $
           Let "c" ("com.ohua.lang/id" `Apply` (Var $ Env 2)) $
-          Let "z" (Apply (Apply (Apply "com.ohua.lang/if" "c") (Lambda "then" (Apply (Apply "some-ns/+" "a") "b"))) (Lambda "else" (Apply (Apply "some-ns/-" "a") "b")))
+          Let "z" (Apply (Apply (Apply "com.ohua.lang/if" "c")
+                                (Lambda "then" (Let "p" (Apply "some-ns/+" "a")
+                                                    (Let "f" (Apply "p" "b") "f"))))
+                         (Lambda "else" (Let "m" (Apply "some-ns/-" "a")
+                                             (Let "f" (Apply "m" "b") "f"))))
           "z"
     let targetExpr = DFExpr
           [ LetExpr 0 "a" (EmbedSf "com.ohua.lang/id") [DFEnvVar (HostExpr 0)] Nothing
@@ -100,7 +102,7 @@ ifLowering = describe "lowering conditionals" $ do
           , LetExpr 6 "z" (DFFunction "com.ohua.lang/switch") [DFVar "s", DFVar "d", DFVar "e"] Nothing
           ]
           "z"
-    compileLowering sourceExpr targetExpr "if"
+    lowerAndValidate sourceExpr targetExpr "if"
 
 ifSpec :: Spec
 ifSpec = ifLowering

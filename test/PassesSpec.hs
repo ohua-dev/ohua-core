@@ -73,7 +73,7 @@ instance Arbitrary a => Arbitrary (Expr a) where
 --         tree (_, values) 0 = Var $ Local
 
 
-runPasses expr = flip runOhuaC expr $ mkSSA >=> runExceptT . normalize
+runPasses expr = flip runOhuaC expr $ performSSA >=> runExceptT . normalize
 
 type ALangCheck = Either String
 
@@ -153,4 +153,3 @@ passesSpec =
 
         it "Reduces lambdas as far as possible but does not remove them when argument" $
             runPasses lambda_with_app_as_arg `shouldSatisfyRet` either (const False) lambdaStaysInput
-
