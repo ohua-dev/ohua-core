@@ -73,50 +73,6 @@ lowerALang expr = do
         go rest
     go  _ = throwError "Expected `let` or binding"
 
-<<<<<<< HEAD
-dispatchFnType :: (MonadOhua m, MonadError String m)
-               => FnId -> Assignment -> [Expression] -> FnName -> m (Seq LetExpr)
-dispatchFnType fnId assign args fn =
-    case fn of
-        "com.ohua.lang/smap" -> do
-            -- TODO add the "one-to-n"s
-            lowered <- lowerALang body
-            identityId <- generateId
-            coll <- expectVar collE
-            pure
-                $ (LetExpr fnId inVar (DFFunction "com.ohua.lang/smap-fun") (return coll) Nothing
-                    <| letExprs lowered)
-                |> LetExpr identityId assign (EmbedSf "com.ohua.lang/collect") [DFVar (returnVar lowered)] Nothing
-          where
-            [Lambda inVar body, collE] = args
-        -- TODO check if that "if" is actually the correct name -> if not then we will rename it to be exactly this one!
-        -- TODO variable scoping.
-        -- TBD: should this be a concept with its on pass. then a context needs to define its own scope ops. as a result:
-        -- this needs to become a type which defines these details specifically.
-        "com.ohua.lang/if" -> do
-            dfCond <- case condition of
-                Var (Local b) -> return $ DFVar b
-                Var (Env e) -> return $ DFEnvVar e
-                Var _ -> throwError "Algo and sfref not allowed as condition"
-                _ -> throwError "Expected var as condition"
-            loweredThen <- lowerALang thenBody
-            loweredElse <- lowerALang elseBody
-
-            switchId <- generateId
-
-            pure
-                $ (LetExpr fnId (Destructure [thenVar, elseVar])
-                    (DFFunction "com.ohua.lang/ifThenElse") [dfCond] Nothing
-                    <| tieContext thenVar (letExprs loweredThen)
-                    >< tieContext elseVar (letExprs loweredElse))
-                |> LetExpr switchId assign (DFFunction "com.ohua.lang/switch")
-                    [DFVar (returnVar loweredThen), DFVar (returnVar loweredElse)]
-                    Nothing
-          where
-            [condition, Lambda (Direct thenVar) thenBody, Lambda (Direct elseVar) elseBody] = args
-        "com.ohua.lang/seq" -> undefined
-        _ -> (\args' -> return $ LetExpr fnId assign (EmbedSf fn) args' Nothing) <$> mapM expectVar args
-=======
 
 dispatchFnType :: (MonadOhua m, MonadError String m) => Pass m
 dispatchFnType fn = fromMaybe lowerDefault (HM.lookup fn passes) $ fn
@@ -166,7 +122,6 @@ lowerSeq = undefined
 
 lowerDefault :: (MonadOhua m, MonadError String m) => Pass m
 lowerDefault fn fnId assign args = mapM expectVar args <&> \args' -> return $ LetExpr fnId assign (EmbedSf fn) args' Nothing
->>>>>>> 58045a045c72dbb2970a4540a227eb945c2f5f67
 
 
 tieContext :: (Functor f, Foldable f) => Binding -> f LetExpr -> f LetExpr
