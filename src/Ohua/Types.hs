@@ -47,6 +47,7 @@ data FnName = FnName
 
 instance HasName FnName String where name = lens fnNameName (\s a -> s {fnNameName=a})
 instance NFData FnName where rnf (FnName ns n) = rnf ns `seq` rnf n
+instance Hashable FnName where hashWithSalt s (FnName a b) = hashWithSalt s (a, b)
 
 instance HasNamespace FnName String where namespace = lens fnNameNamespace (\s a -> s {fnNameNamespace=a})
 

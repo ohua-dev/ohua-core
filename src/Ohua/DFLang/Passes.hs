@@ -11,7 +11,8 @@
 --
 -- Passes required to transform an expression in ALang into an expression in DFLang.
 --
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP             #-}
+{-# LANGUAGE OverloadedLists #-}
 module Ohua.DFLang.Passes where
 
 
@@ -24,11 +25,22 @@ import qualified Data.HashSet         as HS
 import           Data.Maybe
 import           Data.Sequence        (Seq, (<|), (><), (|>))
 import qualified Data.Sequence        as S
+import           Lens.Micro
 import           Ohua.ALang.Lang
 import           Ohua.DFLang.Lang     (DFExpr (..), DFFnRef (..), DFVar (..),
                                        LetExpr (..))
 import           Ohua.Monad
 import           Ohua.Types
+
+
+type Pass m = FnName -> FnId -> Assignment -> [Expression] -> m (Seq LetExpr)
+
+passes :: (MonadOhua m, MonadError String m) => HM.HashMap FnName (Pass m)
+passes =
+    [ ("com.ohua.lang/smap", lowerSmap)
+    , ("com.ohua.lang/if", lowerIf) -- TODO check if that "if" is actually the correct name
+    , ("com.ohua.lang/seq", lowerSeq)
+    ]
 
 
 checkSSA :: (Foldable f, MonadError String m) => f LetExpr -> m ()
@@ -57,10 +69,11 @@ lowerALang expr = do
     go  (Var _) = throwError "Non local return binding"
     go  (Let assign expr rest) = do
         (fn, fnId, args) <- handleApplyExpr expr
-        tell =<< dispatchFnType fnId assign args fn
+        tell =<< dispatchFnType fn fnId assign args
         go rest
     go  _ = throwError "Expected `let` or binding"
 
+<<<<<<< HEAD
 dispatchFnType :: (MonadOhua m, MonadError String m)
                => FnId -> Assignment -> [Expression] -> FnName -> m (Seq LetExpr)
 dispatchFnType fnId assign args fn =
@@ -103,6 +116,57 @@ dispatchFnType fnId assign args fn =
             [condition, Lambda (Direct thenVar) thenBody, Lambda (Direct elseVar) elseBody] = args
         "com.ohua.lang/seq" -> undefined
         _ -> (\args' -> return $ LetExpr fnId assign (EmbedSf fn) args' Nothing) <$> mapM expectVar args
+=======
+
+dispatchFnType :: (MonadOhua m, MonadError String m) => Pass m
+dispatchFnType fn = fromMaybe lowerDefault (HM.lookup fn passes) $ fn
+
+
+lowerSmap :: (MonadOhua m, MonadError String m) => Pass m
+lowerSmap _ fnId assign args = do
+    -- TODO add the "one-to-n"s
+    lowered <- lowerALang body
+    identityId <- generateId
+    coll <- expectVar collE
+    pure
+        $ (LetExpr fnId inVar (DFFunction "com.ohua.lang/smap-fun") (return coll) Nothing
+            <| letExprs lowered)
+        |> LetExpr identityId assign (EmbedSf "com.ohua.lang/collect") [DFVar (returnVar lowered)] Nothing
+  where
+    [Lambda inVar body, collE] = args
+
+
+lowerIf :: (MonadOhua m, MonadError String m) => Pass m
+lowerIf _ fnId assign args = do
+    dfCond <- case condition of
+        Var (Local b) -> return $ DFVar b
+        Var (Env e)   -> return $ DFEnvVar e
+        Var _         -> throwError "Algo and sfref not allowed as condition"
+        _             -> throwError "Expected var as condition"
+    loweredThen <- lowerALang thenBody
+    loweredElse <- lowerALang elseBody
+
+    switchId <- generateId
+
+    pure
+        $ (LetExpr fnId (Destructure [thenVar, elseVar])
+            (DFFunction "com.ohua.lang/ifThenElse") [dfCond] Nothing
+            <| tieContext thenVar (letExprs loweredThen)
+            >< tieContext elseVar (letExprs loweredElse))
+        |> LetExpr switchId assign (DFFunction "com.ohua.lang/switch")
+            [DFVar (returnVar loweredThen), DFVar (returnVar loweredElse)]
+            Nothing
+  where
+    [condition, Lambda (Direct thenVar) thenBody, Lambda (Direct elseVar) elseBody] = args
+
+
+lowerSeq :: (MonadOhua m, MonadError String m) => Pass m
+lowerSeq = undefined
+
+
+lowerDefault :: (MonadOhua m, MonadError String m) => Pass m
+lowerDefault fn fnId assign args = mapM expectVar args <&> \args' -> return $ LetExpr fnId assign (EmbedSf fn) args' Nothing
+>>>>>>> 58045a045c72dbb2970a4540a227eb945c2f5f67
 
 
 tieContext :: (Functor f, Foldable f) => Binding -> f LetExpr -> f LetExpr

@@ -62,8 +62,8 @@ compileLowering sourceExpr targetExpr statementType = do
 smapLowering :: Spec
 smapLowering = describe "lowering smap constructs" $ do
     let sourceExpr =
-            Let "coll" ("com.ohua.lang/id" `Apply` (Var $ Env 0)) $
-            Let "x" ("com.ohua.lang/smap" `Apply` (Lambda "y" (Let "z" (Apply "some.module/inc" "y") "z")) `Apply` "coll")
+            Let "coll" ("com.ohua.lang/id" `Apply` Var (Env 0)) $
+            Let "x" ("com.ohua.lang/smap" `Apply` Lambda "y" (Let "z" (Apply "some.module/inc" "y") "z") `Apply` "coll")
             "x"
     let targetExpr = DFExpr
             [ LetExpr 0 "coll" (EmbedSf "com.ohua.lang/id") [DFEnvVar (HostExpr 0)] Nothing
