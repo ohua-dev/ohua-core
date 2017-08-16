@@ -163,7 +163,11 @@ passesSpec = do
             removeCurrying (Let "a" ("mod/fun" `Apply` "b") $ Let "x" ("a" `Apply` "c") "x")
             `shouldBe`
             Right (Let "x" ("mod/fun" `Apply` "b" `Apply` "c") "x")
-        it "inlines nultiple layers of currying" $
+        it "removes currying even for redefintions" $ 
+            removeCurrying (Let "a" "some/sf" $ Let "b" "a" $ "b" `Apply` "c")
+            `shouldBe`
+            Right ("some/sf" `Apply` "c")
+        it "inlines multiple layers of currying" $
             removeCurrying
                 (Let "f" (Apply "some-ns/fn-with-3-args" "a") $
                 Let "f'" (Apply "f" "b") $
