@@ -69,19 +69,27 @@ instance NFData ResolvedSymbol where
     rnf (Env _)   = ()
     rnf (Sf s i)  = rnf s `seq` rnf i
 
-lrPrewalkExpr :: Monad m => (Expr b -> m (Expr b)) -> Expr b -> m (Expr b)
-lrPrewalkExpr f e = f e >>= \case
-    Let bnd val body -> Let bnd <$> lrPrewalkExpr f val <*> lrPrewalkExpr f body
-    Apply fn arg -> Apply <$> lrPrewalkExpr f fn <*> lrPrewalkExpr f arg
-    Lambda assign body -> Lambda assign <$> lrPrewalkExpr f body
+lrPrewalkExprM :: Monad m => (Expr b -> m (Expr b)) -> Expr b -> m (Expr b)
+lrPrewalkExprM f e = f e >>= \case
+    Let bnd val body -> Let bnd <$> lrPrewalkExprM f val <*> lrPrewalkExprM f body
+    Apply fn arg -> Apply <$> lrPrewalkExprM f fn <*> lrPrewalkExprM f arg
+    Lambda assign body -> Lambda assign <$> lrPrewalkExprM f body
     e' -> return e'
 
 
-lrPostwalkExpr :: Monad m => (Expr b -> m (Expr b)) -> Expr b -> m (Expr b)
-lrPostwalkExpr f (Let assign val body) = f =<< Let assign <$> lrPostwalkExpr f val <*> lrPostwalkExpr f body
-lrPostwalkExpr f (Apply fn arg) = f =<< Apply <$> lrPostwalkExpr f fn <*> lrPostwalkExpr f arg
-lrPostwalkExpr f (Lambda assign body) = f . Lambda assign =<< lrPostwalkExpr f body
-lrPostwalkExpr _ e = return e
+lrPrewalkExpr :: (Expr b -> (Expr b)) -> Expr b -> (Expr b)
+lrPrewalkExpr f = runIdentity . lrPrewalkExprM (return . f)
+
+
+lrPostwalkExprM :: Monad m => (Expr b -> m (Expr b)) -> Expr b -> m (Expr b)
+lrPostwalkExprM f (Let assign val body) = f =<< Let assign <$> lrPostwalkExprM f val <*> lrPostwalkExprM f body
+lrPostwalkExprM f (Apply fn arg) = f =<< Apply <$> lrPostwalkExprM f fn <*> lrPostwalkExprM f arg
+lrPostwalkExprM f (Lambda assign body) = f . Lambda assign =<< lrPostwalkExprM f body
+lrPostwalkExprM _ e = return e
+
+
+lrPostwalkExpr :: (Expr b -> (Expr b)) -> Expr b -> (Expr b)
+lrPostwalkExpr f = runIdentity . lrPostwalkExprM (return . f)
 
 
 foldlExprM :: Monad m => (Expr a -> b -> m b) -> b -> Expr a -> m b

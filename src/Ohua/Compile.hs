@@ -28,28 +28,35 @@ import           Ohua.Types
 
 
 pipeline :: (MonadError String m, MonadOhua m) => Expression -> m OutGraph
-pipeline e
-    = performSSA e
-    >>= normalize
-    >>= \e -> checkHigherOrderFunctionSupport e >> return e
-#ifdef DEBUG
-    >>= \e -> Ohua.ALang.Passes.SSA.checkSSA e >> return e
-#endif
-    >>= Ohua.ALang.Optimizations.runOptimizations
-#ifdef DEBUG
-    >>= \e -> Ohua.ALang.Passes.SSA.checkSSA e >> return e
-#endif
-    >>= lowerALang
-#ifdef DEBUG
-    >>= \e -> Ohua.DFLang.Passes.checkSSAExpr e >> return e
-#endif
-    >>= Ohua.DFLang.Optimizations.runOptimizations
+pipeline e = do 
+    ssaE <- performSSA e
+    normalizedE <- normalize ssaE
 
 #ifdef DEBUG
-    >>= \e -> Ohua.DFLang.Passes.checkSSAExpr e >> return e
+    checkProgramValidity normalizedE
+    checkHigherOrderFunctionSupport normalizedE
+    Ohua.ALang.Passes.SSA.checkSSA normalizedE
+#endif
+
+    optimizedE <- Ohua.ALang.Optimizations.runOptimizations normalizedE
+
+#ifdef DEBUG
+    Ohua.ALang.Passes.SSA.checkSSA optimizedE
+#endif
+
+    dfE <- lowerALang optimizedE
+
+#ifdef DEBUG
+    Ohua.DFLang.Passes.checkSSAExpr dfE
+#endif
+
+    optimizedDfE <- Ohua.DFLang.Optimizations.runOptimizations dfE
+
+#ifdef DEBUG
+    Ohua.DFLang.Passes.checkSSAExpr optimizedDfE
 #endif
     -- Comment: I use `<&>` (aka `fmap`) here because `toGraph` does not run in a monad
-    <&> toGraph
+    return $ toGraph optimizedDfE
 
 
 compile :: MonadError String m => Expression -> m OutGraph

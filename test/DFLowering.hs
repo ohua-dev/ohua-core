@@ -57,7 +57,7 @@ lowerAndValidate sourceExpr targetExpr statementType = do
     let runLowering = runOhuaT (fmap (either error id) . runExceptT . lowerALang)
     let shouldLowerTo :: Expression -> DFExpr -> Expectation
         shouldLowerTo input expected =
-            fmap (traceGr . toFGLGraph . toGraph) (runLowering input) `shouldSatisfyRet` (isIsomorphic (unGr $ toFGLGraph $ toGraph expected) . unGr)
+            fmap (toFGLGraph . toGraph) (runLowering input) `shouldSatisfyRet` (isIsomorphic (unGr $ toFGLGraph $ toGraph expected) . unGr)
     it ("correctly lowers an " ++ statementType ++ " statement") $
         sourceExpr `shouldLowerTo` targetExpr
 

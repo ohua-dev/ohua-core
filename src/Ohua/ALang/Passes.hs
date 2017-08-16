@@ -183,7 +183,7 @@ hasFinalLet _               = throwError "Final value is not a var"
 
 -- | Ensures all of the optionally provided stateful function ids are unique.
 noDuplicateIds :: MonadError String m => Expression -> m ()
-noDuplicateIds = void . flip runStateT mempty . lrPrewalkExpr go
+noDuplicateIds = void . flip runStateT mempty . lrPrewalkExprM go
   where
     go e@(Var (Sf _ (Just id))) = do
         s <- get
@@ -233,10 +233,7 @@ checkProgramValidity e = do
 
 -- The canonical composition of the above transformations to create a program with the invariants we expect.
 normalize :: (MonadOhua m, MonadError Error m) => Expression -> m Expression
-normalize e = do
-    e' <- reduceLambdas (letLift e) >>= removeCurrying >>= ensureFinalLet . inlineReassignments
-    traceShow e' $ checkProgramValidity e'
-    return e'
+normalize e = reduceLambdas (letLift e) >>= removeCurrying >>= ensureFinalLet . inlineReassignments
   where
     -- we repeat this step until a fix point is reached.
     -- this is necessary as lambdas may be input to lambdas,

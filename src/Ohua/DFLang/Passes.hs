@@ -77,7 +77,7 @@ lowerALang expr = do
         (fn, fnId, args) <- handleApplyExpr expr
         tell =<< dispatchFnType fn fnId assign args
         go rest
-    go  x = traceShow x $ throwError "Expected `let` or binding"
+    go  x = throwError "Expected `let` or binding"
 
 
 dispatchFnType :: (MonadOhua m, MonadError String m) => Pass m
