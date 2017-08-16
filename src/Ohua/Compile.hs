@@ -5,14 +5,12 @@ module Ohua.Compile where
 import           Control.Monad.Except
 import           Data.Functor.Identity
 import qualified Data.HashMap.Strict       as HM
-import           Data.Maybe
 import           Lens.Micro
 import           Ohua.ALang.Lang
 import           Ohua.ALang.Optimizations
 import           Ohua.ALang.Passes
 import           Ohua.ALang.Passes.SSA
 import           Ohua.DFGraph
-import           Ohua.DFLang.Lang
 import           Ohua.DFLang.Optimizations
 import           Ohua.DFLang.Passes
 import           Ohua.Monad

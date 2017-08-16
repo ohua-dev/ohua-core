@@ -3,7 +3,6 @@ module Ohua.ALang.Optimizations where
 
 import           Control.Monad.Except
 import           Ohua.ALang.Lang
-import           Ohua.ALang.Passes
 import           Ohua.Monad
 
 
