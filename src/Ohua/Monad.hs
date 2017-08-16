@@ -71,7 +71,7 @@ type Errors = ()
 -- In development this collects errors via a MonadWriter, in production this collection will
 -- be turned off and be replaced by an exception, as such error should technically not occur
 -- there
-newtype OhuaT m a = OhuaT { runOhuaC' :: RWST CompilerEnv Errors CompilerState m a } 
+newtype OhuaT m a = OhuaT { runOhuaT' :: RWST CompilerEnv Errors CompilerState m a } 
     deriving (Functor, Applicative, Monad, MonadIO, MonadTrans)
 
 -- Convenience typeclass.
@@ -107,7 +107,8 @@ instance {-# OVERLAPPABLE #-} (MonadOhua m, MonadTrans t, Monad (t m)) => MonadO
     getState = lift getState
 
 instance (MonadError e m) => MonadError e (OhuaT m) where
-  throwError = OhuaT . throwError
+    throwError = OhuaT . throwError
+    catchError (OhuaT m) f = OhuaT $ m `catchError` (runOhuaT' . f)
 
 
 fromState :: MonadOhua m => Lens' CompilerState a -> m a
@@ -118,7 +119,7 @@ fromState l = (^. l) <$> getState
 -- If there are any errors during the compilation they are reported together at the end
 runOhuaC :: Monad ctxt => (Expression -> OhuaT ctxt result) -> Expression -> ctxt result
 runOhuaC f tree = do
-    (val, errors) <- evalRWST (runOhuaC' (f tree)) (error "Ohua has no environment!") (CompilerState nameGen 0)
+    (val, errors) <- evalRWST (runOhuaT' (f tree)) (error "Ohua has no environment!") (CompilerState nameGen 0)
 #ifdef DEBUG
     unless (null errors) $ error $ intercalate "\n" errors
 #endif
