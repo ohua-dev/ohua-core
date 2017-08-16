@@ -14,8 +14,8 @@ module Ohua.ALang.Passes where
 import           Control.Monad.Except
 import           Control.Monad.State
 import           Control.Monad.Writer
-import qualified Data.HashSet         as HS
 import qualified Data.HashMap.Strict  as HM
+import qualified Data.HashSet         as HS
 import           Ohua.ALang.Lang
 import           Ohua.ALang.Util
 import           Ohua.IR.Functions

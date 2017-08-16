@@ -12,9 +12,9 @@ module Ohua.ALang.Lang where
 
 
 import           Control.DeepSeq
+import           Data.Functor.Identity
 import           Data.String
 import           Ohua.Types
-import Data.Functor.Identity
 
 
 -- bindingType is the type of general bindings

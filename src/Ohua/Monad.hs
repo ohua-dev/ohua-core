@@ -21,9 +21,9 @@ module Ohua.Monad
     ) where
 
 
+import           Control.Monad.Except     hiding (Error)
 import           Control.Monad.RWS.Strict
 import           Control.Monad.Trans
-import           Control.Monad.Except hiding (Error)
 import           Data.Functor.Identity
 import qualified Data.HashSet             as HS
 import           Data.List                (intercalate)
@@ -71,7 +71,7 @@ type Errors = ()
 -- In development this collects errors via a MonadWriter, in production this collection will
 -- be turned off and be replaced by an exception, as such error should technically not occur
 -- there
-newtype OhuaT m a = OhuaT { runOhuaT' :: RWST CompilerEnv Errors CompilerState m a } 
+newtype OhuaT m a = OhuaT { runOhuaT' :: RWST CompilerEnv Errors CompilerState m a }
     deriving (Functor, Applicative, Monad, MonadIO, MonadTrans)
 
 -- Convenience typeclass.

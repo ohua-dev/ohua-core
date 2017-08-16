@@ -1,8 +1,8 @@
 
 
+import qualified ALangVerify
 import qualified DFLowering
 import           PassesSpec
-import qualified ALangVerify
 import           Test.Hspec
 
 

@@ -8,7 +8,8 @@ module ALangVerify where
 import           Control.Arrow
 import           Control.Monad.Except
 import           Data.Function
-import qualified Data.Map.Strict                   as Map
+import           Data.Functor.Identity
+import qualified Data.Map.Strict       as Map
 import           Data.Maybe
 import           Debug.Trace
 import           Ohua.ALang.Lang
@@ -16,7 +17,6 @@ import           Ohua.ALang.Passes
 import           Ohua.Monad
 import           Ohua.Types
 import           Test.Hspec
-import           Data.Functor.Identity
 
 -- OhuaT Expr (Either [Char] Expression)
 justTrace :: Expression -> Expectation
