@@ -175,7 +175,7 @@ noDuplicateIds = void . flip runStateT mempty . lrPrewalkExpr go
         return e
     go e = return e
 
-
+-- FIXME this function is never called. was it supposed to be part of the below validity check?
 lamdasAreInputToHigherOrderFunctions :: MonadError Error m => Expression -> m ()
 lamdasAreInputToHigherOrderFunctions _                         = return ()
 lamdasAreInputToHigherOrderFunctions (Apply v (Lambda _ body)) = undefined

@@ -169,7 +169,7 @@ handleApplyExpr (Apply fn arg) = go fn [arg]
   where
     go (Var (Sf fn id)) args = (fn, , args) <$> maybe generateId return id
             -- reject algos for now
-    go (Var v) _             = throwError $ "Expected Sf Var but got: Sf " ++ show v -- FIXME there should be a special type of error here that takes the string and a value
+    go (Var v) _             = throwError $ "Expected Var Sf but got: Var " ++ show v -- FIXME there should be a special type of error here that takes the string and a value
     go (Apply fn arg) args   = go fn (arg:args)
     go x _                   = throwError $ "Expected Apply or Var but got: " ++ show x
 handleApplyExpr g = throwError $ "Expected apply but got: " ++ show g

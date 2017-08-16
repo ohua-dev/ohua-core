@@ -102,7 +102,8 @@ ifLowering = describe "lowering conditionals" $ do
           , LetExpr 6 "z" (DFFunction "com.ohua.lang/switch") [DFVar "s", DFVar "d", DFVar "e"] Nothing
           ]
           "z"
-    lowerAndValidate sourceExpr targetExpr "if"
+
+    lowerAndValidate (traceShowId sourceExpr) targetExpr "if"
 
 ifSpec :: Spec
 ifSpec = ifLowering

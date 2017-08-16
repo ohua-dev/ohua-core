@@ -23,6 +23,7 @@ module Ohua.Monad
 
 import           Control.Monad.RWS.Strict
 import           Control.Monad.Trans
+import           Control.Monad.Except hiding (Error)
 import           Data.Functor.Identity
 import qualified Data.HashSet             as HS
 import           Data.List                (intercalate)
@@ -103,6 +104,9 @@ instance {-# OVERLAPPABLE #-} (MonadOhua m, MonadTrans t, Monad (t m)) => MonadO
     modifyState = lift . modifyState
     getState = lift getState
 
+instance (MonadError e m) => MonadError e (OhuaT m) where
+  throwError = OhuaT . throwError
+
 
 fromState :: MonadOhua m => Lens' CompilerState a -> m a
 fromState l = (^. l) <$> getState
@@ -110,7 +114,7 @@ fromState l = (^. l) <$> getState
 -- | Run a compiler
 -- Creates the state from the tree being passed in
 -- If there are any errors during the compilation they are reported together at the end
-runOhuaC :: Monad m => (Expression -> OhuaT m a) -> Expression -> m a
+runOhuaC :: Monad ctxt => (Expression -> OhuaT ctxt result) -> Expression -> ctxt result
 runOhuaC f tree = do
     (val, errors) <- evalRWST (runOhuaC' (f tree)) (error "Ohua has no environment!") (CompilerState nameGen 0)
 #ifdef DEBUG
@@ -152,4 +156,3 @@ generateId :: MonadOhua m => m FnId
 generateId = do
     modifyState $ idCounter %~ succ
     FnId <$> fromState idCounter
-
