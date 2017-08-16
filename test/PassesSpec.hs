@@ -132,7 +132,7 @@ calculated_lambda_as_argument = Let "f" (Lambda "a" "a") $ Let "z" (Lambda "a" "
 
 lambda_with_app_as_arg = Apply "some/func" $ Apply (Lambda "a" (Lambda "b" "a")) "b"
 
-passesSpec =
+passesSpec = do
     describe "passes" $ do
         prop "creates ir with the right invariants" prop_passes
         it "does not reject a program with lambda as input to smap" $
@@ -153,3 +153,21 @@ passesSpec =
 
         it "Reduces lambdas as far as possible but does not remove them when argument" $
             runPasses lambda_with_app_as_arg `shouldSatisfyRet` either (const False) lambdaStaysInput
+    
+    describe "remove currying pass" $ do
+        it "inlines curring" $
+            removeCurrying (Let "a" ("mod/fun" `Apply` "b") ("a" `Apply` "c")) 
+            `shouldBe` 
+            Right ("mod/fun" `Apply` "b" `Apply` "c")
+        it "inlines curring 2" $
+            removeCurrying (Let "a" ("mod/fun" `Apply` "b") $ Let "x" ("a" `Apply` "c") "x")
+            `shouldBe` 
+            Right (Let "x" ("mod/fun" `Apply` "b" `Apply` "c") "x")
+        it "inlines nultiple layers of currying" $
+            removeCurrying
+                (Let "f" (Apply "some-ns/fn-with-3-args" "a") $
+                Let "f'" (Apply "f" "b") $
+                Let "x" (Apply "f'" "c")
+                "x" )
+            `shouldBe`
+            Right (Let "x" ("some-ns/fn-with-3-args" `Apply` "a" `Apply` "b" `Apply` "c") "x")

@@ -14,6 +14,7 @@ module Ohua.ALang.Passes where
 import           Control.Monad.Except
 import           Control.Monad.State
 import           Control.Monad.Writer
+import Control.Monad.RWS.Lazy
 import qualified Data.HashMap.Strict  as HM
 import qualified Data.HashSet         as HS
 import           Ohua.ALang.Lang
@@ -21,13 +22,17 @@ import           Ohua.ALang.Util
 import           Ohua.IR.Functions
 import           Ohua.Monad
 import           Ohua.Types
+import Debug.Trace
+
 
 
 type Error = String
 
 inlineLambdaRefs :: MonadError Error m => Expression -> m Expression
-inlineLambdaRefs (Let (Direct bnd) l@(Lambda _ _) body) = inlineLambdaRefs $ substitute bnd l body
-inlineLambdaRefs (Let (Destructure _) (Lambda _ _) _) = throwError "invariant broken, cannot destructure lambda"
+inlineLambdaRefs (Let assignment l@(Lambda _ _) body) = 
+    case assignment of 
+        Direct bnd -> inlineLambdaRefs $ substitute bnd l body
+        _ -> throwError "invariant broken, cannot destructure lambda"
 inlineLambdaRefs (Let assignment value body) = Let assignment <$> inlineLambdaRefs value <*> inlineLambdaRefs body
 inlineLambdaRefs (Apply body argument) = liftM2 Apply (inlineLambdaRefs body) (inlineLambdaRefs argument)
 inlineLambdaRefs (Lambda argument body) = Lambda argument <$> inlineLambdaRefs body
@@ -120,13 +125,26 @@ removeUnusedBindings = fst . runWriter . go
             Let bnds <$> go val <*> pure inner
 
 
-inlineFunctions :: Monad m => Expression -> m Expression
-inlineFunctions e = evalStateT (lrPrewalkExpr go e) mempty
+removeCurrying :: MonadError String m => Expression -> m Expression
+removeCurrying e = fst <$> evalRWST (inlinePartials e) mempty ()
   where
-    go v@(Let (Direct bnd) val _) = modify (HM.insert bnd val) >> return v
-    go v@(Apply (Var (Local bnd)) arg) = maybe v (flip Apply arg) <$> gets (HM.lookup bnd)
-    go v = return v
-
+    inlinePartials (Let assign@(Direct bnd) val body) = do
+        val' <- inlinePartials val
+        (body', touched) <- listen $ local (HM.insert bnd val') $ inlinePartials body
+        return $ 
+            if bnd `HS.member` touched then 
+                body'
+            else
+                Let assign val' body'
+    inlinePartials (Apply (Var (Local bnd)) arg) = do
+        tell $ HS.singleton bnd
+        val <- asks (HM.lookup bnd)
+        Apply 
+            <$> maybe (throwError $ "No suitable value found for binding " ++ show bnd) return val
+            <*> inlinePartials arg
+    inlinePartials (Apply function arg) = Apply <$> inlinePartials function <*> inlinePartials arg
+    inlinePartials (Let assign val body) = Let assign <$> inlinePartials val <*> inlinePartials body
+    inlinePartials e = return e
 
 
 hasFinalLet :: MonadError String m => Expression -> m ()
@@ -168,8 +186,8 @@ checkProgramValidity e = do
 
 normalize :: (MonadOhua m, MonadError Error m) => Expression -> m Expression
 normalize e = do
-    e' <- reduceLambdas (letLift e) >>= ensureFinalLet . inlineReassignments
-    checkProgramValidity e'
+    e' <- reduceLambdas (letLift e) >>= removeCurrying >>= ensureFinalLet . inlineReassignments 
+    traceShow e' $ checkProgramValidity e'
     return e'
   where
     -- we repeat this step until a fix point is reached.
