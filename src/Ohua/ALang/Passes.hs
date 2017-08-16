@@ -163,6 +163,7 @@ checkProgramValidity :: MonadError Error m => Expression -> m ()
 checkProgramValidity e = do
     hasFinalLet e
     noDuplicateIds e
+    applyToSf e
 
 
 normalize :: (MonadOhua m, MonadError Error m) => Expression -> m Expression

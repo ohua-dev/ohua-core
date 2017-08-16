@@ -33,6 +33,7 @@ import           Ohua.ALang.Lang
 import           Ohua.LensClasses
 import           Ohua.Types
 
+
 type Error = String
 
 data CompilerState = CompilerState
@@ -70,7 +71,8 @@ type Errors = ()
 -- In development this collects errors via a MonadWriter, in production this collection will
 -- be turned off and be replaced by an exception, as such error should technically not occur
 -- there
-newtype OhuaT m a = OhuaT { runOhuaC' :: RWST CompilerEnv Errors CompilerState m a } deriving (Functor, Applicative, Monad, MonadIO, MonadTrans)
+newtype OhuaT m a = OhuaT { runOhuaC' :: RWST CompilerEnv Errors CompilerState m a } 
+    deriving (Functor, Applicative, Monad, MonadIO, MonadTrans)
 
 -- Convenience typeclass.
 -- This class is intend to make it simpler to use functionality related to the ohua monad
@@ -118,12 +120,9 @@ runOhuaC :: Monad ctxt => (Expression -> OhuaT ctxt result) -> Expression -> ctx
 runOhuaC f tree = do
     (val, errors) <- evalRWST (runOhuaC' (f tree)) (error "Ohua has no environment!") (CompilerState nameGen 0)
 #ifdef DEBUG
-    case errors of
-        []   -> return val
-        errs -> error $ intercalate "\n" errs
-#else
-    return val
+    unless (null errors) $ error $ intercalate "\n" errors
 #endif
+    return val
   where
     nameGen = initNameGen tree
 
