@@ -153,15 +153,15 @@ passesSpec = do
 
         it "Reduces lambdas as far as possible but does not remove them when argument" $
             runPasses lambda_with_app_as_arg `shouldSatisfyRet` either (const False) lambdaStaysInput
-    
+
     describe "remove currying pass" $ do
         it "inlines curring" $
-            removeCurrying (Let "a" ("mod/fun" `Apply` "b") ("a" `Apply` "c")) 
-            `shouldBe` 
+            removeCurrying (Let "a" ("mod/fun" `Apply` "b") ("a" `Apply` "c"))
+            `shouldBe`
             Right ("mod/fun" `Apply` "b" `Apply` "c")
         it "inlines curring 2" $
             removeCurrying (Let "a" ("mod/fun" `Apply` "b") $ Let "x" ("a" `Apply` "c") "x")
-            `shouldBe` 
+            `shouldBe`
             Right (Let "x" ("mod/fun" `Apply` "b" `Apply` "c") "x")
         it "inlines nultiple layers of currying" $
             removeCurrying

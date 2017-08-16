@@ -12,25 +12,25 @@ module Ohua.ALang.Passes where
 
 
 import           Control.Monad.Except
+import           Control.Monad.RWS.Lazy
 import           Control.Monad.State
 import           Control.Monad.Writer
-import Control.Monad.RWS.Lazy
-import qualified Data.HashMap.Strict  as HM
-import qualified Data.HashSet         as HS
+import qualified Data.HashMap.Strict    as HM
+import qualified Data.HashSet           as HS
+import           Debug.Trace
 import           Ohua.ALang.Lang
 import           Ohua.ALang.Util
 import           Ohua.IR.Functions
 import           Ohua.Monad
 import           Ohua.Types
-import Debug.Trace
 
 
 
 type Error = String
 
 inlineLambdaRefs :: MonadError Error m => Expression -> m Expression
-inlineLambdaRefs (Let assignment l@(Lambda _ _) body) = 
-    case assignment of 
+inlineLambdaRefs (Let assignment l@(Lambda _ _) body) =
+    case assignment of
         Direct bnd -> inlineLambdaRefs $ substitute bnd l body
         _ -> throwError "invariant broken, cannot destructure lambda"
 inlineLambdaRefs (Let assignment value body) = Let assignment <$> inlineLambdaRefs value <*> inlineLambdaRefs body
@@ -131,15 +131,15 @@ removeCurrying e = fst <$> evalRWST (inlinePartials e) mempty ()
     inlinePartials (Let assign@(Direct bnd) val body) = do
         val' <- inlinePartials val
         (body', touched) <- listen $ local (HM.insert bnd val') $ inlinePartials body
-        return $ 
-            if bnd `HS.member` touched then 
+        return $
+            if bnd `HS.member` touched then
                 body'
             else
                 Let assign val' body'
     inlinePartials (Apply (Var (Local bnd)) arg) = do
         tell $ HS.singleton bnd
         val <- asks (HM.lookup bnd)
-        Apply 
+        Apply
             <$> maybe (throwError $ "No suitable value found for binding " ++ show bnd) return val
             <*> inlinePartials arg
     inlinePartials (Apply function arg) = Apply <$> inlinePartials function <*> inlinePartials arg
@@ -186,7 +186,7 @@ checkProgramValidity e = do
 
 normalize :: (MonadOhua m, MonadError Error m) => Expression -> m Expression
 normalize e = do
-    e' <- reduceLambdas (letLift e) >>= removeCurrying >>= ensureFinalLet . inlineReassignments 
+    e' <- reduceLambdas (letLift e) >>= removeCurrying >>= ensureFinalLet . inlineReassignments
     traceShow e' $ checkProgramValidity e'
     return e'
   where
