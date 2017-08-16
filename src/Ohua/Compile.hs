@@ -45,7 +45,7 @@ pipeline e
 
 
 compile :: Expression -> IO (Either String OutGraph)
-compile e = flip runOhuaC e $ runExceptT . pipeline
+compile e = flip runOhuaT e $ runExceptT . pipeline
 
 
 checkHigherOrderFunctionSupport :: MonadError String m => Expression -> m ()

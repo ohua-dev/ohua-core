@@ -14,7 +14,7 @@
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE UndecidableInstances       #-}
 module Ohua.Monad
-    ( OhuaT, runOhuaC
+    ( OhuaT, runOhuaT
     , MonadOhua(modifyState, getState, recordError)
     , generateBinding, generateBindingWith, generateId
     , MonadIO(..)
@@ -117,8 +117,8 @@ fromState l = (^. l) <$> getState
 -- | Run a compiler
 -- Creates the state from the tree being passed in
 -- If there are any errors during the compilation they are reported together at the end
-runOhuaC :: Monad ctxt => (Expression -> OhuaT ctxt result) -> Expression -> ctxt result
-runOhuaC f tree = do
+runOhuaT :: Monad ctxt => (Expression -> OhuaT ctxt result) -> Expression -> ctxt result
+runOhuaT f tree = do
     (val, errors) <- evalRWST (runOhuaT' (f tree)) (error "Ohua has no environment!") (CompilerState nameGen 0)
 #ifdef DEBUG
     unless (null errors) $ error $ intercalate "\n" errors

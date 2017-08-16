@@ -36,6 +36,6 @@ currying = describe "resolution of curried functions" $ do
           "x"
   let f :: Expression -> OhuaT (Either String) Expression
       f = normalize
-  let runALangTransforms = either error id . runOhuaC f
+  let runALangTransforms = either error id . runOhuaT f
   let output = runALangTransforms sourceExpr
   it "just some output" $ justTrace output

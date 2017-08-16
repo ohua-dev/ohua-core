@@ -73,7 +73,7 @@ instance Arbitrary a => Arbitrary (Expr a) where
 --         tree (_, values) 0 = Var $ Local
 
 
-runPasses expr = flip runOhuaC expr $ performSSA >=> runExceptT . normalize
+runPasses expr = flip runOhuaT expr $ performSSA >=> runExceptT . normalize
 
 type ALangCheck = Either String
 

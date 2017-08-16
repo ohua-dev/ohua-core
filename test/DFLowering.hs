@@ -54,7 +54,7 @@ traceGr g = trace (prettify $ unGr g) g
 
 lowerAndValidate :: Expression -> DFExpr -> String -> Spec
 lowerAndValidate sourceExpr targetExpr statementType = do
-    let runLowering = runOhuaC (fmap (either error id) . runExceptT . lowerALang)
+    let runLowering = runOhuaT (fmap (either error id) . runExceptT . lowerALang)
     let shouldLowerTo :: Expression -> DFExpr -> Expectation
         shouldLowerTo input expected =
             fmap (traceGr . toFGLGraph . toGraph) (runLowering input) `shouldSatisfyRet` (isIsomorphic (unGr $ toFGLGraph $ toGraph expected) . unGr)
