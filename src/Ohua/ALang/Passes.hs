@@ -15,50 +15,12 @@ import           Control.Monad.Except
 import           Control.Monad.State
 import           Control.Monad.Writer
 import qualified Data.HashSet         as HS
+import qualified Data.HashMap.Strict  as HM
 import           Ohua.ALang.Lang
 import           Ohua.ALang.Util
 import           Ohua.IR.Functions
 import           Ohua.Monad
 import           Ohua.Types
-
-
--- instead of doing a traversal, we should transform the expression in the following steps:
--- 1. make implicit passing explicit by binding the result
--- 2. contextify
--- 3. create SSA
--- 4. perform lambda lifting to derive just a single let statement
-
-
--- -- step: turn implicit into explicit
--- mkDataflowExplicit :: Expression -> Expression
--- mkDataflowExplicit (Let l e) = return $ Let (map convertAssignment l) (mkDataflowExplicit e)
-
--- mkDataflowExplicit (Var v) = return $ Var v
-
-
--- mkDataflowExplicit (Lambda as e) = return $ Lambda as $ mkDataflowExplicit e
-
--- mkDataflowExplicit (Apply (Apply f s) e) = mkDataflowExplicit $
---                               Let
---                                [(Direct (Binding "something"), Apply f s)]
---                               $ Apply (Var (Local (Binding "something"))) e
--- mkDataflowExplicit (Apply r as) = convertApply r as []
-
-
--- convertApply :: Expression -> [Expression] -> [Expression] -> Expression
--- convertApply r (x@(Apply f as):xs) n = Let
---                                          [ (Direct (Binding "something"), mkDataflowExplicit (Apply f as)) ]
---                                          $ convertApply r xs (n ++ [(Var (Local (Binding "something")))])
--- convertApply r (x:xs) n = convertApply r xs $ n ++ [(mkDataflowExplicit x)]
--- convertApply r [] n = Apply r n
-
--- convertAssignment :: (Assignment, Expression) -> (Assignment, Expression)
--- convertAssignment t@(a,e) = (a, (mkDataflowExplicit e))
-
-
--- contexts: seq, if, higher-order functions (any function that takes an algo as an input)
-contextify :: Expression -> Expression
-contextify e = undefined
 
 
 type Error = String
@@ -158,6 +120,15 @@ removeUnusedBindings = fst . runWriter . go
             Let bnds <$> go val <*> pure inner
 
 
+inlineFunctions :: Monad m => Expression -> m Expression
+inlineFunctions e = evalStateT (lrPrewalkExpr go e) mempty
+  where
+    go v@(Let (Direct bnd) val _) = modify (HM.insert bnd val) >> return v
+    go v@(Apply (Var (Local bnd)) arg) = maybe v (flip Apply arg) <$> gets (HM.lookup bnd)
+    go v = return v
+
+
+
 hasFinalLet :: MonadError String m => Expression -> m ()
 hasFinalLet (Let _ _ body)  = hasFinalLet body
 hasFinalLet (Var (Local _)) = return ()
@@ -174,6 +145,13 @@ noDuplicateIds = void . flip runStateT mempty . lrPrewalkExpr go
         modify (HS.insert id)
         return e
     go e = return e
+
+
+applyToSf :: MonadError String m => Expression -> m ()
+applyToSf = foldlExprM (const . go) ()
+  where
+    go (Apply (Var (Local bnd)) _) = throwError $ "Illegal Apply to local var " ++ show bnd
+    go _ = return ()
 
 -- FIXME this function is never called. was it supposed to be part of the below validity check?
 lamdasAreInputToHigherOrderFunctions :: MonadError Error m => Expression -> m ()

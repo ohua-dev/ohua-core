@@ -10,9 +10,12 @@
 -- This source code is licensed under the terms described in the associated LICENSE.TXT file
 module Ohua.ALang.Lang where
 
+
 import           Control.DeepSeq
 import           Data.String
 import           Ohua.Types
+import Data.Functor.Identity
+
 
 -- bindingType is the type of general bindings
 -- Binding is the type for function arguments and `let`s etc which we know to always be local
@@ -79,6 +82,41 @@ lrPostwalkExpr f (Let assign val body) = f =<< Let assign <$> lrPostwalkExpr f v
 lrPostwalkExpr f (Apply fn arg) = f =<< Apply <$> lrPostwalkExpr f fn <*> lrPostwalkExpr f arg
 lrPostwalkExpr f (Lambda assign body) = f . Lambda assign =<< lrPostwalkExpr f body
 lrPostwalkExpr _ e = return e
+
+
+foldlExprM :: Monad m => (Expr a -> b -> m b) -> b -> Expr a -> m b
+foldlExprM f b e = do
+    b' <- f e b
+    case e of
+        Apply e1 e2 -> do
+            b1 <- foldlExprM f b' e1
+            foldlExprM f b1 e2
+        Let _ e1 e2 -> do
+            b1 <- foldlExprM f b' e1
+            foldlExprM f b1 e2
+        Lambda _ e1 -> foldlExprM f b' e1
+        _ -> return b'
+
+
+foldrExprM :: Monad m => (a -> Expr b -> m a) -> Expr b -> a -> m a
+foldrExprM f e a = do
+    a' <- case e of
+        Apply e1 e2 -> do
+            a2 <- foldrExprM f e2 a
+            foldrExprM f e1 a2
+        Let _ e1 e2 -> do
+            a2 <- foldrExprM f e2 a
+            foldrExprM f e1 a2
+        Lambda _ e1 -> foldrExprM f e1 a
+        _ -> return a
+    f a' e
+
+foldlExpr :: (Expr a -> b -> b) -> b -> Expr a -> b
+foldlExpr f b e = runIdentity $ foldlExprM (\x y -> return $ f x y) b e
+
+
+foldrExpr :: (a -> Expr b -> a) -> Expr b -> a -> a
+foldrExpr f e b = runIdentity $ foldrExprM (\x y -> return $ f x y) e b
 
 -- (Sebastian) TODO: In Clojure, every variable/binding, even local ones, are namespaced. Should we go down this path too, i.e., change Binding to take FnReference/Reference?
 -- (Justus)    AFAIK The local ones aren't namespaced ... Apart from that since we distinguish between local and
