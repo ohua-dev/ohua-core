@@ -24,7 +24,15 @@ import           Ohua.Types
 import           Test.Hspec
 
 
-newtype OhuaGrGraph = OhuaGrGraph { unGr :: Gr FnName (Int, Int) } deriving Eq
+newtype OhuaGrGraph = OhuaGrGraph { unGr :: Gr FnName OhuaGrEdgeLabel } deriving Eq
+
+
+data OhuaGrEdgeLabel = OhuaGrEdgeLabel
+    { sourceIndex :: !Int
+    , targetIndex :: !Int
+    } deriving (Eq, Show, Ord)
+
+
 
 instance Show OhuaGrGraph where
     show = prettify . unGr
@@ -42,8 +50,8 @@ toFGLGraph (OutGraph ops arcs) = OhuaGrGraph $ mkGraph nodes edges
 
     edges = map toEdge arcs
 
-    toEdge (Arc s t) = (unFnId $ operator s, unFnId $ operator t, (index s, index t))
-    toEdge (EnvArc t a) = (envId, unFnId $ operator t, (unwrapHostExpr a, index t))
+    toEdge (Arc s t) = (unFnId $ operator s, unFnId $ operator t, OhuaGrEdgeLabel (index s) (index t))
+    toEdge (EnvArc t a) = (envId, unFnId $ operator t, OhuaGrEdgeLabel (unwrapHostExpr a) (index t))
 
 
 
