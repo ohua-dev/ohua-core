@@ -34,8 +34,8 @@ import           Ohua.Types
 type Error = String
 
 data CompilerState = CompilerState
-    { compilerStateNameGenerator :: NameGenerator
-    , compilerStateIdCounter     :: Int
+    { compilerStateNameGenerator :: !NameGenerator
+    , compilerStateIdCounter     :: !Int
     }
 data CompilerEnv
 
@@ -46,7 +46,7 @@ instance HasIdCounter CompilerState Int where
     idCounter = lens compilerStateIdCounter $ \s a -> s { compilerStateIdCounter = a }
 
 data NameGenerator = NameGenerator
-    { nameGeneratorTakenNames     :: HS.HashSet Binding
+    { nameGeneratorTakenNames     :: !(HS.HashSet Binding)
     , nameGeneratorSimpleNameList :: [Binding]
     }
 

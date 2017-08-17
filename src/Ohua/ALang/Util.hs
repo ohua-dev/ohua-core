@@ -19,10 +19,7 @@ substitute :: Binding -> Expression -> Expression -> Expression
 -- Postwalk avoids an infinite recursion in a case where `val` uses a `var` binding.
 -- This should never happen but might if this this invariant is violated for some reason
 -- and the violation is not caught.
-
--- I want to use postwalk, but its broken somehow currently ... :(
--- substitute var val = lrPostwalkExpr f
-substitute var val = lrPrewalkExpr f
+substitute !var val = lrPostwalkExpr f
   where
     f (Var (Local v)) | var == v = val
     f e               = e

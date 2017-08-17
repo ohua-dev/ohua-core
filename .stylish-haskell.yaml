@@ -194,3 +194,4 @@ language_extensions:
   - TypeSynonymInstances
   - LambdaCase
   - TupleSections
+  - BangPatterns

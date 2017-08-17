@@ -65,6 +65,7 @@ library
     , TypeSynonymInstances
     , LambdaCase
     , TupleSections
+    , BangPatterns
   if flag(debug)
     cpp-options: -DDEBUG=1
 

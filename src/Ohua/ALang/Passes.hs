@@ -12,10 +12,10 @@ module Ohua.ALang.Passes where
 
 
 import           Control.Monad.Except
+import           Control.Monad.Reader
 import           Control.Monad.RWS.Lazy
 import           Control.Monad.State
 import           Control.Monad.Writer
-import           Control.Monad.Reader
 import qualified Data.HashMap.Strict    as HM
 import qualified Data.HashSet           as HS
 import           Debug.Trace
@@ -122,7 +122,7 @@ ensureFinalLet a = do
 
 
 -- | Removes bindings that are never used.
--- This is actually not safe becuase sfn invocations may have side effects 
+-- This is actually not safe becuase sfn invocations may have side effects
 -- and therefore cannot be removed.
 -- Assumes ssa for simplicity
 removeUnusedBindings :: Expression -> Expression
@@ -145,10 +145,10 @@ removeUnusedBindings = fst . runWriter . go
 -- aka `let f = some/sf a in f b` becomes `some/sf a b`.
 -- It both inlines the curried function and removes the binding site.
 -- Recursively calls it self and therefore handles redefinitions as well.
--- It only substitutes vars in the function positions of apply's 
+-- It only substitutes vars in the function positions of apply's
 -- hence it may produce an expression with undefined local bindings.
 -- It is recommended therefore to check this with 'noUndefinedBindings'.
--- If an undefined binging is left behind this indicates the source expression 
+-- If an undefined binging is left behind this indicates the source expression
 -- was not fulfilling all its invariants.
 removeCurrying :: MonadError String m => Expression -> m Expression
 removeCurrying e = fst <$> evalRWST (inlinePartials e) mempty ()
@@ -195,7 +195,7 @@ noDuplicateIds = void . flip runStateT mempty . lrPrewalkExprM go
 
 -- | Checks that no apply to a local variable is performed.
 -- This is a simple check and it will pass on complex expressions even if they would reduce
--- to an apply to a local variable. 
+-- to an apply to a local variable.
 applyToSf :: MonadError String m => Expression -> m ()
 applyToSf = foldlExprM (const . go) ()
   where
@@ -212,7 +212,7 @@ lamdasAreInputToHigherOrderFunctions (Apply v (Lambda _ body)) = undefined
 -- Scoped. Aka bindings are only visible in their respective scopes.
 -- Hence the expression does not need to be in SSA form.
 noUndefinedBindings :: MonadError String m => Expression -> m ()
-noUndefinedBindings = flip runReaderT mempty . go 
+noUndefinedBindings = flip runReaderT mempty . go
   where
     go (Let assign val body) = go val >> local (HS.union $ HS.fromList $ flattenAssign assign) (go body)
     go (Var (Local bnd)) = do

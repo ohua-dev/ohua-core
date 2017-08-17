@@ -39,19 +39,19 @@ data ResolvedSymbol
 
        -- the basic symbols occuring in the algorithm language
 
-    = Local Binding
+    = Local !Binding
 
         -- a variable/binding in the algorithm language
 
-    | Sf FnName (Maybe FnId)
+    | Sf !FnName !(Maybe FnId)
 
         -- reference to a stateful function
 
-    | Algo FnName
+    | Algo !FnName
 
         -- reference to an algo definition
 
-    | Env HostExpr
+    | Env !HostExpr
 
         -- reference to an environment object. this maybe a var or any other term of the host language.
     deriving (Show, Eq)

@@ -21,25 +21,25 @@ import           Ohua.Types
 
 
 data Operator = Operator
-    { operatorId   :: FnId
-    , operatorType :: FnName
+    { operatorId   :: !FnId
+    , operatorType :: !FnName
     }
 
 
 data Target = Target
-    { operator :: FnId
-    , index    :: Int
+    { operator :: !FnId
+    , index    :: !Int
     }
 
 
 data Arc
     = Arc
-        { source :: Target
-        , target :: Target
+        { source :: !Target
+        , target :: !Target
         }
     | EnvArc
-        { target    :: Target
-        , envSource :: HostExpr
+        { target    :: !Target
+        , envSource :: !HostExpr
         }
 
 
