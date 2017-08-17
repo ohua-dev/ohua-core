@@ -109,11 +109,7 @@ lowerSmap _ fnId assign args = do
 -- | Lowers an if call.
 lowerIf :: (MonadOhua m, MonadError String m) => Pass m
 lowerIf _ fnId assign args = do
-    dfCond <- case condition of
-        Var (Local b) -> return $ DFVar b
-        Var (Env e)   -> return $ DFEnvVar e
-        Var _         -> throwError "Algo and sfref not allowed as condition"
-        _             -> throwError "Expected var as condition"
+    dfCond <- expectVar condition
     loweredThen <- lowerALang thenBody
     loweredElse <- lowerALang elseBody
 
@@ -133,12 +129,17 @@ lowerIf _ fnId assign args = do
 
 -- | Lowers a seq call.
 lowerSeq :: (MonadOhua m, MonadError String m) => Pass m
-lowerSeq = undefined
+lowerSeq _ fnId assign args = do
+    loweredExpr <- lowerALang toSeq
+    return $ tieContext binding (letExprs loweredExpr) |> LetExpr fnId assign (EmbedSf "com.ohua.lang/id") [DFVar (returnVar loweredExpr)] Nothing
+  where
+    -- Is binding first the right way around?
+    [Var (Local binding), Lambda _ toSeq] = args 
 
 
 -- | Lower any not specially treated function type.
 lowerDefault :: (MonadOhua m, MonadError String m) => Pass m
-lowerDefault fn fnId assign args = mapM expectVar args <&> \args' -> return $ LetExpr fnId assign (EmbedSf fn) args' Nothing
+lowerDefault fn fnId assign args = mapM expectVar args <&> \args' -> [LetExpr fnId assign (EmbedSf fn) args' Nothing]
 
 
 -- | Tie all functions which do not depend on locally bound variables via context arc
@@ -189,6 +190,7 @@ handleApplyExpr (Apply fn arg) = go fn [arg]
     go (Var v) _             = throwError $ "Expected Var Sf but got: Var " ++ show v -- FIXME there should be a special type of error here that takes the string and a value
     go (Apply fn arg) args   = go fn (arg:args)
     go x _                   = throwError $ "Expected Apply or Var but got: " ++ show x
+handleApplyExpr (Var (Sf fn id)) = (fn, , []) <$> maybe generateId return id
 handleApplyExpr g = throwError $ "Expected apply but got: " ++ show g
 
 

@@ -21,6 +21,7 @@ import           Ohua.DFLang.Passes
 import           Ohua.Monad
 import           Ohua.Types
 import           Test.Hspec
+import Data.String
 
 
 newtype OhuaGrGraph = OhuaGrGraph { unGr :: Gr FnName (Int, Int) } deriving Eq
@@ -52,12 +53,21 @@ shouldSatisfyRet action predicate = action >>= (`shouldSatisfy` predicate)
 traceGr :: OhuaGrGraph -> OhuaGrGraph
 traceGr g = trace (prettify $ unGr g) g
 
+
+runLowering :: Expression -> IO DFExpr
+runLowering = runOhuaT (fmap (either error id) . runExceptT . lowerALang)
+
+
+shouldLowerTo :: Expression -> DFExpr -> Expectation
+shouldLowerTo input expected = do
+    gr1 <- fmap (toFGLGraph . toGraph) (runLowering input)  
+    let gr2 = toFGLGraph $ toGraph expected
+    unless (gr1 `matches` gr2) $ expectationFailure (show gr1 ++ "\nis not isomorph to\n\n" ++ show gr2) 
+  where matches = isIsomorphic `on` unGr
+
+
 lowerAndValidate :: Expression -> DFExpr -> String -> Spec
 lowerAndValidate sourceExpr targetExpr statementType = do
-    let runLowering = runOhuaT (fmap (either error id) . runExceptT . lowerALang)
-    let shouldLowerTo :: Expression -> DFExpr -> Expectation
-        shouldLowerTo input expected =
-            fmap (toFGLGraph . toGraph) (runLowering input) `shouldSatisfyRet` (isIsomorphic (unGr $ toFGLGraph $ toGraph expected) . unGr)
     it ("correctly lowers an " ++ statementType ++ " statement") $
         sourceExpr `shouldLowerTo` targetExpr
 
@@ -93,20 +103,51 @@ ifLowering = describe "lowering conditionals" $ do
                                              (Let "f" (Apply "m" "b") "f"))))
           "z"
     let targetExpr = DFExpr
-          [ LetExpr 0 "a" (EmbedSf "com.ohua.lang/id") [DFEnvVar (HostExpr 0)] Nothing
-          , LetExpr 1 "b" (EmbedSf "com.ohua.lang/id") [DFEnvVar (HostExpr 1)] Nothing
-          , LetExpr 2 "c" (EmbedSf "com.ohua.lang/id") [DFEnvVar (HostExpr 2)] Nothing
-          , LetExpr 3 "s" (DFFunction "com.ohua.lang/ifThenElse") [DFVar "c"] Nothing
-          , LetExpr 4 "d" (EmbedSf "some-ns/+") [DFVar "a", DFVar "b"] Nothing
-          , LetExpr 5 "e" (EmbedSf "some-ns/-") [DFVar "a", DFVar "b"] Nothing
-          , LetExpr 6 "z" (DFFunction "com.ohua.lang/switch") [DFVar "s", DFVar "d", DFVar "e"] Nothing
+          [ LetExpr 0 "a" (EmbedSf "com.ohua.lang/id") [0] Nothing
+          , LetExpr 1 "b" (EmbedSf "com.ohua.lang/id") [1] Nothing
+          , LetExpr 2 "c" (EmbedSf "com.ohua.lang/id") [2] Nothing
+          , LetExpr 3 "s" (DFFunction "com.ohua.lang/ifThenElse") ["c"] Nothing
+          , LetExpr 4 "d" (EmbedSf "some-ns/+") ["a", "b"] Nothing
+          , LetExpr 5 "e" (EmbedSf "some-ns/-") ["a", "b"] Nothing
+          , LetExpr 6 "z" (DFFunction "com.ohua.lang/switch") ["s", "d", "e"] Nothing
           ]
           "z"
 
     lowerAndValidate (traceShowId sourceExpr) targetExpr "if"
 
+
+generalLowering :: Spec
+generalLowering = do
+    describe "lowering a stateful function" $ do
+        it "lowers a function with one argument" $
+            Let "a" ("com.ohua.lang/id" `Apply` Var (Env 0)) (Let "x" ("some/function" `Apply` "a") "x")
+            `shouldLowerTo`
+            DFExpr [ LetExpr 1 "a" (EmbedSf "com.ohua.lang/id") [0] Nothing, LetExpr 0 "x" (EmbedSf "some/function") ["a"] Nothing ] "x"
+        it "lowers a function with one env argument" $
+            Let "x" ("some/function" `Apply` Var (Env 0)) "x"
+            `shouldLowerTo`
+            DFExpr [ LetExpr 0 "x" (EmbedSf "some/function") [0] Nothing ] "x"
+        it "lowers a function with no arguments" $
+            Let "x" "some/function" "x"
+            `shouldLowerTo`
+            DFExpr [ LetExpr 0 "x" (EmbedSf "some/function") [] Nothing ] "x"
+
+
 ifSpec :: Spec
 ifSpec = ifLowering
+
+
+instance IsString a => IsString (Maybe a) where fromString = Just . fromString
+
+
+seqSpec :: Spec
+seqSpec = do
+    describe "seq lowering" $ do
+        it "lowers a simple seq" $
+            Let "y" ("com.ohua.lang/id" `Apply` Var (Env 0)) (Let "x" ("com.ohua.lang/seq" `Apply` "y" `Apply` Lambda "_" (Let "p" "some/function" "p")) "x")
+            `shouldLowerTo`
+            DFExpr [ LetExpr 1 "y" (EmbedSf "com.ohua.lang/id") [0] Nothing, LetExpr 0 "x" (EmbedSf "some/function") [] (Just "y"), LetExpr 2 "z" (EmbedSf "com.ohua.lang/id") ["x"] Nothing ] "x"
+
 
 isIsomorphic :: (Eq a, Ord b) => Gr a b -> Gr a b -> Bool
 isIsomorphic gr1 gr2 = isJust $ isomorphicMapping gr1 gr2

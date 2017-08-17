@@ -22,6 +22,7 @@ module Ohua.DFLang.Lang where
 import           Data.Sequence
 import           Ohua.ALang.Lang
 import           Ohua.Types
+import Data.String
 
 -- | A sequence of let statements with a terminating binding to be used as return value
 data DFExpr = DFExpr
@@ -48,3 +49,6 @@ data DFVar
     = DFEnvVar !HostExpr
     | DFVar !Binding
     deriving Eq
+
+instance IsString DFVar where fromString = DFVar . fromString
+instance Num DFVar where fromInteger = DFEnvVar . fromInteger
