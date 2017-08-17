@@ -81,7 +81,11 @@ executable ohua-test-exec
 
 test-suite ohua-tests
   main-is: Spec.hs
-  other-modules:       PassesSpec, DFLowering
+  other-modules:       
+      PassesSpec
+    , DFLowering
+    , TestALangUtils
+    , ALangVerify
   hs-source-dirs:      test
   build-depends:       
       base >=4.8 && <4.9

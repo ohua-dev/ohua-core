@@ -82,10 +82,11 @@ lrPrewalkExpr f = runIdentity . lrPrewalkExprM (return . f)
 
 
 lrPostwalkExprM :: Monad m => (Expr b -> m (Expr b)) -> Expr b -> m (Expr b)
-lrPostwalkExprM f (Let assign val body) = f =<< Let assign <$> lrPostwalkExprM f val <*> lrPostwalkExprM f body
-lrPostwalkExprM f (Apply fn arg) = f =<< Apply <$> lrPostwalkExprM f fn <*> lrPostwalkExprM f arg
-lrPostwalkExprM f (Lambda assign body) = f . Lambda assign =<< lrPostwalkExprM f body
-lrPostwalkExprM _ e = return e
+lrPostwalkExprM f e = f =<< case e of
+    Let assign val body -> Let assign <$> lrPostwalkExprM f val <*> lrPostwalkExprM f body
+    Apply fn arg -> Apply <$> lrPostwalkExprM f fn <*> lrPostwalkExprM f arg
+    Lambda assign body -> Lambda assign <$> lrPostwalkExprM f body
+    _ -> return e
 
 
 lrPostwalkExpr :: (Expr b -> (Expr b)) -> Expr b -> (Expr b)
