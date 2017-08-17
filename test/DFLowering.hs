@@ -13,6 +13,7 @@ import           Data.Graph.Inductive.Graph
 import           Data.Graph.Inductive.PatriciaTree
 import qualified Data.Map.Strict                   as Map
 import           Data.Maybe
+import           Data.String
 import           Debug.Trace
 import           Ohua.ALang.Lang
 import           Ohua.DFGraph
@@ -21,7 +22,6 @@ import           Ohua.DFLang.Passes
 import           Ohua.Monad
 import           Ohua.Types
 import           Test.Hspec
-import Data.String
 
 
 newtype OhuaGrGraph = OhuaGrGraph { unGr :: Gr FnName (Int, Int) } deriving Eq
@@ -60,9 +60,9 @@ runLowering = runOhuaT (fmap (either error id) . runExceptT . lowerALang)
 
 shouldLowerTo :: Expression -> DFExpr -> Expectation
 shouldLowerTo input expected = do
-    gr1 <- fmap (toFGLGraph . toGraph) (runLowering input)  
+    gr1 <- fmap (toFGLGraph . toGraph) (runLowering input)
     let gr2 = toFGLGraph $ toGraph expected
-    unless (gr1 `matches` gr2) $ expectationFailure (show gr1 ++ "\nis not isomorph to\n\n" ++ show gr2) 
+    unless (gr1 `matches` gr2) $ expectationFailure (show gr1 ++ "\nis not isomorph to\n\n" ++ show gr2)
   where matches = isIsomorphic `on` unGr
 
 

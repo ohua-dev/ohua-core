@@ -153,7 +153,7 @@ passesSpec = do
 
         it "Reduces lambdas as far as possible but does not remove them when argument" $
             runPasses lambda_with_app_as_arg `shouldSatisfyRet` either (const False) lambdaStaysInput
-        
+
         let normalize' = runOhuaT normalize
             e = Let "f" (Lambda "x" ("some/fn" `Apply` "x")) $
                 Let "g" ("f" `Apply` "a")
@@ -162,7 +162,7 @@ passesSpec = do
         it "reduces curried functions which are produced by a lambda" $
             normalize' e `shouldBe` Right (Let "c" ("some/fn" `Apply` "a" `Apply` "b" ) "c")
 
-    
+
 
     describe "remove currying pass" $ do
         it "inlines curring" $
@@ -173,7 +173,7 @@ passesSpec = do
             removeCurrying (Let "a" ("mod/fun" `Apply` "b") $ Let "x" ("a" `Apply` "c") "x")
             `shouldBe`
             Right (Let "x" ("mod/fun" `Apply` "b" `Apply` "c") "x")
-        it "removes currying even for redefintions" $ 
+        it "removes currying even for redefintions" $
             removeCurrying (Let "a" "some/sf" $ Let "b" "a" $ "b" `Apply` "c")
             `shouldBe`
             Right ("some/sf" `Apply` "c")

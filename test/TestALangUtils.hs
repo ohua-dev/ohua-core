@@ -2,8 +2,8 @@
 module TestALangUtils where
 
 
-import Ohua.ALang.Lang
-import Test.Hspec
+import           Ohua.ALang.Lang
+import           Test.Hspec
 
 
 substitute' var val = lrPostwalkExpr f
@@ -20,21 +20,21 @@ utilsSpec = do
         it "substitutes a complicated expression" $
             let toSub@(Var (Local toSubBinding)) = "h"
                 subVal = "result" `Apply` "e"
-                e = 
+                e =
                     Let "x" toSub $
                     Let "v" (toSub `Apply` "c") $
                     Let "q" (Lambda "g" ("some/func" `Apply` toSub))
                     "q"
-                
-                e1 = 
+
+                e1 =
                     Let "x" subVal $
                     Let "v" (subVal `Apply` "c") $
                     Let "q" (Lambda "g" ("some/func" `Apply` subVal))
                     "q"
             in substitute' toSubBinding subVal e `shouldBe` e1
-        
+
         it "does not recurse indefinitely" $
             substitute' "h" "h" "h" `shouldBe` "h"
 
-        
+
 spec = utilsSpec

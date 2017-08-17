@@ -28,7 +28,7 @@ import           Ohua.Types
 
 
 pipeline :: (MonadError String m, MonadOhua m) => Expression -> m OutGraph
-pipeline e = do 
+pipeline e = do
     ssaE <- performSSA e
     normalizedE <- normalize ssaE
 

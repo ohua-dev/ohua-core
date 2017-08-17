@@ -134,7 +134,7 @@ lowerSeq _ fnId assign args = do
     return $ tieContext binding (letExprs loweredExpr) |> LetExpr fnId assign (EmbedSf "com.ohua.lang/id") [DFVar (returnVar loweredExpr)] Nothing
   where
     -- Is binding first the right way around?
-    [Var (Local binding), Lambda _ toSeq] = args 
+    [Var (Local binding), Lambda _ toSeq] = args
 
 
 -- | Lower any not specially treated function type.
