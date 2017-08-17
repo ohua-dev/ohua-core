@@ -69,6 +69,8 @@ instance NFData ResolvedSymbol where
     rnf (Env _)   = ()
     rnf (Sf s i)  = rnf s `seq` rnf i
 
+
+-- | Traverse an ALang expression from left to right and top down, building a new expression.
 lrPrewalkExprM :: Monad m => (Expr b -> m (Expr b)) -> Expr b -> m (Expr b)
 lrPrewalkExprM f e = f e >>= \case
     Let bnd val body -> Let bnd <$> lrPrewalkExprM f val <*> lrPrewalkExprM f body
@@ -77,10 +79,26 @@ lrPrewalkExprM f e = f e >>= \case
     e' -> return e'
 
 
+-- | Traverse an ALang expression from right to left and top down.
+rlPrewalkExprM :: Monad m => (Expr b -> m (Expr b)) -> Expr b -> m (Expr b)
+rlPrewalkExprM f e = f e >>= \case
+    Let bnd val body -> flip (Let bnd) <$> lrPrewalkExprM f body <*> lrPrewalkExprM f val
+    Apply fn arg -> flip Apply <$> lrPrewalkExprM f arg <*> lrPrewalkExprM f fn
+    Lambda assign body -> Lambda assign <$> lrPrewalkExprM f body
+    e' -> return e'
+
+
+-- | Same as 'lrPrewalkExprM' but does not carry a monaic value.
 lrPrewalkExpr :: (Expr b -> (Expr b)) -> Expr b -> (Expr b)
 lrPrewalkExpr f = runIdentity . lrPrewalkExprM (return . f)
 
 
+-- | Same as 'rlPrewalkExprM' but does not carry a monaic value.
+rlPrewalkExpr :: (Expr b -> (Expr b)) -> Expr b -> (Expr b)
+rlPrewalkExpr f = runIdentity . rlPrewalkExprM (return . f)
+
+
+-- | Traverse an ALang expression from left to right and from the bottom up.
 lrPostwalkExprM :: Monad m => (Expr b -> m (Expr b)) -> Expr b -> m (Expr b)
 lrPostwalkExprM f e = f =<< case e of
     Let assign val body -> Let assign <$> lrPostwalkExprM f val <*> lrPostwalkExprM f body
@@ -89,10 +107,27 @@ lrPostwalkExprM f e = f =<< case e of
     _ -> return e
 
 
+-- | Traverse an ALang expression from right to left and from the bottom up.
+rlPostwalkExprM :: Monad m => (Expr b -> m (Expr b)) -> Expr b -> m (Expr b)
+rlPostwalkExprM f e = f =<< case e of
+    Let assign val body -> flip (Let assign) <$> lrPostwalkExprM f body <*> lrPostwalkExprM f val
+    Apply fn arg -> flip Apply <$> lrPostwalkExprM f arg <*>  lrPostwalkExprM f fn
+    Lambda assign body -> Lambda assign <$> lrPostwalkExprM f body
+    _ -> return e
+
+
+-- | Same as 'lrPostwalkExprM' but does not carry a monad.
 lrPostwalkExpr :: (Expr b -> (Expr b)) -> Expr b -> (Expr b)
 lrPostwalkExpr f = runIdentity . lrPostwalkExprM (return . f)
 
 
+-- | Same as 'lrPostwalkExprM' bot does not carry a monad.
+rlPostwalkExpr :: (Expr b -> (Expr b)) -> Expr b -> (Expr b)
+rlPostwalkExpr f = runIdentity . rlPostwalkExprM (return . f)
+
+
+-- | Generic fold over an ALang expression.
+-- Folds from top down and from left to right.
 foldlExprM :: Monad m => (Expr a -> b -> m b) -> b -> Expr a -> m b
 foldlExprM f b e = do
     b' <- f e b
@@ -107,6 +142,8 @@ foldlExprM f b e = do
         _ -> return b'
 
 
+-- | Generic fold over an ALang expression.
+-- Folds from bottom up and from right to left.
 foldrExprM :: Monad m => (a -> Expr b -> m a) -> Expr b -> a -> m a
 foldrExprM f e a = do
     a' <- case e of
@@ -120,10 +157,13 @@ foldrExprM f e a = do
         _ -> return a
     f a' e
 
+
+-- | Same as 'foldlExprM' but does not carry a monad.
 foldlExpr :: (Expr a -> b -> b) -> b -> Expr a -> b
 foldlExpr f b e = runIdentity $ foldlExprM (\x y -> return $ f x y) b e
 
 
+-- | Same as 'foldrExprM' but does not carry a monad.
 foldrExpr :: (a -> Expr b -> a) -> Expr b -> a -> a
 foldrExpr f e b = runIdentity $ foldrExprM (\x y -> return $ f x y) e b
 
