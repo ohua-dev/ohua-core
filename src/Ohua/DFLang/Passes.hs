@@ -45,6 +45,7 @@ passes =
     ]
 
 
+-- | Check that a sequence of let expressions does not redefine bindings.
 checkSSA :: (Foldable f, MonadError String m) => f LetExpr -> m ()
 checkSSA = flip evalStateT mempty . mapM_ go
   where
@@ -59,10 +60,15 @@ checkSSA = flip evalStateT mempty . mapM_ go
     addAll add set = foldr' HS.insert set add
 
 
+-- | Check that a DFExpression is in SSA form.
 checkSSAExpr :: MonadError String m => DFExpr -> m ()
 checkSSAExpr (DFExpr l _) = checkSSA l
 
 
+-- | Transform an ALang expression into a DFExpression.
+-- This assumes a certain structure in the expression.
+-- This can be achieved with the 'normalize' and 'performSSA' functions and tested with
+-- 'checkProgramValidity'.
 lowerALang :: (MonadOhua m, MonadError String m) => Expression -> m DFExpr
 lowerALang expr = do
     (var, exprs) <- runWriterT (go expr)
@@ -80,10 +86,12 @@ lowerALang expr = do
     go  x = throwError "Expected `let` or binding"
 
 
+-- | Select a function for lowering a let expression absed on the type of the function called.
 dispatchFnType :: (MonadOhua m, MonadError String m) => Pass m
 dispatchFnType fn = fromMaybe lowerDefault (HM.lookup fn passes) $ fn
 
 
+-- | Lowers an smap call.
 lowerSmap :: (MonadOhua m, MonadError String m) => Pass m
 lowerSmap _ fnId assign args = do
     -- TODO add the "one-to-n"s
@@ -98,6 +106,7 @@ lowerSmap _ fnId assign args = do
     [Lambda inVar body, collE] = args
 
 
+-- | Lowers an if call.
 lowerIf :: (MonadOhua m, MonadError String m) => Pass m
 lowerIf _ fnId assign args = do
     dfCond <- case condition of
@@ -122,14 +131,18 @@ lowerIf _ fnId assign args = do
     [condition, Lambda (Direct thenVar) thenBody, Lambda (Direct elseVar) elseBody] = args
 
 
+-- | Lowers a seq call.
 lowerSeq :: (MonadOhua m, MonadError String m) => Pass m
 lowerSeq = undefined
 
 
+-- | Lower any not specially treated function type.
 lowerDefault :: (MonadOhua m, MonadError String m) => Pass m
 lowerDefault fn fnId assign args = mapM expectVar args <&> \args' -> return $ LetExpr fnId assign (EmbedSf fn) args' Nothing
 
 
+-- | Tie all functions which do not depend on locally bound variables via context arc
+-- to a source binding.
 tieContext :: (Functor f, Foldable f) => Binding -> f LetExpr -> f LetExpr
 tieContext ctxSource exprs = fmap go exprs
   where
@@ -140,10 +153,12 @@ tieContext ctxSource exprs = fmap go exprs
     isBoundArg _         = False
 
 
+-- | Find all locally bound variables.
 findBoundVars :: (Functor f, Foldable f) => f LetExpr -> HS.HashSet Binding
 findBoundVars = HS.fromList . fold . fmap (flattenAssign . returnAssignment)
 
 
+-- | Insert a `one-to-n` node for each free variable to scope them.
 replicateFreeVars :: (MonadOhua m, MonadError String m) => Binding -> [Binding] -> Seq LetExpr -> m (Seq LetExpr)
 replicateFreeVars countSource_ initialBindings exprs = do
     (replicators, replications) <- unzip <$> mapM mkReplicator freeVars
@@ -164,6 +179,8 @@ replicateFreeVars countSource_ initialBindings exprs = do
         pure (LetExpr id (Direct newVar) (DFFunction "com.ohua.lang/one-to-n") [DFVar countSource_, DFVar var] Nothing, newVar)
 
 
+-- | Ananlyze an apply expression, extracting the inner stateful function and the nested arguments as a list.
+-- Also generates a new function id for the inner function should it not have one yet.
 handleApplyExpr :: (MonadOhua m, MonadError String m) => Expression -> m (FnName, FnId, [Expression])
 handleApplyExpr (Apply fn arg) = go fn [arg]
   where
@@ -175,6 +192,7 @@ handleApplyExpr (Apply fn arg) = go fn [arg]
 handleApplyExpr g = throwError $ "Expected apply but got: " ++ show g
 
 
+-- | Inspect an expression expecting something which can be captured in a DFVar otherwies throws appropriate errors.
 expectVar :: MonadError String m => Expression -> m DFVar
 expectVar (Var (Local bnd)) = pure $ DFVar bnd
 expectVar (Var (Env i))     = pure $ DFEnvVar i
