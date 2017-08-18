@@ -17,6 +17,9 @@
 {-# LANGUAGE OverloadedLists     #-}
 {-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+#if __GLASGOW_HASKELL__ >= 800
+{-# LANGUAGE TypeApplications #-}
+#endif
 module Ohua.DFLang.Passes where
 
 
@@ -110,16 +113,21 @@ lowerALang2 expr = do
     go  (Let assign expr rest) = do
         (fn, fnId, args) <- handleApplyExpr expr
         case HM.lookup fn hofNames of
-            Just (WHOF p) -> lowerHOF (nameFrom p) assign args
+#if __GLASGOW_HASKELL__ >= 800
+            Just (WHOF (_ :: Proxy p)) -> lowerHOF (name @p) assign args
+#else
+            Just (WHOF (_ :: Proxy p)) -> lowerHOF (name :: TaggedFnName p) assign args
+#endif
             Nothing       -> tell =<< lowerDefault fn fnId assign args
         go rest
     go  x = throwError "Expected `let` or binding"
 
     hofNames = HM.fromList $ map (extractName &&& id) hofs
-    extractName :: WHOF -> FnName
-    extractName (WHOF p) = unTagFnName $ nameFrom p
-    nameFrom :: HigherOrderFunction f => Proxy f -> TaggedFnName f
-    nameFrom _ = name
+#if __GLASGOW_HASKELL__ >= 800
+    extractName (WHOF (_ :: Proxy p)) = unTagFnName $ name @p
+#else
+    extractName (WHOF (_ :: Proxy p)) = unTagFnName $ (name :: TaggedFnName p)
+#endif
 
 
 -- | Select a function for lowering a let expression absed on the type of the function called.
