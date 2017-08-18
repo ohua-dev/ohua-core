@@ -61,7 +61,9 @@ checkSSA = flip evalStateT mempty . mapM_ go
     go le = do
         defined <- get
         let produced = flattenAssign (returnAssignment le)
-        case msum $ map (\a -> if HS.member a defined then Just a else Nothing) produced of
+            f a | HS.member a defined = Just a
+            f _ = Nothing
+        case msum $ map f produced of
             Just b  -> throwError $ "Rebinding of " ++ show b
             Nothing -> return ()
         modify (addAll produced)
@@ -108,9 +110,8 @@ lowerALang2 expr = do
     go  (Let assign expr rest) = do
         (fn, fnId, args) <- handleApplyExpr expr
         case HM.lookup fn hofNames of
-            Just (WHOF p) ->
-                lowerHOF (nameFrom p) assign args
-            Nothing -> tell =<< lowerDefault fn fnId assign args
+            Just (WHOF p) -> lowerHOF (nameFrom p) assign args
+            Nothing       -> tell =<< lowerDefault fn fnId assign args
         go rest
     go  x = throwError "Expected `let` or binding"
 
@@ -190,6 +191,7 @@ tieContext0 bounds ctxSource = fmap go
   where
     go e | any isBoundArg (callArguments e) = e
     go e = e { contextArg = Just ctxSource }
+
     isBoundArg (DFVar v) = v `HS.member` bounds
     isBoundArg _         = False
 
@@ -203,6 +205,7 @@ findFreeVars0 boundVars = HS.fromList . concatMap (mapMaybe f . callArguments)
   where
     f (DFVar b) | not (HS.member b boundVars) = Just b
     f _         = Nothing
+
 
 -- | Insert a `one-to-n` node for each free variable to scope them.
 replicateFreeVars :: (MonadOhua m, MonadError String m) => Binding -> [Binding] -> Seq LetExpr -> m (Seq LetExpr)
@@ -251,7 +254,8 @@ expectVar (Var _)           = throwError "Var must be local or env"
 expectVar _                 = throwError "Argument must be var"
 
 
-lowerHOF :: forall f m . (MonadError String m, MonadOhua m, HigherOrderFunction f, MonadWriter (Seq LetExpr) m) => TaggedFnName f -> Assignment -> [Expression] -> m ()
+lowerHOF :: forall f m . (MonadError String m, MonadOhua m, HigherOrderFunction f, MonadWriter (Seq LetExpr) m)
+         => TaggedFnName f -> Assignment -> [Expression] -> m ()
 lowerHOF name assign args = do
     simpleArgs <- mapM handleArg args
     let newFnArgs = map (either Variable LamArg . fmap fst) simpleArgs
@@ -282,6 +286,7 @@ data SmapFn = SmapFn
     , smapLambda :: !Lambda
     , sizeSource :: Binding
     }
+
 
 instance HigherOrderFunction SmapFn where
     name = "com.ohua.lang/smap"
@@ -320,7 +325,6 @@ instance HigherOrderFunction SmapFn where
         (replicators, replications) <- unzip <$> mapM mkReplicator freeVars
         return (S.fromList replicators, zip freeVars replications)
 
-
     scopeUnboundFunctions _ = return True
 
 
@@ -348,7 +352,6 @@ instance HigherOrderFunction IfFn where
             -- not sure this has to be a dffunction
             [ LetExpr ifId (Destructure [ifRet, thenBnd, elseBnd]) (DFFunction "com.ohua.lang/if") [conditionVariable f] Nothing
             ]
-
 
     end assignment = do
         switchId <- generateId
