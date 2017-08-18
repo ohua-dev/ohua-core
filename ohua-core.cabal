@@ -35,6 +35,7 @@ library
     , Ohua.ALang.Optimizations
     , Ohua.ALang.Util
     , Ohua.DFLang.Lang
+    , Ohua.DFLang.HigherOrderFunction
     , Ohua.DFLang.Passes
     , Ohua.DFLang.Optimizations
     , Ohua.DFGraph

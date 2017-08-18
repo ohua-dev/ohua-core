@@ -11,24 +11,33 @@
 --
 -- Passes required to transform an expression in ALang into an expression in DFLang.
 --
-{-# LANGUAGE CPP             #-}
-{-# LANGUAGE OverloadedLists #-}
+{-# LANGUAGE CPP                 #-}
+{-# LANGUAGE ExplicitForAll      #-}
+{-# LANGUAGE NamedFieldPuns      #-}
+{-# LANGUAGE OverloadedLists     #-}
+{-# LANGUAGE RecordWildCards     #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Ohua.DFLang.Passes where
 
 
+import           Control.Arrow
 import           Control.Monad.Except
 import           Control.Monad.State
 import           Control.Monad.Writer
+import           Data.Either
 import           Data.Foldable
-import qualified Data.HashMap.Strict  as HM
-import qualified Data.HashSet         as HS
+import qualified Data.HashMap.Strict             as HM
+import qualified Data.HashSet                    as HS
 import           Data.Maybe
-import           Data.Sequence        (Seq, (<|), (><), (|>))
-import qualified Data.Sequence        as S
+import           Data.Proxy
+import           Data.Sequence                   (Seq, (<|), (><), (|>))
+import qualified Data.Sequence                   as S
+import           Data.Traversable
 import           Lens.Micro
 import           Ohua.ALang.Lang
-import           Ohua.DFLang.Lang     (DFExpr (..), DFFnRef (..), DFVar (..),
-                                       LetExpr (..))
+import           Ohua.DFLang.HigherOrderFunction as HOF
+import           Ohua.DFLang.Lang                (DFExpr (..), DFFnRef (..),
+                                                  DFVar (..), LetExpr (..))
 import           Ohua.Monad
 import           Ohua.Types
 
@@ -84,6 +93,32 @@ lowerALang expr = do
         tell =<< dispatchFnType fn fnId assign args
         go rest
     go  x = throwError "Expected `let` or binding"
+
+
+lowerALang2 :: (MonadOhua m, MonadError String m) => Expression -> m DFExpr
+lowerALang2 expr = do
+    (var, exprs) <- runWriterT (go expr)
+#ifdef DEBUG
+    checkSSA exprs
+#endif
+    return $ DFExpr exprs var
+  where
+    go  (Var (Local bnd)) = return bnd
+    go  (Var _) = throwError "Non local return binding"
+    go  (Let assign expr rest) = do
+        (fn, fnId, args) <- handleApplyExpr expr
+        case HM.lookup fn hofNames of
+            Just (WHOF p) ->
+                lowerHOF (nameFrom p) assign args
+            Nothing -> tell =<< lowerDefault fn fnId assign args
+        go rest
+    go  x = throwError "Expected `let` or binding"
+
+    hofNames = HM.fromList $ map (extractName &&& id) hofs
+    extractName :: WHOF -> FnName
+    extractName (WHOF p) = unTagFnName $ nameFrom p
+    nameFrom :: HigherOrderFunction f => Proxy f -> TaggedFnName f
+    nameFrom _ = name
 
 
 -- | Select a function for lowering a let expression absed on the type of the function called.
@@ -145,25 +180,35 @@ lowerDefault fn fnId assign args = mapM expectVar args <&> \args' -> [LetExpr fn
 -- | Tie all functions which do not depend on locally bound variables via context arc
 -- to a source binding.
 tieContext :: (Functor f, Foldable f) => Binding -> f LetExpr -> f LetExpr
-tieContext ctxSource exprs = fmap go exprs
+tieContext ctxSource exprs = tieContext0 bounds ctxSource exprs
   where
     bounds = findBoundVars exprs
+
+
+tieContext0 :: Functor f => HS.HashSet Binding -> Binding -> f LetExpr -> f LetExpr
+tieContext0 bounds ctxSource = fmap go
+  where
     go e | any isBoundArg (callArguments e) = e
     go e = e { contextArg = Just ctxSource }
     isBoundArg (DFVar v) = v `HS.member` bounds
     isBoundArg _         = False
-
 
 -- | Find all locally bound variables.
 findBoundVars :: (Functor f, Foldable f) => f LetExpr -> HS.HashSet Binding
 findBoundVars = HS.fromList . fold . fmap (flattenAssign . returnAssignment)
 
 
+findFreeVars0 :: Foldable f => HS.HashSet Binding -> f LetExpr -> HS.HashSet Binding
+findFreeVars0 boundVars = HS.fromList . concatMap (mapMaybe f . callArguments)
+  where
+    f (DFVar b) | not (HS.member b boundVars) = Just b
+    f _         = Nothing
+
 -- | Insert a `one-to-n` node for each free variable to scope them.
 replicateFreeVars :: (MonadOhua m, MonadError String m) => Binding -> [Binding] -> Seq LetExpr -> m (Seq LetExpr)
 replicateFreeVars countSource_ initialBindings exprs = do
     (replicators, replications) <- unzip <$> mapM mkReplicator freeVars
-    pure $ S.fromList replicators >< fmap (renameWith $ HM.fromList $ zip freeVars replications) exprs
+    pure $ S.fromList replicators >< renameWith (HM.fromList $ zip freeVars replications) exprs
   where
     boundVars = findBoundVars exprs `mappend` HS.fromList initialBindings
 
@@ -172,12 +217,16 @@ replicateFreeVars countSource_ initialBindings exprs = do
     f (DFVar b) | not (HS.member b boundVars) = Just b
     f _         = Nothing
 
-    renameWith m e = e { callArguments = map (\case v@(DFVar var) -> maybe v DFVar $ HM.lookup var m; v -> v;) (callArguments e) }
-
     mkReplicator var = do
         id <- generateId
         newVar <- generateBindingWith var
         pure (LetExpr id (Direct newVar) (DFFunction "com.ohua.lang/one-to-n") [DFVar countSource_, DFVar var] Nothing, newVar)
+
+
+renameWith :: Functor f => HM.HashMap Binding Binding -> f LetExpr -> f LetExpr
+renameWith m = fmap go
+  where
+    go e = e { callArguments = map (\case v@(DFVar var) -> maybe v DFVar $ HM.lookup var m; v -> v;) (callArguments e) }
 
 
 -- | Ananlyze an apply expression, extracting the inner stateful function and the nested arguments as a list.
@@ -200,3 +249,130 @@ expectVar (Var (Local bnd)) = pure $ DFVar bnd
 expectVar (Var (Env i))     = pure $ DFEnvVar i
 expectVar (Var _)           = throwError "Var must be local or env"
 expectVar _                 = throwError "Argument must be var"
+
+
+lowerHOF :: forall f m . (MonadError String m, MonadOhua m, HigherOrderFunction f, MonadWriter (Seq LetExpr) m) => TaggedFnName f -> Assignment -> [Expression] -> m ()
+lowerHOF name assign args = do
+    simpleArgs <- mapM handleArg args
+    let newFnArgs = map (either Variable LamArg . fmap fst) simpleArgs
+    f <- HOF.init newFnArgs :: m f
+    flip evalStateT f $ do
+        begin >>= tell
+        let lambdas = rights simpleArgs
+        for_ lambdas $ \(lam, body) -> do
+            let boundVars = findBoundVars body `mappend` HS.fromList (flattenAssign $ beginAssignment lam)
+            let freeVars = HS.toList $ findFreeVars0 boundVars body
+            (scopers, renaming) <- scopeFreeVariables lam freeVars
+            tell scopers
+            scopeUnbound <- scopeUnboundFunctions lam
+            let tieContext1 = if scopeUnbound then tieContext0 boundVars (head $ flattenAssign $ beginAssignment lam) else id
+            tell $ tieContext1 (renameWith (HM.fromList renaming) body)
+        end assign >>= tell
+  where
+    handleArg (Var (Local v)) = return $ Left $ DFVar v
+    handleArg (Var (Env e)) = return $ Left $ DFEnvVar e
+    handleArg (Lambda assign body) = do
+        DFExpr lets bnd <- lowerALang body
+        return $ Right (Lam assign bnd, lets)
+    handleArg _ = throwError "unexpected type of argument"
+
+
+data SmapFn = SmapFn
+    { collSource :: !DFVar
+    , smapLambda :: !Lambda
+    , sizeSource :: Binding
+    }
+
+instance HigherOrderFunction SmapFn where
+    name = "com.ohua.lang/smap"
+
+    init [Variable v, LamArg bnd] = return $ SmapFn v bnd (error "size uninitialized")
+    init _ = throwError "Unexpected number/type of arguments to smap"
+
+    begin = do
+        f <- get
+        sizeId <- generateId
+        sizeRet <- generateBindingWith "size"
+        otnId <- generateId
+        otnRet <- generateBinding
+        smapId <- generateId
+        modify $ \s -> s { sizeSource = otnRet } -- do we need the size or otn of the size?
+        return
+            [ LetExpr sizeId (Direct sizeRet) (EmbedSf "com.ohua.lang/size") [collSource f] Nothing
+            -- I am not sure about the order here ... is it size first or collection first?
+            , LetExpr otnId (Direct otnRet) (DFFunction "com.ohua.lang/one-to-n") [DFVar sizeRet, collSource f] Nothing
+            , LetExpr smapId (beginAssignment $ smapLambda f) (DFFunction "com.ohua.lang/smap-fun") [DFVar otnRet] Nothing
+            ]
+
+    end assignment = do
+        collectId <- generateId
+        f <- get
+        return
+            [ LetExpr collectId assignment (DFFunction "com.ohua.lang/collect") [DFVar $ sizeSource f, DFVar $ resultBinding $ smapLambda f] Nothing
+            ]
+
+    scopeFreeVariables _ freeVars = do
+        SmapFn{sizeSource} <- get
+        let mkReplicator var = do
+                id <- generateId
+                newVar <- generateBindingWith var
+                pure (LetExpr id (Direct newVar) (DFFunction "com.ohua.lang/one-to-n") [DFVar sizeSource, DFVar var] Nothing, newVar)
+        (replicators, replications) <- unzip <$> mapM mkReplicator freeVars
+        return (S.fromList replicators, zip freeVars replications)
+
+
+    scopeUnboundFunctions _ = return True
+
+
+data IfFn = IfFn
+    { conditionVariable :: !DFVar
+    , thenBranch        :: !Lambda
+    , elseBranch        :: !Lambda
+    , ifRet             :: Binding
+    }
+
+
+instance HigherOrderFunction IfFn where
+    name = "com.ohua.lang/if"
+
+    init [Variable v, LamArg thenBr, LamArg elseBr] = return $ IfFn v thenBr elseBr (error "return uninitialized")
+
+    begin = do
+        f <- get
+        ifId <- generateId
+        ifRet <- generateBinding
+        let Direct thenBnd = beginAssignment $ thenBranch f
+            Direct elseBnd = beginAssignment $ elseBranch f
+        modify $ \s -> s { ifRet = ifRet }
+        return
+            -- not sure this has to be a dffunction
+            [ LetExpr ifId (Destructure [ifRet, thenBnd, elseBnd]) (DFFunction "com.ohua.lang/if") [conditionVariable f] Nothing
+            ]
+
+
+    end assignment = do
+        switchId <- generateId
+        IfFn {..} <- get
+        return
+            [ LetExpr switchId assignment (DFFunction "com.ohua.lang/switch") [DFVar ifRet, DFVar $ resultBinding thenBranch, DFVar $ resultBinding elseBranch] Nothing
+            ]
+
+    scopeFreeVariables lam freeVars = do
+        selected <- mapM generateBindingWith freeVars
+        selectorId <- generateId
+        let Direct sourceVar = beginAssignment lam
+        return   -- im just prepending the if return, this is probably not correct
+            (   [ LetExpr selectorId (Destructure selected) (DFFunction "com.ohua.lang/scope") (map DFVar (sourceVar:freeVars)) Nothing
+                ]
+            ,   zip freeVars selected
+            )
+
+    scopeUnboundFunctions _ = return True
+
+
+hofs :: [WHOF]
+hofs =
+    [ WHOF (Proxy :: Proxy IfFn)
+    , WHOF (Proxy :: Proxy SmapFn)
+    -- , WHOF (Proxy :: Proxy SeqFn)
+    ]
