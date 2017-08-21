@@ -1,12 +1,13 @@
-{-# LANGUAGE RecordWildCards, OverloadedLists     #-}
+{-# LANGUAGE OverloadedLists #-}
+{-# LANGUAGE RecordWildCards #-}
 module Ohua.DFLang.HOF.If where
 
+import           Control.Monad.Except
+import           Control.Monad.State
 import           Ohua.DFLang.HOF
-import Ohua.Types
-import Ohua.DFLang.Lang
-import Ohua.Monad
-import Control.Monad.Except
-import Control.Monad.State
+import           Ohua.DFLang.Lang
+import           Ohua.Monad
+import           Ohua.Types
 
 data IfFn = IfFn
     { conditionVariable :: !DFVar

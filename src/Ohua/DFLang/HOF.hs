@@ -9,7 +9,7 @@
 
 -- This source code is licensed under the terms described in the associated LICENSE.TXT file
 --
-{-# LANGUAGE ExistentialQuantification, CPP #-}
+{-# LANGUAGE ExistentialQuantification #-}
 module Ohua.DFLang.HOF where
 
 
@@ -46,20 +46,39 @@ data Argument
 type Renaming = [(Binding, Binding)]
 
 
--- mention method call order
+-- | Implementation of the lowering of a higher order function.
+-- The type @f@ is dispatched based on the 'name'.
+-- For each invocation of @name@ the lowering is executed once.
+-- 'parseCallAndInitState' is called sepatately for each lowering
+-- meaning there is no state sharing across invocations.
+-- The call order for the methods of this class is fixed.
+--
+--      (1) 'parseCallAndInitState' is called with the arguments provided to the HOF call.
+--      (2) 'createContextEntry' is called
+--      (3) 'scopeFreeVariables' is called once for each lambda present in the arguments
+--      (4) 'contextifyUnboundFunctions' is called once for each lambda present in the arguments
+--      (5) 'createContextExit' is called
 class HigherOrderFunction f where
     name :: TaggedFnName f
 
+    -- | Initialize the state for a single lowering from the arguments given to the HOF call
     parseCallAndInitState :: (MonadOhua m, MonadError String m) => [Argument] -> m f
 
+    -- | Generate the entry node(s) for this HOF context
     createContextEntry :: (MonadOhua m, MonadError String m, MonadState f m) => m (Seq LetExpr)
 
+    -- | Generate the exit node(s) for this HOF context
     createContextExit :: (MonadOhua m, MonadError String m, MonadState f m) => Assignment -> m (Seq LetExpr)
 
-    -- mention and impement compiler check for no free vars
+    -- | Create scope nodes for __all__ free variables of __one of the lambdas__ that were input to 'parseCallAndInitState'.
+    -- This methiod is never called with a lambda which was not in the list given to 'parseCallAndInitState'.
+    -- The compiler checks that this makes all previously free variables locally bound variables.
     scopeFreeVariables :: (MonadOhua m, MonadError String m, MonadState f m) => Lambda -> [Binding] -> m (Seq LetExpr, Renaming)
 
-    -- INVARIANT: unbound functions == functions with no arguments (see above)
+    -- | Whether the compiler should add context args for all functions in this lambda
+    -- which have no local variables as input.
+    -- As an invariant, since 'scopeFreeVariables' makes all free varaibles local ones
+    -- this should only apply to funcitons with no inputs at all.
     contextifyUnboundFunctions :: (MonadOhua m, MonadError String m, MonadState f m) => Lambda -> m Bool
 
 

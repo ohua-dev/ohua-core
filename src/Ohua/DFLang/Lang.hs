@@ -51,7 +51,7 @@ data DFVar
 
 
 instance Hashable DFVar where
-   hashWithSalt s (DFVar v) = hashWithSalt s (0::Int, v)
+   hashWithSalt s (DFVar v)    = hashWithSalt s (0::Int, v)
    hashWithSalt s (DFEnvVar e) = hashWithSalt s (1::Int, e)
 
 instance IsString DFVar where fromString = DFVar . fromString

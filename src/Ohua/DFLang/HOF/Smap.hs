@@ -1,14 +1,15 @@
-{-# LANGUAGE NamedFieldPuns, OverloadedLists      #-}
+{-# LANGUAGE NamedFieldPuns  #-}
+{-# LANGUAGE OverloadedLists #-}
 module Ohua.DFLang.HOF.Smap where
 
 
+import           Control.Monad.Except
+import           Control.Monad.State
+import qualified Data.Sequence        as S
 import           Ohua.DFLang.HOF
-import Ohua.Types
-import Ohua.DFLang.Lang
-import Ohua.Monad
-import Control.Monad.Except
-import qualified Data.Sequence                   as S
-import Control.Monad.State
+import           Ohua.DFLang.Lang
+import           Ohua.Monad
+import           Ohua.Types
 
 
 data SmapFn = SmapFn

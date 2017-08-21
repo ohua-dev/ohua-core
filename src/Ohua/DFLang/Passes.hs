@@ -26,21 +26,22 @@ import           Control.Monad.State
 import           Control.Monad.Writer
 import           Data.Either
 import           Data.Foldable
-import qualified Data.HashMap.Strict             as HM
-import qualified Data.HashSet                    as HS
+import qualified Data.HashMap.Strict  as HM
+import qualified Data.HashSet         as HS
 import           Data.Maybe
 import           Data.Proxy
-import           Data.Sequence                   (Seq, (><))
-import qualified Data.Sequence                   as S
+import           Data.Sequence        (Seq, (><))
+import qualified Data.Sequence        as S
 import           Lens.Micro
 import           Ohua.ALang.Lang
-import           Ohua.DFLang.HOF as HOF
-import           Ohua.DFLang.HOF.Smap
+import           Ohua.DFLang.HOF      as HOF
 import           Ohua.DFLang.HOF.If
-import           Ohua.DFLang.Lang                (DFExpr (..), DFFnRef (..),
-                                                  DFVar (..), LetExpr (..))
+import           Ohua.DFLang.HOF.Smap
+import           Ohua.DFLang.Lang     (DFExpr (..), DFFnRef (..), DFVar (..),
+                                       LetExpr (..))
 import           Ohua.Monad
 import           Ohua.Types
+import           Ohua.Util
 
 
 -- class LoweringPass a where
@@ -207,7 +208,9 @@ lowerHOF _ assign args = do
             (scopers, renaming) <- scopeFreeVariables lam freeVars
             tell scopers
             scopeUnbound <- contextifyUnboundFunctions lam
-            let tieContext1 = if scopeUnbound then tieContext0 boundVars (head $ flattenAssign $ beginAssignment lam) else id
+            let tieContext1 | scopeUnbound = tieContext0 boundVars (head $ flattenAssign $ beginAssignment lam)
+                            | otherwise = id
+            assertM $ HS.null $ findFreeVars0 (boundVars `mappend` HS.fromList (map snd renaming)) body
             tell $ tieContext1 (renameWith (HM.fromList renaming) body)
         createContextExit assign >>= tell
   where

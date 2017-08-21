@@ -11,6 +11,8 @@
 {-# LANGUAGE Rank2Types #-}
 module Ohua.Util where
 
+import           Control.Exception
+import           Control.Monad.Except
 import           Lens.Micro
 
 
@@ -29,3 +31,15 @@ prism make get f thing =
 
 prism' :: (b -> a) -> (a -> Maybe b) -> Prism' a b
 prism' make get = prism make (\s -> maybe (Left s) Right $ get s)
+
+
+
+assertM :: Monad m => Bool -> m ()
+assertM = flip assert (return ())
+{-# INLINE assertM #-}
+
+
+assertE :: MonadError String m => Bool -> m ()
+assertE True  = return ()
+assertE False = throwError "AssertionError"
+{-# INLINE assertE #-}
