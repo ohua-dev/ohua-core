@@ -9,8 +9,8 @@
 
 -- This source code is licensed under the terms described in the associated LICENSE.TXT file
 --
-{-# LANGUAGE ExistentialQuantification #-}
-module Ohua.DFLang.HigherOrderFunction where
+{-# LANGUAGE ExistentialQuantification, CPP #-}
+module Ohua.DFLang.HOF where
 
 
 import           Control.Monad.Except
@@ -25,9 +25,11 @@ import           Ohua.Types
 
 newtype TaggedFnName f = TaggedFnName { unTagFnName :: FnName }
 
-
 instance IsString (TaggedFnName a) where
     fromString = tagFnName . fromString
+
+tagFnName :: FnName -> TaggedFnName f
+tagFnName = TaggedFnName
 
 
 data Lambda = Lam
@@ -41,25 +43,24 @@ data Argument
     | LamArg Lambda
 
 
-tagFnName :: FnName -> TaggedFnName f
-tagFnName = TaggedFnName
-
-
 type Renaming = [(Binding, Binding)]
 
-class HigherOrderFunction f where
 
+-- mention method call order
+class HigherOrderFunction f where
     name :: TaggedFnName f
 
-    init :: (MonadOhua m, MonadError String m) => [Argument] -> m f
+    parseCallAndInitState :: (MonadOhua m, MonadError String m) => [Argument] -> m f
 
-    begin :: (MonadOhua m, MonadError String m, MonadState f m) => m (Seq LetExpr)
+    createContextEntry :: (MonadOhua m, MonadError String m, MonadState f m) => m (Seq LetExpr)
 
-    end :: (MonadOhua m, MonadError String m, MonadState f m) => Assignment -> m (Seq LetExpr)
+    createContextExit :: (MonadOhua m, MonadError String m, MonadState f m) => Assignment -> m (Seq LetExpr)
 
+    -- mention and impement compiler check for no free vars
     scopeFreeVariables :: (MonadOhua m, MonadError String m, MonadState f m) => Lambda -> [Binding] -> m (Seq LetExpr, Renaming)
 
-    scopeUnboundFunctions :: (MonadOhua m, MonadError String m, MonadState f m) => Lambda -> m Bool
+    -- INVARIANT: unbound functions == functions with no arguments (see above)
+    contextifyUnboundFunctions :: (MonadOhua m, MonadError String m, MonadState f m) => Lambda -> m Bool
 
 
 data WHOF = forall f . HigherOrderFunction f => WHOF (Proxy f)

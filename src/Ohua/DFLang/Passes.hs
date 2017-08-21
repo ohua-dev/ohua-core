@@ -17,9 +17,6 @@
 {-# LANGUAGE OverloadedLists     #-}
 {-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-#if __GLASGOW_HASKELL__ >= 800
-{-# LANGUAGE TypeApplications #-}
-#endif
 module Ohua.DFLang.Passes where
 
 
@@ -38,7 +35,9 @@ import qualified Data.Sequence                   as S
 import           Data.Traversable
 import           Lens.Micro
 import           Ohua.ALang.Lang
-import           Ohua.DFLang.HigherOrderFunction as HOF
+import           Ohua.DFLang.HOF as HOF
+import           Ohua.DFLang.HOF.Smap
+import           Ohua.DFLang.HOF.If
 import           Ohua.DFLang.Lang                (DFExpr (..), DFFnRef (..),
                                                   DFVar (..), LetExpr (..))
 import           Ohua.Monad
@@ -71,7 +70,7 @@ checkSSA = flip evalStateT mempty . mapM_ go
             Nothing -> return ()
         modify (addAll produced)
 
-    addAll add set = foldr' HS.insert set add
+    addAll = flip $ foldr' HS.insert
 
 
 -- | Check that a DFExpression is in SSA form.
@@ -113,21 +112,13 @@ lowerALang2 expr = do
     go  (Let assign expr rest) = do
         (fn, fnId, args) <- handleApplyExpr expr
         case HM.lookup fn hofNames of
-#if __GLASGOW_HASKELL__ >= 800
-            Just (WHOF (_ :: Proxy p)) -> lowerHOF (name @p) assign args
-#else
             Just (WHOF (_ :: Proxy p)) -> lowerHOF (name :: TaggedFnName p) assign args
-#endif
             Nothing       -> tell =<< lowerDefault fn fnId assign args
         go rest
     go  x = throwError "Expected `let` or binding"
 
     hofNames = HM.fromList $ map (extractName &&& id) hofs
-#if __GLASGOW_HASKELL__ >= 800
-    extractName (WHOF (_ :: Proxy p)) = unTagFnName $ name @p
-#else
     extractName (WHOF (_ :: Proxy p)) = unTagFnName $ (name :: TaggedFnName p)
-#endif
 
 
 -- | Select a function for lowering a let expression absed on the type of the function called.
@@ -267,19 +258,19 @@ lowerHOF :: forall f m . (MonadError String m, MonadOhua m, HigherOrderFunction 
 lowerHOF name assign args = do
     simpleArgs <- mapM handleArg args
     let newFnArgs = map (either Variable LamArg . fmap fst) simpleArgs
-    f <- HOF.init newFnArgs :: m f
+    f <- HOF.parseCallAndInitState newFnArgs :: m f
     flip evalStateT f $ do
-        begin >>= tell
+        createContextEntry >>= tell
         let lambdas = rights simpleArgs
         for_ lambdas $ \(lam, body) -> do
             let boundVars = findBoundVars body `mappend` HS.fromList (flattenAssign $ beginAssignment lam)
             let freeVars = HS.toList $ findFreeVars0 boundVars body
             (scopers, renaming) <- scopeFreeVariables lam freeVars
             tell scopers
-            scopeUnbound <- scopeUnboundFunctions lam
+            scopeUnbound <- contextifyUnboundFunctions lam
             let tieContext1 = if scopeUnbound then tieContext0 boundVars (head $ flattenAssign $ beginAssignment lam) else id
             tell $ tieContext1 (renameWith (HM.fromList renaming) body)
-        end assign >>= tell
+        createContextExit assign >>= tell
   where
     handleArg (Var (Local v)) = return $ Left $ DFVar v
     handleArg (Var (Env e)) = return $ Left $ DFEnvVar e
@@ -287,98 +278,6 @@ lowerHOF name assign args = do
         DFExpr lets bnd <- lowerALang body
         return $ Right (Lam assign bnd, lets)
     handleArg _ = throwError "unexpected type of argument"
-
-
-data SmapFn = SmapFn
-    { collSource :: !DFVar
-    , smapLambda :: !Lambda
-    , sizeSource :: Binding
-    }
-
-
-instance HigherOrderFunction SmapFn where
-    name = "com.ohua.lang/smap"
-
-    init [Variable v, LamArg bnd] = return $ SmapFn v bnd (error "size uninitialized")
-    init _ = throwError "Unexpected number/type of arguments to smap"
-
-    begin = do
-        f <- get
-        sizeId <- generateId
-        sizeRet <- generateBindingWith "size"
-        otnId <- generateId
-        otnRet <- generateBinding
-        smapId <- generateId
-        modify $ \s -> s { sizeSource = otnRet } -- do we need the size or otn of the size?
-        return
-            [ LetExpr sizeId (Direct sizeRet) (EmbedSf "com.ohua.lang/size") [collSource f] Nothing
-            -- I am not sure about the order here ... is it size first or collection first?
-            , LetExpr otnId (Direct otnRet) (DFFunction "com.ohua.lang/one-to-n") [DFVar sizeRet, collSource f] Nothing
-            , LetExpr smapId (beginAssignment $ smapLambda f) (DFFunction "com.ohua.lang/smap-fun") [DFVar otnRet] Nothing
-            ]
-
-    end assignment = do
-        collectId <- generateId
-        f <- get
-        return
-            [ LetExpr collectId assignment (DFFunction "com.ohua.lang/collect") [DFVar $ sizeSource f, DFVar $ resultBinding $ smapLambda f] Nothing
-            ]
-
-    scopeFreeVariables _ freeVars = do
-        SmapFn{sizeSource} <- get
-        let mkReplicator var = do
-                id <- generateId
-                newVar <- generateBindingWith var
-                pure (LetExpr id (Direct newVar) (DFFunction "com.ohua.lang/one-to-n") [DFVar sizeSource, DFVar var] Nothing, newVar)
-        (replicators, replications) <- unzip <$> mapM mkReplicator freeVars
-        return (S.fromList replicators, zip freeVars replications)
-
-    scopeUnboundFunctions _ = return True
-
-
-data IfFn = IfFn
-    { conditionVariable :: !DFVar
-    , thenBranch        :: !Lambda
-    , elseBranch        :: !Lambda
-    , ifRet             :: Binding
-    }
-
-
-instance HigherOrderFunction IfFn where
-    name = "com.ohua.lang/if"
-
-    init [Variable v, LamArg thenBr, LamArg elseBr] = return $ IfFn v thenBr elseBr (error "return uninitialized")
-
-    begin = do
-        f <- get
-        ifId <- generateId
-        ifRet <- generateBinding
-        let Direct thenBnd = beginAssignment $ thenBranch f
-            Direct elseBnd = beginAssignment $ elseBranch f
-        modify $ \s -> s { ifRet = ifRet }
-        return
-            -- not sure this has to be a dffunction
-            [ LetExpr ifId (Destructure [ifRet, thenBnd, elseBnd]) (DFFunction "com.ohua.lang/if") [conditionVariable f] Nothing
-            ]
-
-    end assignment = do
-        switchId <- generateId
-        IfFn {..} <- get
-        return
-            [ LetExpr switchId assignment (DFFunction "com.ohua.lang/switch") [DFVar ifRet, DFVar $ resultBinding thenBranch, DFVar $ resultBinding elseBranch] Nothing
-            ]
-
-    scopeFreeVariables lam freeVars = do
-        selected <- mapM generateBindingWith freeVars
-        selectorId <- generateId
-        let Direct sourceVar = beginAssignment lam
-        return   -- im just prepending the if return, this is probably not correct
-            (   [ LetExpr selectorId (Destructure selected) (DFFunction "com.ohua.lang/scope") (map DFVar (sourceVar:freeVars)) Nothing
-                ]
-            ,   zip freeVars selected
-            )
-
-    scopeUnboundFunctions _ = return True
 
 
 hofs :: [WHOF]
