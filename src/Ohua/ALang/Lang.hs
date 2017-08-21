@@ -49,10 +49,6 @@ data ResolvedSymbol
 
         -- reference to a stateful function
 
-    | Algo !FnName
-
-        -- reference to an algo definition
-
     | Env !HostExpr
 
         -- reference to an environment object. this maybe a var or any other term of the host language.
@@ -67,7 +63,6 @@ instance ExtractBindings ResolvedSymbol where
 
 instance NFData ResolvedSymbol where
     rnf (Local b) = rnf b
-    rnf (Algo a)  = rnf a
     rnf (Env _)   = ()
     rnf (Sf s i)  = rnf s `seq` rnf i
 
