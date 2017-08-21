@@ -21,14 +21,11 @@ module Ohua.Monad
     ) where
 
 
-import           Control.Monad.Except     hiding (Error)
+import           Control.Monad.Except
 import           Control.Monad.RWS.Strict
-import           Control.Monad.Trans
-import           Data.Functor.Identity
 import qualified Data.HashSet             as HS
 import           Data.List                (intercalate)
 import           Lens.Micro
-import           Lens.Micro.Mtl
 import           Ohua.ALang.Lang
 import           Ohua.LensClasses
 import           Ohua.Types
@@ -37,8 +34,8 @@ import           Ohua.Types
 type Error = String
 
 data CompilerState = CompilerState
-    { compilerStateNameGenerator :: NameGenerator
-    , compilerStateIdCounter     :: Int
+    { compilerStateNameGenerator :: !NameGenerator
+    , compilerStateIdCounter     :: !Int
     }
 data CompilerEnv
 
@@ -49,7 +46,7 @@ instance HasIdCounter CompilerState Int where
     idCounter = lens compilerStateIdCounter $ \s a -> s { compilerStateIdCounter = a }
 
 data NameGenerator = NameGenerator
-    { nameGeneratorTakenNames     :: HS.HashSet Binding
+    { nameGeneratorTakenNames     :: !(HS.HashSet Binding)
     , nameGeneratorSimpleNameList :: [Binding]
     }
 
@@ -147,7 +144,7 @@ generateBinding = do
 generateBindingWith :: MonadOhua m => Binding -> m Binding
 generateBindingWith (Binding prefix) = do
     taken <- fromState $ nameGenerator . takenNames
-    let (h:_) = dropWhile (`HS.member` taken) $ map (Binding . (prefix' ++) . show) [0..]
+    let (h:_) = dropWhile (`HS.member` taken) $ map (Binding . (prefix' ++) . show) ([0..] :: [Int])
     modifyState $ nameGenerator . takenNames %~ HS.insert h
     return h
   where prefix' = prefix ++ "_"

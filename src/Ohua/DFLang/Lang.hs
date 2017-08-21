@@ -19,35 +19,40 @@ module Ohua.DFLang.Lang where
 
 import           Data.Hashable
 import           Data.Sequence
+import           Data.String
 import           Ohua.ALang.Lang
 import           Ohua.Types
 
 -- | A sequence of let statements with a terminating binding to be used as return value
 data DFExpr = DFExpr
     { letExprs  :: Seq LetExpr
-    , returnVar :: Binding
+    , returnVar :: !Binding
     }
     deriving Eq
 
 data LetExpr = LetExpr
-    { callSiteId       :: FnId
-    , returnAssignment :: Assignment
-    , functionRef      :: DFFnRef
-    , callArguments    :: [DFVar]
-    , contextArg       :: Maybe Binding
+    { callSiteId       :: !FnId
+    , returnAssignment :: !Assignment
+    , functionRef      :: !DFFnRef
+    , callArguments    :: ![DFVar]
+    , contextArg       :: !(Maybe Binding)
     }
     deriving Eq
 
 data DFFnRef
-    = DFFunction FnName -- a build-in function of DFLang
-    | EmbedSf FnName -- an generic dataflow function that wraps a stateful function call
+    = DFFunction !FnName -- a build-in function of DFLang
+    | EmbedSf !FnName -- an generic dataflow function that wraps a stateful function call
     deriving Eq
 
 data DFVar
-    = DFEnvVar HostExpr
-    | DFVar Binding
+    = DFEnvVar !HostExpr
+    | DFVar !Binding
     deriving Eq
+
 
 instance Hashable DFVar where
    hashWithSalt s (DFVar v) = hashWithSalt s (0::Int, v)
    hashWithSalt s (DFEnvVar e) = hashWithSalt s (1::Int, e)
+
+instance IsString DFVar where fromString = DFVar . fromString
+instance Num DFVar where fromInteger = DFEnvVar . fromInteger

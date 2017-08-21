@@ -12,10 +12,13 @@ module Ohua.ALang.Passes where
 
 
 import           Control.Monad.Except
+import           Control.Monad.Reader
+import           Control.Monad.RWS.Lazy
 import           Control.Monad.State
 import           Control.Monad.Writer
-import qualified Data.HashMap.Strict  as HM
-import qualified Data.HashSet         as HS
+import qualified Data.HashMap.Strict    as HM
+import qualified Data.HashSet           as HS
+import           Debug.Trace
 import           Ohua.ALang.Lang
 import           Ohua.ALang.Util
 import           Ohua.IR.Functions
@@ -23,17 +26,25 @@ import           Ohua.Monad
 import           Ohua.Types
 
 
+
 type Error = String
 
+
+-- | Inline all references to lambdas.
+-- Aka `let f = (\a -> E) in f N` -> `(\a -> E) N`
 inlineLambdaRefs :: MonadError Error m => Expression -> m Expression
-inlineLambdaRefs (Let (Direct bnd) l@(Lambda _ _) body) = inlineLambdaRefs $ substitute bnd l body
-inlineLambdaRefs (Let (Destructure _) (Lambda _ _) _) = throwError "invariant broken, cannot destructure lambda"
+inlineLambdaRefs (Let assignment l@(Lambda _ _) body) =
+    case assignment of
+        Direct bnd -> inlineLambdaRefs $ substitute bnd l body
+        _ -> throwError "invariant broken, cannot destructure lambda"
 inlineLambdaRefs (Let assignment value body) = Let assignment <$> inlineLambdaRefs value <*> inlineLambdaRefs body
 inlineLambdaRefs (Apply body argument) = liftM2 Apply (inlineLambdaRefs body) (inlineLambdaRefs argument)
 inlineLambdaRefs (Lambda argument body) = Lambda argument <$> inlineLambdaRefs body
 inlineLambdaRefs e = return e
 
 
+-- | Reduce lambdas by simulating application
+-- Aka `(\a -> E) N` -> `let a = N in E`
 -- Assumes lambda refs have been inlined
 inlineLambda :: Expression -> Expression
 inlineLambda e@(Var _) = e
@@ -77,6 +88,9 @@ reduceApplication :: Expression -> Expression
 reduceApplication = reduceLetCWith reduceAppArgument
 
 
+-- | Lift all nested lets to the top level
+-- Aka `let x = let y = E in N in M` -> `let y = E in let x = N in M`
+-- and `(let x = E in F) a` -> `let x = E in F a`
 letLift :: Expression -> Expression
 letLift (Let assign expr expr2) = reduceLetA $ Let assign (letLift expr) (letLift expr2)
 letLift (Apply function argument) = reduceApplication $ Apply (letLift function) (letLift argument)
@@ -84,6 +98,8 @@ letLift (Lambda bnd body) = Lambda bnd (letLift body)
 letLift v = v
 
 
+-- | Inline all direct reassignments.
+-- Aka `let x = E in let y = x in y` -> `let x = E in x`
 inlineReassignments :: Expression -> Expression
 inlineReassignments (Let assign val@(Var _) body) =
     case assign of
@@ -95,6 +111,8 @@ inlineReassignments (Lambda assign e) = Lambda assign $ inlineReassignments e
 inlineReassignments v@(Var _) = v
 
 
+-- | Transforms the final expression into a let expression with the result variable as body.
+-- Aka `let x = E in some/sf a` -> `let x = E in let y = some/sf a in y`
 ensureFinalLet :: MonadOhua m => Expression -> m Expression
 ensureFinalLet (Let a e b) = Let a e <$> ensureFinalLet b
 ensureFinalLet v@(Var _) = return v
@@ -103,7 +121,10 @@ ensureFinalLet a = do
     return $ Let (Direct newBnd) a (Var (Local newBnd))
 
 
--- assumes ssa for simplicity
+-- | Removes bindings that are never used.
+-- This is actually not safe becuase sfn invocations may have side effects
+-- and therefore cannot be removed.
+-- Assumes ssa for simplicity
 removeUnusedBindings :: Expression -> Expression
 removeUnusedBindings = fst . runWriter . go
   where
@@ -120,15 +141,39 @@ removeUnusedBindings = fst . runWriter . go
             Let bnds <$> go val <*> pure inner
 
 
-inlineFunctions :: Monad m => Expression -> m Expression
-inlineFunctions e = evalStateT (lrPrewalkExpr go e) mempty
+-- | Reduce curried expressions.
+-- aka `let f = some/sf a in f b` becomes `some/sf a b`.
+-- It both inlines the curried function and removes the binding site.
+-- Recursively calls it self and therefore handles redefinitions as well.
+-- It only substitutes vars in the function positions of apply's
+-- hence it may produce an expression with undefined local bindings.
+-- It is recommended therefore to check this with 'noUndefinedBindings'.
+-- If an undefined binging is left behind this indicates the source expression
+-- was not fulfilling all its invariants.
+removeCurrying :: MonadError String m => Expression -> m Expression
+removeCurrying e = fst <$> evalRWST (inlinePartials e) mempty ()
   where
-    go v@(Let (Direct bnd) val _) = modify (HM.insert bnd val) >> return v
-    go v@(Apply (Var (Local bnd)) arg) = maybe v (flip Apply arg) <$> gets (HM.lookup bnd)
-    go v = return v
+    inlinePartials (Let assign@(Direct bnd) val body) = do
+        val' <- inlinePartials val
+        (body', touched) <- listen $ local (HM.insert bnd val') $ inlinePartials body
+        return $
+            if bnd `HS.member` touched then
+                body'
+            else
+                Let assign val' body'
+    inlinePartials (Apply (Var (Local bnd)) arg) = do
+        tell $ HS.singleton bnd
+        val <- asks (HM.lookup bnd)
+        inlinePartials =<< Apply
+            <$> maybe (throwError $ "No suitable value found for binding " ++ show bnd) return val
+            <*> inlinePartials arg
+    inlinePartials (Apply function arg) = Apply <$> inlinePartials function <*> inlinePartials arg
+    inlinePartials (Let assign val body) = Let assign <$> inlinePartials val <*> inlinePartials body
+    inlinePartials (Lambda a body) = Lambda a <$> inlinePartials body
+    inlinePartials e = return e
 
 
-
+-- | Ensures the expression is a sequence of let statements terminated with a local variable.
 hasFinalLet :: MonadError String m => Expression -> m ()
 hasFinalLet (Let _ _ body)  = hasFinalLet body
 hasFinalLet (Var (Local _)) = return ()
@@ -136,8 +181,9 @@ hasFinalLet (Var _)         = throwError "Non-local final var"
 hasFinalLet _               = throwError "Final value is not a var"
 
 
+-- | Ensures all of the optionally provided stateful function ids are unique.
 noDuplicateIds :: MonadError String m => Expression -> m ()
-noDuplicateIds = void . flip runStateT mempty . lrPrewalkExpr go
+noDuplicateIds = void . flip runStateT mempty . lrPrewalkExprM go
   where
     go e@(Var (Sf _ (Just id))) = do
         s <- get
@@ -147,6 +193,9 @@ noDuplicateIds = void . flip runStateT mempty . lrPrewalkExpr go
     go e = return e
 
 
+-- | Checks that no apply to a local variable is performed.
+-- This is a simple check and it will pass on complex expressions even if they would reduce
+-- to an apply to a local variable.
 applyToSf :: MonadError String m => Expression -> m ()
 applyToSf = foldlExprM (const . go) ()
   where
@@ -159,18 +208,32 @@ lamdasAreInputToHigherOrderFunctions _                         = return ()
 lamdasAreInputToHigherOrderFunctions (Apply v (Lambda _ body)) = undefined
 
 
+-- | Checks that all local bindings are defined before use.
+-- Scoped. Aka bindings are only visible in their respective scopes.
+-- Hence the expression does not need to be in SSA form.
+noUndefinedBindings :: MonadError String m => Expression -> m ()
+noUndefinedBindings = flip runReaderT mempty . go
+  where
+    go (Let assign val body) = go val >> local (HS.union $ HS.fromList $ flattenAssign assign) (go body)
+    go (Var (Local bnd)) = do
+        isDefined <- asks (HS.member bnd)
+        unless isDefined $ throwError $ "Not in scope " ++ show bnd
+    go (Apply function arg) = go function >> go arg
+    go (Lambda assign body) = local (HS.union $ HS.fromList $ flattenAssign assign) $ go body
+    go (Var _) = return ()
+
+
 checkProgramValidity :: MonadError Error m => Expression -> m ()
 checkProgramValidity e = do
     hasFinalLet e
     noDuplicateIds e
     applyToSf e
+    noUndefinedBindings e
 
 
+-- The canonical composition of the above transformations to create a program with the invariants we expect.
 normalize :: (MonadOhua m, MonadError Error m) => Expression -> m Expression
-normalize e = do
-    e' <- reduceLambdas (letLift e) >>= ensureFinalLet . inlineReassignments
-    checkProgramValidity e'
-    return e'
+normalize e = reduceLambdas (letLift e) >>= removeCurrying >>= ensureFinalLet . inlineReassignments
   where
     -- we repeat this step until a fix point is reached.
     -- this is necessary as lambdas may be input to lambdas,

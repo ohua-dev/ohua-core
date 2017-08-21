@@ -73,7 +73,7 @@ instance Arbitrary a => Arbitrary (Expr a) where
 --         tree (_, values) 0 = Var $ Local
 
 
-runPasses expr = flip runOhuaT expr $ performSSA >=> runExceptT . normalize
+runPasses expr = flip runOhuaT expr $ performSSA >=> runExceptT . (normalize >=> \e -> checkProgramValidity e >> return e)
 
 type ALangCheck = Either String
 
@@ -132,8 +132,8 @@ calculated_lambda_as_argument = Let "f" (Lambda "a" "a") $ Let "z" (Lambda "a" "
 
 lambda_with_app_as_arg = Apply "some/func" $ Apply (Lambda "a" (Lambda "b" "a")) "b"
 
-passesSpec =
-    describe "passes" $ do
+passesSpec = do
+    describe "normalization" $ do
         prop "creates ir with the right invariants" prop_passes
         it "does not reject a program with lambda as input to smap" $
             doesn't_reject lambda_as_argument
@@ -153,3 +153,35 @@ passesSpec =
 
         it "Reduces lambdas as far as possible but does not remove them when argument" $
             runPasses lambda_with_app_as_arg `shouldSatisfyRet` either (const False) lambdaStaysInput
+
+        let normalize' = runOhuaT normalize
+            e = Let "f" (Lambda "x" ("some/fn" `Apply` "x")) $
+                Let "g" ("f" `Apply` "a")
+                "g" `Apply` "b"
+
+        it "reduces curried functions which are produced by a lambda" $
+            normalize' e `shouldBe` Right (Let "c" ("some/fn" `Apply` "a" `Apply` "b" ) "c")
+
+
+
+    describe "remove currying pass" $ do
+        it "inlines curring" $
+            removeCurrying (Let "a" ("mod/fun" `Apply` "b") ("a" `Apply` "c"))
+            `shouldBe`
+            Right ("mod/fun" `Apply` "b" `Apply` "c")
+        it "inlines curring 2" $
+            removeCurrying (Let "a" ("mod/fun" `Apply` "b") $ Let "x" ("a" `Apply` "c") "x")
+            `shouldBe`
+            Right (Let "x" ("mod/fun" `Apply` "b" `Apply` "c") "x")
+        it "removes currying even for redefintions" $
+            removeCurrying (Let "a" "some/sf" $ Let "b" "a" $ "b" `Apply` "c")
+            `shouldBe`
+            Right ("some/sf" `Apply` "c")
+        it "inlines multiple layers of currying" $
+            removeCurrying
+                (Let "f" (Apply "some-ns/fn-with-3-args" "a") $
+                Let "f'" (Apply "f" "b") $
+                Let "x" (Apply "f'" "c")
+                "x" )
+            `shouldBe`
+            Right (Let "x" ("some-ns/fn-with-3-args" `Apply` "a" `Apply` "b" `Apply` "c") "x")

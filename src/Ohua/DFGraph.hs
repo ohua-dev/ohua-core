@@ -1,3 +1,13 @@
+-- |
+-- Module      : $Header$
+-- Description : The low level dataflow graph the compiler produces in the end
+-- Copyright   : (c) Sebastian Ertel and Justus Adam 2017. All Rights Reserved.
+-- License     : EPL-1.0
+-- Maintainer  : sebastian.ertel@gmail.com, dev@justus.science
+-- Stability   : experimental
+-- Portability : portable
+
+-- This source code is licensed under the terms described in the associated LICENSE.TXT file
 module Ohua.DFGraph where
 
 
@@ -11,25 +21,25 @@ import           Ohua.Types
 
 
 data Operator = Operator
-    { operatorId   :: FnId
-    , operatorType :: FnName
+    { operatorId   :: !FnId
+    , operatorType :: !FnName
     }
 
 
 data Target = Target
-    { operator :: FnId
-    , index    :: Int
+    { operator :: !FnId
+    , index    :: !Int
     }
 
 
 data Arc
     = Arc
-        { source :: Target
-        , target :: Target
+        { source :: !Target
+        , target :: !Target
         }
     | EnvArc
-        { target    :: Target
-        , envSource :: HostExpr
+        { target    :: !Target
+        , envSource :: !HostExpr
         }
 
 

@@ -19,10 +19,10 @@ substitute :: Binding -> Expression -> Expression -> Expression
 -- Postwalk avoids an infinite recursion in a case where `val` uses a `var` binding.
 -- This should never happen but might if this this invariant is violated for some reason
 -- and the violation is not caught.
-substitute var val = runIdentity . lrPostwalkExpr f
+substitute !var val = lrPostwalkExpr f
   where
-    f (Var (Local v)) | var == v = return val
-    f e               = return e
+    f (Var (Local v)) | var == v = val
+    f e               = e
 -- substitute var val e =
 --     case e of
 --         Var (Local v)

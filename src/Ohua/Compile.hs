@@ -1,3 +1,13 @@
+-- |
+-- Module      : $Header$
+-- Description : The compiler pipeline
+-- Copyright   : (c) Sebastian Ertel and Justus Adam 2017. All Rights Reserved.
+-- License     : EPL-1.0
+-- Maintainer  : sebastian.ertel@gmail.com, dev@justus.science
+-- Stability   : experimental
+-- Portability : portable
+
+-- This source code is licensed under the terms described in the associated LICENSE.TXT file
 {-# LANGUAGE CPP #-}
 module Ohua.Compile where
 
@@ -5,14 +15,12 @@ module Ohua.Compile where
 import           Control.Monad.Except
 import           Data.Functor.Identity
 import qualified Data.HashMap.Strict       as HM
-import           Data.Maybe
 import           Lens.Micro
 import           Ohua.ALang.Lang
 import           Ohua.ALang.Optimizations
 import           Ohua.ALang.Passes
 import           Ohua.ALang.Passes.SSA
 import           Ohua.DFGraph
-import           Ohua.DFLang.Lang
 import           Ohua.DFLang.Optimizations
 import           Ohua.DFLang.Passes
 import           Ohua.Monad
@@ -20,32 +28,42 @@ import           Ohua.Types
 
 
 pipeline :: (MonadError String m, MonadOhua m) => Expression -> m OutGraph
-pipeline e
-    = performSSA e
-    >>= normalize
-    >>= \e -> checkHigherOrderFunctionSupport e >> return e
-#ifdef DEBUG
-    >>= \e -> Ohua.ALang.Passes.SSA.checkSSA e >> return e
-#endif
-    >>= Ohua.ALang.Optimizations.runOptimizations
-#ifdef DEBUG
-    >>= \e -> Ohua.ALang.Passes.SSA.checkSSA e >> return e
-#endif
-    >>= lowerALang
-#ifdef DEBUG
-    >>= \e -> Ohua.DFLang.Passes.checkSSAExpr e >> return e
-#endif
-    >>= Ohua.DFLang.Optimizations.runOptimizations
+pipeline e = do
+    ssaE <- performSSA e
+    normalizedE <- normalize ssaE
 
 #ifdef DEBUG
-    >>= \e -> Ohua.DFLang.Passes.checkSSAExpr e >> return e
+    checkProgramValidity normalizedE
+    checkHigherOrderFunctionSupport normalizedE
+    Ohua.ALang.Passes.SSA.checkSSA normalizedE
+#endif
+
+    optimizedE <- Ohua.ALang.Optimizations.runOptimizations normalizedE
+
+#ifdef DEBUG
+    Ohua.ALang.Passes.SSA.checkSSA optimizedE
+#endif
+
+    dfE <- lowerALang optimizedE
+
+#ifdef DEBUG
+    Ohua.DFLang.Passes.checkSSAExpr dfE
+#endif
+
+    optimizedDfE <- Ohua.DFLang.Optimizations.runOptimizations dfE
+
+#ifdef DEBUG
+    Ohua.DFLang.Passes.checkSSAExpr optimizedDfE
 #endif
     -- Comment: I use `<&>` (aka `fmap`) here because `toGraph` does not run in a monad
-    <&> toGraph
+    return $ toGraph optimizedDfE
 
 
-compile :: Expression -> IO (Either String OutGraph)
-compile e = flip runOhuaT e $ runExceptT . pipeline
+compile :: MonadError String m => Expression -> m OutGraph
+compile e = flip runOhuaT e pipeline
+
+
+type SimplePass = Pass (OhuaT (Either String))
 
 
 checkHigherOrderFunctionSupport :: MonadError String m => Expression -> m ()
@@ -57,7 +75,7 @@ checkHigherOrderFunctionSupport (Let _ e rest) = do
         supportsHOF <- checkNestedExpr f
         when (isLambda arg && not supportsHOF) $ throwError "Lambdas may only be input to higher order functions!"
         return True
-    checkNestedExpr (Var (Sf n _)) = return $ HM.member n (passes :: HM.HashMap FnName (Pass (ExceptT String (OhuaT Identity))))
+    checkNestedExpr (Var (Sf n _)) = return $ HM.member n (passes :: HM.HashMap FnName SimplePass)
     checkNestedExpr (Var _) = return False
     checkNestedExpr _ = throwError "Expected var or apply expr"
     isLambda (Lambda _ _) = True
