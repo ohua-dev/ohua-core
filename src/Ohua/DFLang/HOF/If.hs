@@ -32,7 +32,7 @@ instance HigherOrderFunction IfFn where
         modify $ \s -> s { ifRet = ifRet' }
         return
             -- not sure this has to be a dffunction
-            [ LetExpr ifId (Destructure [ifRet', thenBnd, elseBnd]) (DFFunction "com.ohua.lang/if") [conditionVariable f] Nothing
+            [ LetExpr ifId (Destructure [thenBnd, elseBnd]) (DFFunction "com.ohua.lang/ifThenElse") [conditionVariable f] Nothing
             ]
 
     createContextExit assignment = do
@@ -52,5 +52,6 @@ instance HigherOrderFunction IfFn where
             ,   zip freeVars selected
             )
 
-    contextifyUnboundFunctions _ = return True
+    contextifyUnboundFunctions (Lam (Direct x) _) = return $ Just x
+    contextifyUnboundFunctions _ = throwError "Unexpected destructuring in begin assignment"
 

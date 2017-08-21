@@ -208,9 +208,9 @@ lowerHOF _ assign args = do
             (scopers, renaming) <- scopeFreeVariables lam freeVars
             tell scopers
             scopeUnbound <- contextifyUnboundFunctions lam
-            let tieContext1 | scopeUnbound = tieContext0 boundVars (head $ flattenAssign $ beginAssignment lam)
-                            | otherwise = id
-            assertM $ HS.null $ findFreeVars0 (boundVars `mappend` HS.fromList (map snd renaming)) body
+            let tieContext1 = case scopeUnbound of
+                    Just bnd -> tieContext0 boundVars bnd
+                    Nothing -> id
             tell $ tieContext1 (renameWith (HM.fromList renaming) body)
         createContextExit assign >>= tell
   where

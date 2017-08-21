@@ -25,4 +25,4 @@ instance HigherOrderFunction SeqFn where
 
   scopeFreeVariables lam freeVars = return (S.empty, [])
 
-  contextifyUnboundFunctions _ = return True
+  contextifyUnboundFunctions _ = undefined

@@ -79,7 +79,7 @@ class HigherOrderFunction f where
     -- which have no local variables as input.
     -- As an invariant, since 'scopeFreeVariables' makes all free varaibles local ones
     -- this should only apply to funcitons with no inputs at all.
-    contextifyUnboundFunctions :: (MonadOhua m, MonadError String m, MonadState f m) => Lambda -> m Bool
+    contextifyUnboundFunctions :: (MonadOhua m, MonadError String m, MonadState f m) => Lambda -> m (Maybe Binding)
 
 
 data WHOF = forall f . HigherOrderFunction f => WHOF (Proxy f)

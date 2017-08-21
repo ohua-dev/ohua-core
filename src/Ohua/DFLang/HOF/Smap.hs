@@ -56,4 +56,4 @@ instance HigherOrderFunction SmapFn where
         (replicators, replications) <- unzip <$> mapM mkReplicator freeVars
         return (S.fromList replicators, zip freeVars replications)
 
-    contextifyUnboundFunctions _ = return True
+    contextifyUnboundFunctions lam = return $ Just $ head $ flattenAssign $ beginAssignment lam
