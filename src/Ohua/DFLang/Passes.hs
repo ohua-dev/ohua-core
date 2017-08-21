@@ -24,16 +24,14 @@ import           Control.Arrow
 import           Control.Monad.Except
 import           Control.Monad.State
 import           Control.Monad.Writer
-import           Control.Exception
 import           Data.Either
 import           Data.Foldable
 import qualified Data.HashMap.Strict             as HM
 import qualified Data.HashSet                    as HS
 import           Data.Maybe
 import           Data.Proxy
-import           Data.Sequence                   (Seq, (<|), (><), (|>))
+import           Data.Sequence                   (Seq, (><))
 import qualified Data.Sequence                   as S
-import           Data.Traversable
 import           Lens.Micro
 import           Ohua.ALang.Lang
 import           Ohua.DFLang.HOF as HOF
@@ -43,8 +41,6 @@ import           Ohua.DFLang.Lang                (DFExpr (..), DFFnRef (..),
                                                   DFVar (..), LetExpr (..))
 import           Ohua.Monad
 import           Ohua.Types
-
-import           Debug.Trace
 
 
 -- class LoweringPass a where
@@ -67,13 +63,6 @@ import           Debug.Trace
 
 
 type Pass m = FnName -> FnId -> Assignment -> [Expression] -> m (Seq LetExpr)
-
-passes :: (MonadOhua m, MonadError String m) => HM.HashMap FnName (Pass m)
-passes =
-    [ ("com.ohua.lang/smap", lowerSmap)
-    , ("com.ohua.lang/if", lowerIf) -- TODO check if that "if" is actually the correct name
-    , ("com.ohua.lang/seq", lowerSeq)
-    ]
 
 
 -- | Check that a sequence of let expressions does not redefine bindings.
@@ -114,99 +103,17 @@ lowerALang expr = do
     go  (Var _) = throwError "Non local return binding"
     go  (Let assign expr rest) = do
         (fn, fnId, args) <- handleApplyExpr expr
-        tell =<< dispatchFnType fn fnId assign args
-        go rest
-    go  x = throwError "Expected `let` or binding"
-
-
-lowerALang2 :: (MonadOhua m, MonadError String m) => Expression -> m DFExpr
-lowerALang2 expr = do
-    (var, exprs) <- runWriterT (go expr)
-#ifdef DEBUG
-    checkSSA exprs
-#endif
-    return $ DFExpr exprs var
-  where
-    go  (Var (Local bnd)) = return bnd
-    go  (Var _) = throwError "Non local return binding"
-    go  (Let assign expr rest) = do
-        (fn, fnId, args) <- handleApplyExpr expr
         case HM.lookup fn hofNames of
             Just (WHOF (_ :: Proxy p)) -> lowerHOF (name :: TaggedFnName p) assign args
             Nothing       -> tell =<< lowerDefault fn fnId assign args
         go rest
-    go  x = throwError "Expected `let` or binding"
-
-    hofNames = HM.fromList $ map (extractName &&& id) hofs
-    extractName (WHOF (_ :: Proxy p)) = unTagFnName $ (name :: TaggedFnName p)
-
-
--- | Select a function for lowering a let expression absed on the type of the function called.
-dispatchFnType :: (MonadOhua m, MonadError String m) => Pass m
-dispatchFnType fn = fromMaybe lowerDefault (HM.lookup fn passes) $ fn
-
-
--- | Lowers an smap call.
-lowerSmap :: (MonadOhua m, MonadError String m) => Pass m
-lowerSmap _ fnId assign args = do
-    -- TODO add the "one-to-n"s
-    lowered <- lowerALang body
-    identityId <- generateId
-    coll <- expectVar collE
-    pure
-        $ (LetExpr fnId inVar (DFFunction "com.ohua.lang/smap-fun") (return coll) Nothing
-            <| letExprs lowered)
-        |> LetExpr identityId assign (EmbedSf "com.ohua.lang/collect") [DFVar (returnVar lowered)] Nothing
-  where
-    [Lambda inVar body, collE] = args
-
-
--- | Lowers an if call.
-lowerIf :: (MonadOhua m, MonadError String m) => Pass m
-lowerIf _ fnId assign args = do
-    dfCond <- expectVar condition
-    loweredThen <- lowerALang thenBody
-    loweredElse <- lowerALang elseBody
-
-    switchId <- generateId
-    ctxtifiedThen <- tieIfContext thenVar (letExprs loweredThen)
-    ctxtifiedElse <- tieIfContext elseVar (letExprs loweredElse)
-    pure
-        $ (LetExpr fnId (Destructure [thenVar, elseVar])
-            (DFFunction "com.ohua.lang/ifThenElse") [dfCond] Nothing
-            <| ctxtifiedThen
-            >< ctxtifiedElse)
-        |> LetExpr switchId assign (DFFunction "com.ohua.lang/switch")
-            [DFVar (returnVar loweredThen), DFVar (returnVar loweredElse)]
-            Nothing
-  where
-    [condition, Lambda (Direct thenVar) thenBody, Lambda (Direct elseVar) elseBody] = args
-
-
--- | Lowers a seq call.
-lowerSeq :: (MonadOhua m, MonadError String m) => Pass m
-lowerSeq _ fnId assign args = do
-    loweredExpr <- lowerALang toSeq
-    return $ tieContext binding (letExprs loweredExpr) |> LetExpr fnId assign (EmbedSf "com.ohua.lang/id") [DFVar (returnVar loweredExpr)] Nothing
-  where
-    -- Is binding first the right way around?
-    [Var (Local binding), Lambda _ toSeq] = args
+    go  _ = throwError "Expected `let` or binding"
 
 
 -- | Lower any not specially treated function type.
 lowerDefault :: (MonadOhua m, MonadError String m) => Pass m
 lowerDefault fn fnId assign args = mapM expectVar args <&> \args' -> [LetExpr fnId assign (EmbedSf fn) args' Nothing]
 
-
-tieIfContext :: (Functor f, Foldable f, MonadOhua m) => Binding -> f LetExpr -> m (Seq LetExpr)
-tieIfContext ctxSource = fmap (contextify ctxSource) . scopeVars ctxSource
-
---
--- registers the given binding as the context arc for all calls that do not
--- take a bound var as input.
---
-contextify :: (Functor f, Foldable f) => Binding -> f LetExpr -> f LetExpr
-contextify ctxSource exprs = fmap go exprs
     -- finds all functions that use vars from the lexical context and adds the context source to them.
 -- needs to do the following two things
 --        1. contextify all functions that do not have a bound arg -> context arg
@@ -226,44 +133,10 @@ tieContext0 bounds ctxSource = fmap go
     isBoundArg (DFVar v) = v `HS.member` bounds
     isBoundArg _         = False
 
-scopeVars :: (Functor f, Foldable f, MonadOhua m) => Binding -> f LetExpr -> m (Seq LetExpr)
-scopeVars ctxSource exprs = do
-  let boundVars = findBoundVars exprs
-  let usedVars = findUsedVars exprs
-  let unboundVars = (HS.toList . HS.difference usedVars) boundVars
-  let oldToNewVars = generateNewVars unboundVars
-  updatedLambda <- foldM (updateVarRefs oldToNewVars) S.empty exprs
-  scopeId <- generateId
-  let ctxtDFVars = map DFVar unboundVars
-  let ctxtDFVarsNew = mapMaybe (`HM.lookup` oldToNewVars) ctxtDFVars
-  assert (length ctxtDFVars == length ctxtDFVarsNew) (return ())
-  return $ LetExpr scopeId (Destructure ctxtDFVarsNew) (DFFunction "com.ohua.lang/scope") ctxtDFVars Nothing <| updatedLambda
-
-updateVarRefs :: MonadOhua m => HM.HashMap DFVar Binding -> Seq LetExpr -> LetExpr -> m (Seq LetExpr)
-updateVarRefs oldToNewVars newExprs (LetExpr id boundVars fnRef usedVars ctxt) | any (`HM.member` oldToNewVars) usedVars =
-  return $ newExprs |> LetExpr id boundVars fnRef (map (\b -> maybe b DFVar $ HM.lookup b oldToNewVars) usedVars) ctxt
-updateVarRefs oldToNewVars newExprs e = return $ newExprs |> e
-
-
-generateNewVars :: [Binding] -> HM.HashMap DFVar Binding
-generateNewVars bs = foldl go HM.empty $ zip bs [0 .. length bs] where
-  go :: HM.HashMap DFVar Binding -> (Binding, Int) -> HM.HashMap DFVar Binding
-  go hmap b = HM.insert (DFVar (fst b)) (Binding (unBinding (fst b) ++ show (snd b))) hmap
-
 -- | Find all locally bound variables.
 findBoundVars :: (Functor f, Foldable f) => f LetExpr -> HS.HashSet Binding
 findBoundVars = HS.fromList . fold . fmap (flattenAssign . returnAssignment)
 
-findUsedVars :: (Functor f, Foldable f) => f LetExpr -> HS.HashSet Binding
-findUsedVars = HS.fromList . fold . fmap (extractAssigments . filterVars . callArguments)
-  where
-    filterVars :: [DFVar] -> [DFVar]
-    filterVars = filter varFilter
-    varFilter (DFVar _) = True
-    varFilter _ = False
-    extractAssigments :: [DFVar] -> [Binding]
-    extractAssigments = map e
-    e (DFVar b) = b
 
 findFreeVars0 :: Foldable f => HS.HashSet Binding -> f LetExpr -> HS.HashSet Binding
 findFreeVars0 boundVars = HS.fromList . concatMap (mapMaybe f . callArguments)
@@ -321,7 +194,7 @@ expectVar _                 = throwError "Argument must be var"
 
 lowerHOF :: forall f m . (MonadError String m, MonadOhua m, HigherOrderFunction f, MonadWriter (Seq LetExpr) m)
          => TaggedFnName f -> Assignment -> [Expression] -> m ()
-lowerHOF name assign args = do
+lowerHOF _ assign args = do
     simpleArgs <- mapM handleArg args
     let newFnArgs = map (either Variable LamArg . fmap fst) simpleArgs
     f <- HOF.parseCallAndInitState newFnArgs :: m f
@@ -352,3 +225,7 @@ hofs =
     , WHOF (Proxy :: Proxy SmapFn)
     -- , WHOF (Proxy :: Proxy SeqFn)
     ]
+
+hofNames :: HM.HashMap FnName WHOF
+hofNames = HM.fromList $ map (extractName &&& id) hofs
+  where extractName (WHOF (_ :: Proxy p)) = unTagFnName $ (name :: TaggedFnName p)

@@ -6,7 +6,6 @@ import Ohua.Types
 import Ohua.DFLang.Lang
 import Ohua.Monad
 import Control.Monad.Except
-import qualified Data.Sequence                   as S
 import Control.Monad.State
 
 data IfFn = IfFn

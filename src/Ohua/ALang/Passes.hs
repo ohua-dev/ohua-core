@@ -18,7 +18,6 @@ import           Control.Monad.State
 import           Control.Monad.Writer
 import qualified Data.HashMap.Strict    as HM
 import qualified Data.HashSet           as HS
-import           Debug.Trace
 import           Ohua.ALang.Lang
 import           Ohua.ALang.Util
 import           Ohua.IR.Functions

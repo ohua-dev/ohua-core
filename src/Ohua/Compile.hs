@@ -75,7 +75,7 @@ checkHigherOrderFunctionSupport (Let _ e rest) = do
         supportsHOF <- checkNestedExpr f
         when (isLambda arg && not supportsHOF) $ throwError "Lambdas may only be input to higher order functions!"
         return True
-    checkNestedExpr (Var (Sf n _)) = return $ HM.member n (passes :: HM.HashMap FnName SimplePass)
+    checkNestedExpr (Var (Sf n _)) = return $ HM.member n hofNames
     checkNestedExpr (Var _) = return False
     checkNestedExpr _ = throwError "Expected var or apply expr"
     isLambda (Lambda _ _) = True
