@@ -1,3 +1,13 @@
+-- |
+-- Module      : $Header$
+-- Description : Implementation for the @if@ higher order function.
+-- Copyright   : (c) Sebastian Ertel, Justus Adam 2017. All Rights Reserved.
+-- License     : EPL-1.0
+-- Maintainer  : dev@justus.science, sebastian.ertel@gmail.com
+-- Stability   : experimental
+-- Portability : portable
+
+-- This source code is licensed under the terms described in the associated LICENSE.TXT file
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE RecordWildCards #-}
 module Ohua.DFLang.HOF.If where
