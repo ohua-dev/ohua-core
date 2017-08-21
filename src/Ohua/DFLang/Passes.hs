@@ -11,26 +11,36 @@
 --
 -- Passes required to transform an expression in ALang into an expression in DFLang.
 --
-{-# LANGUAGE CPP             #-}
-{-# LANGUAGE OverloadedLists #-}
+{-# LANGUAGE CPP                 #-}
+{-# LANGUAGE ExplicitForAll      #-}
+{-# LANGUAGE NamedFieldPuns      #-}
+{-# LANGUAGE OverloadedLists     #-}
+{-# LANGUAGE RecordWildCards     #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Ohua.DFLang.Passes where
 
 
+import           Control.Arrow
 import           Control.Monad.Except
 import           Control.Monad.State
 import           Control.Monad.Writer
 import           Control.Exception
+import           Data.Either
 import           Data.Foldable
-import qualified Data.HashMap.Strict  as HM
-import qualified Data.HashSet         as HS
+import qualified Data.HashMap.Strict             as HM
+import qualified Data.HashSet                    as HS
 import           Data.Maybe
-import           Data.Sequence        (Seq, (<|), (><), (|>))
-import qualified Data.Sequence        as S
-import           Data.Ix
+import           Data.Proxy
+import           Data.Sequence                   (Seq, (<|), (><), (|>))
+import qualified Data.Sequence                   as S
+import           Data.Traversable
 import           Lens.Micro
 import           Ohua.ALang.Lang
-import           Ohua.DFLang.Lang     (DFExpr (..), DFFnRef (..), DFVar (..),
-                                       LetExpr (..))
+import           Ohua.DFLang.HOF as HOF
+import           Ohua.DFLang.HOF.Smap
+import           Ohua.DFLang.HOF.If
+import           Ohua.DFLang.Lang                (DFExpr (..), DFFnRef (..),
+                                                  DFVar (..), LetExpr (..))
 import           Ohua.Monad
 import           Ohua.Types
 
@@ -73,12 +83,14 @@ checkSSA = flip evalStateT mempty . mapM_ go
     go le = do
         defined <- get
         let produced = flattenAssign (returnAssignment le)
-        case msum $ map (\a -> if HS.member a defined then Just a else Nothing) produced of
+            f a | HS.member a defined = Just a
+            f _ = Nothing
+        case msum $ map f produced of
             Just b  -> throwError $ "Rebinding of " ++ show b
             Nothing -> return ()
         modify (addAll produced)
 
-    addAll add set = foldr' HS.insert set add
+    addAll = flip $ foldr' HS.insert
 
 
 -- | Check that a DFExpression is in SSA form.
@@ -105,6 +117,28 @@ lowerALang expr = do
         tell =<< dispatchFnType fn fnId assign args
         go rest
     go  x = throwError "Expected `let` or binding"
+
+
+lowerALang2 :: (MonadOhua m, MonadError String m) => Expression -> m DFExpr
+lowerALang2 expr = do
+    (var, exprs) <- runWriterT (go expr)
+#ifdef DEBUG
+    checkSSA exprs
+#endif
+    return $ DFExpr exprs var
+  where
+    go  (Var (Local bnd)) = return bnd
+    go  (Var _) = throwError "Non local return binding"
+    go  (Let assign expr rest) = do
+        (fn, fnId, args) <- handleApplyExpr expr
+        case HM.lookup fn hofNames of
+            Just (WHOF (_ :: Proxy p)) -> lowerHOF (name :: TaggedFnName p) assign args
+            Nothing       -> tell =<< lowerDefault fn fnId assign args
+        go rest
+    go  x = throwError "Expected `let` or binding"
+
+    hofNames = HM.fromList $ map (extractName &&& id) hofs
+    extractName (WHOF (_ :: Proxy p)) = unTagFnName $ (name :: TaggedFnName p)
 
 
 -- | Select a function for lowering a let expression absed on the type of the function called.
@@ -164,13 +198,6 @@ lowerDefault :: (MonadOhua m, MonadError String m) => Pass m
 lowerDefault fn fnId assign args = mapM expectVar args <&> \args' -> [LetExpr fnId assign (EmbedSf fn) args' Nothing]
 
 
--- finds all functions that use vars from the lexical context and adds the context source to them.
--- needs to do the following two things
---        1. contextify all functions that do not have a bound arg -> context arg
---        2. provide lexical scope access to these args
-tieContext :: (Functor f, Foldable f) => Binding -> f LetExpr -> f LetExpr
-tieContext ctxSource exprs = undefined
-
 tieIfContext :: (Functor f, Foldable f, MonadOhua m) => Binding -> f LetExpr -> m (Seq LetExpr)
 tieIfContext ctxSource = fmap (contextify ctxSource) . scopeVars ctxSource
 
@@ -180,10 +207,22 @@ tieIfContext ctxSource = fmap (contextify ctxSource) . scopeVars ctxSource
 --
 contextify :: (Functor f, Foldable f) => Binding -> f LetExpr -> f LetExpr
 contextify ctxSource exprs = fmap go exprs
+    -- finds all functions that use vars from the lexical context and adds the context source to them.
+-- needs to do the following two things
+--        1. contextify all functions that do not have a bound arg -> context arg
+--        2. provide lexical scope access to these args
+tieContext :: (Functor f, Foldable f) => Binding -> f LetExpr -> f LetExpr
+tieContext ctxSource exprs = tieContext0 bounds ctxSource exprs
   where
     bounds = findBoundVars exprs
+
+
+tieContext0 :: Functor f => HS.HashSet Binding -> Binding -> f LetExpr -> f LetExpr
+tieContext0 bounds ctxSource = fmap go
+  where
     go e | any isBoundArg (callArguments e) = e
     go e = e { contextArg = Just ctxSource }
+
     isBoundArg (DFVar v) = v `HS.member` bounds
     isBoundArg _         = False
 
@@ -226,11 +265,18 @@ findUsedVars = HS.fromList . fold . fmap (extractAssigments . filterVars . callA
     extractAssigments = map e
     e (DFVar b) = b
 
+findFreeVars0 :: Foldable f => HS.HashSet Binding -> f LetExpr -> HS.HashSet Binding
+findFreeVars0 boundVars = HS.fromList . concatMap (mapMaybe f . callArguments)
+  where
+    f (DFVar b) | not (HS.member b boundVars) = Just b
+    f _         = Nothing
+
+
 -- | Insert a `one-to-n` node for each free variable to scope them.
 replicateFreeVars :: (MonadOhua m, MonadError String m) => Binding -> [Binding] -> Seq LetExpr -> m (Seq LetExpr)
 replicateFreeVars countSource_ initialBindings exprs = do
     (replicators, replications) <- unzip <$> mapM mkReplicator freeVars
-    pure $ S.fromList replicators >< fmap (renameWith $ HM.fromList $ zip freeVars replications) exprs
+    pure $ S.fromList replicators >< renameWith (HM.fromList $ zip freeVars replications) exprs
   where
     boundVars = findBoundVars exprs `mappend` HS.fromList initialBindings
 
@@ -239,12 +285,16 @@ replicateFreeVars countSource_ initialBindings exprs = do
     f (DFVar b) | not (HS.member b boundVars) = Just b
     f _         = Nothing
 
-    renameWith m e = e { callArguments = map (\case v@(DFVar var) -> maybe v DFVar $ HM.lookup var m; v -> v;) (callArguments e) }
-
     mkReplicator var = do
         id <- generateId
         newVar <- generateBindingWith var
         pure (LetExpr id (Direct newVar) (DFFunction "com.ohua.lang/one-to-n") [DFVar countSource_, DFVar var] Nothing, newVar)
+
+
+renameWith :: Functor f => HM.HashMap Binding Binding -> f LetExpr -> f LetExpr
+renameWith m = fmap go
+  where
+    go e = e { callArguments = map (\case v@(DFVar var) -> maybe v DFVar $ HM.lookup var m; v -> v;) (callArguments e) }
 
 
 -- | Ananlyze an apply expression, extracting the inner stateful function and the nested arguments as a list.
@@ -267,3 +317,38 @@ expectVar (Var (Local bnd)) = pure $ DFVar bnd
 expectVar (Var (Env i))     = pure $ DFEnvVar i
 expectVar (Var _)           = throwError "Var must be local or env"
 expectVar _                 = throwError "Argument must be var"
+
+
+lowerHOF :: forall f m . (MonadError String m, MonadOhua m, HigherOrderFunction f, MonadWriter (Seq LetExpr) m)
+         => TaggedFnName f -> Assignment -> [Expression] -> m ()
+lowerHOF name assign args = do
+    simpleArgs <- mapM handleArg args
+    let newFnArgs = map (either Variable LamArg . fmap fst) simpleArgs
+    f <- HOF.parseCallAndInitState newFnArgs :: m f
+    flip evalStateT f $ do
+        createContextEntry >>= tell
+        let lambdas = rights simpleArgs
+        for_ lambdas $ \(lam, body) -> do
+            let boundVars = findBoundVars body `mappend` HS.fromList (flattenAssign $ beginAssignment lam)
+            let freeVars = HS.toList $ findFreeVars0 boundVars body
+            (scopers, renaming) <- scopeFreeVariables lam freeVars
+            tell scopers
+            scopeUnbound <- contextifyUnboundFunctions lam
+            let tieContext1 = if scopeUnbound then tieContext0 boundVars (head $ flattenAssign $ beginAssignment lam) else id
+            tell $ tieContext1 (renameWith (HM.fromList renaming) body)
+        createContextExit assign >>= tell
+  where
+    handleArg (Var (Local v)) = return $ Left $ DFVar v
+    handleArg (Var (Env e)) = return $ Left $ DFEnvVar e
+    handleArg (Lambda assign body) = do
+        DFExpr lets bnd <- lowerALang body
+        return $ Right (Lam assign bnd, lets)
+    handleArg _ = throwError "unexpected type of argument"
+
+
+hofs :: [WHOF]
+hofs =
+    [ WHOF (Proxy :: Proxy IfFn)
+    , WHOF (Proxy :: Proxy SmapFn)
+    -- , WHOF (Proxy :: Proxy SeqFn)
+    ]

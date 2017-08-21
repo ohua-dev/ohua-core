@@ -35,6 +35,9 @@ library
     , Ohua.ALang.Optimizations
     , Ohua.ALang.Util
     , Ohua.DFLang.Lang
+    , Ohua.DFLang.HOF
+    , Ohua.DFLang.HOF.Smap
+    , Ohua.DFLang.HOF.If
     , Ohua.DFLang.Passes
     , Ohua.DFLang.Optimizations
     , Ohua.DFGraph
@@ -42,7 +45,7 @@ library
   -- other-modules:
   -- other-extensions:
   build-depends:       
-      base >=4.8 && <4.9
+      base >=4.8 && <5
     , transformers
     , microlens
     , microlens-mtl
@@ -74,7 +77,7 @@ executable ohua-test-exec
   main-is: Main.hs
   hs-source-dirs: .
   build-depends: 
-      base >=4.8 && <4.9
+      base >=4.8 && <5
     , ohua-core
     , mtl
   default-language: Haskell2010
@@ -89,7 +92,7 @@ test-suite ohua-tests
     , ALangVerify
   hs-source-dirs:      test
   build-depends:       
-      base >=4.8 && <4.9
+      base >=4.8 && <5
     , ohua-core
     , hspec
     , mtl
