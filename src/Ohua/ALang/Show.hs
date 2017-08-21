@@ -38,5 +38,4 @@ showArgument e              = showLambda e
 showSymbol :: ResolvedSymbol -> String
 showSymbol (Local l) = show l
 showSymbol (Sf s i)   = "Sf[" ++ show s ++ "]" ++ maybe "" (\(FnId a) -> "<" ++ show a ++ ">") i
-showSymbol (Algo a)  = "Algo[" ++ show a ++ "]"
 showSymbol (Env e)   = show e

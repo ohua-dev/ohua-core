@@ -50,7 +50,7 @@ expr4 =
         "x"
 
 expr5 =
-    Apply (Lambda (Direct "c") (Var (Sf "com.ohua.lang/smap-io-fun" Nothing))) (Lambda (Direct "c") (Var (Algo "com.ohua.lang/pcollect")))
+    Apply (Lambda (Direct "c") (Var (Sf "com.ohua.lang/smap-io-fun" Nothing))) (Lambda (Direct "c") (Var (Sf  "com.ohua.lang/pcollect" Nothing)))
 
 
 main = do
