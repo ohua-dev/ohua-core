@@ -21,7 +21,10 @@
                 "ohua-core:debug"
             ],
             "type": "shell",
-            "group": "build",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
             "problemMatcher": [
                 {
                     "owner": "haskell",

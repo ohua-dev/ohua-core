@@ -32,15 +32,14 @@ data Target = Target
     }
 
 
-data Arc
-    = Arc
-        { source :: !Target
-        , target :: !Target
-        }
-    | EnvArc
-        { target    :: !Target
-        , envSource :: !HostExpr
-        }
+data Arc = Arc
+    { target :: !Target
+    , source :: !Source
+    }
+    
+data Source
+    = LocalSource !Target
+    | EnvSource !HostExpr
 
 
 data OutGraph = OutGraph
