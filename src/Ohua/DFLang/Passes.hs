@@ -19,12 +19,14 @@ module Ohua.DFLang.Passes where
 import           Control.Monad.Except
 import           Control.Monad.State
 import           Control.Monad.Writer
+import           Control.Exception
 import           Data.Foldable
 import qualified Data.HashMap.Strict  as HM
 import qualified Data.HashSet         as HS
 import           Data.Maybe
 import           Data.Sequence        (Seq, (<|), (><), (|>))
 import qualified Data.Sequence        as S
+import           Data.Ix
 import           Lens.Micro
 import           Ohua.ALang.Lang
 import           Ohua.DFLang.Lang     (DFExpr (..), DFFnRef (..), DFVar (..),
@@ -33,6 +35,25 @@ import           Ohua.Monad
 import           Ohua.Types
 
 import           Debug.Trace
+
+
+-- class LoweringPass a where
+--   -- sfn :: String
+--   pass :: a -> Seq LetExpr
+--   -- scope m ::
+--   -- contextify ::
+--
+-- data SFRef = SFRef { fname::FnName, fid::FnId, as::Assignment, es::[Expression] }
+-- type Cond = SFRef
+-- -- smap = SFRef { fname = FnName "com.ohua.lang" "smap" }
+-- -- cond = SFRef { fname = FnName "com.ohua.lang" "if"}
+--
+-- instance LoweringPass SMap where
+--   -- pass :: FnName -> FnId -> Assignment -> [Expression] -> Seq LetExpr
+--   pass s = undefined
+--
+-- instance LoweringPass Cond where
+--   pass i = undefined
 
 
 type Pass m = FnName -> FnId -> Assignment -> [Expression] -> m (Seq LetExpr)
@@ -109,12 +130,13 @@ lowerIf _ fnId assign args = do
     loweredElse <- lowerALang elseBody
 
     switchId <- generateId
-
+    ctxtifiedThen <- tieIfContext thenVar (letExprs loweredThen)
+    ctxtifiedElse <- tieIfContext elseVar (letExprs loweredElse)
     pure
         $ (LetExpr fnId (Destructure [thenVar, elseVar])
             (DFFunction "com.ohua.lang/ifThenElse") [dfCond] Nothing
-            <| tieContext thenVar (letExprs loweredThen)
-            >< tieContext elseVar (letExprs loweredElse))
+            <| ctxtifiedThen
+            >< ctxtifiedElse)
         |> LetExpr switchId assign (DFFunction "com.ohua.lang/switch")
             [DFVar (returnVar loweredThen), DFVar (returnVar loweredElse)]
             Nothing
@@ -129,9 +151,22 @@ lowerSeq = undefined
 lowerDefault :: (MonadOhua m, MonadError String m) => Pass m
 lowerDefault fn fnId assign args = mapM expectVar args <&> \args' -> return $ LetExpr fnId assign (EmbedSf fn) args' Nothing
 
-
+-- finds all functions that use vars from the lexical context and adds the context source to them.
+-- FIXME: this is actually wrong. instead it needs to do the following two things
+--        1. contextify all functions that do not have a bound arg -> context arg
+--        2. provide lexical scope access to these args
 tieContext :: (Functor f, Foldable f) => Binding -> f LetExpr -> f LetExpr
-tieContext ctxSource exprs = fmap go exprs
+tieContext ctxSource exprs = undefined
+
+tieIfContext :: (Functor f, Foldable f, MonadOhua m) => Binding -> f LetExpr -> m (Seq LetExpr)
+tieIfContext ctxSource = fmap (contextify ctxSource) . scopeVars ctxSource
+
+--
+-- registers the given binding as the context arc for all calls that do not
+-- take a bound var as input.
+--
+contextify :: (Functor f, Foldable f) => Binding -> f LetExpr -> f LetExpr
+contextify ctxSource exprs = fmap go exprs
   where
     bounds = findBoundVars exprs
     go e | any isBoundArg (callArguments e) = e
@@ -139,10 +174,43 @@ tieContext ctxSource exprs = fmap go exprs
     isBoundArg (DFVar v) = v `HS.member` bounds
     isBoundArg _         = False
 
+scopeVars :: (Functor f, Foldable f, MonadOhua m) => Binding -> f LetExpr -> m (Seq LetExpr)
+scopeVars ctxSource exprs = do
+  let boundVars = findBoundVars exprs
+  let usedVars = findUsedVars exprs
+  let unboundVars = (HS.toList . HS.difference usedVars) boundVars
+  let oldToNewVars = generateNewVars unboundVars
+  updatedLambda <- foldM (updateVarRefs oldToNewVars) S.empty exprs
+  scopeId <- generateId
+  let ctxtDFVars = map DFVar unboundVars
+  let ctxtDFVarsNew = mapMaybe (`HM.lookup` oldToNewVars) ctxtDFVars
+  assert (length ctxtDFVars == length ctxtDFVarsNew) (return ())
+  return $ LetExpr scopeId (Destructure ctxtDFVarsNew) (DFFunction "com.ohua.lang/scope") ctxtDFVars Nothing <| updatedLambda
+
+updateVarRefs :: MonadOhua m => HM.HashMap DFVar Binding -> Seq LetExpr -> LetExpr -> m (Seq LetExpr)
+updateVarRefs oldToNewVars newExprs (LetExpr id boundVars fnRef usedVars ctxt) | any (`HM.member` oldToNewVars) usedVars =
+  return $ newExprs |> LetExpr id boundVars fnRef (map (\b -> maybe b DFVar $ HM.lookup b oldToNewVars) usedVars) ctxt
+updateVarRefs oldToNewVars newExprs e = return $ newExprs |> e
+
+
+generateNewVars :: [Binding] -> HM.HashMap DFVar Binding
+generateNewVars bs = foldl go HM.empty $ zip bs [0 .. length bs] where
+  go :: HM.HashMap DFVar Binding -> (Binding, Int) -> HM.HashMap DFVar Binding
+  go hmap b = HM.insert (DFVar (fst b)) (Binding (unBinding (fst b) ++ show (snd b))) hmap
 
 findBoundVars :: (Functor f, Foldable f) => f LetExpr -> HS.HashSet Binding
 findBoundVars = HS.fromList . fold . fmap (flattenAssign . returnAssignment)
 
+findUsedVars :: (Functor f, Foldable f) => f LetExpr -> HS.HashSet Binding
+findUsedVars = HS.fromList . fold . fmap (extractAssigments . filterVars . callArguments)
+  where
+    filterVars :: [DFVar] -> [DFVar]
+    filterVars = filter varFilter
+    varFilter (DFVar _) = True
+    varFilter _ = False
+    extractAssigments :: [DFVar] -> [Binding]
+    extractAssigments = map e
+    e (DFVar b) = b
 
 replicateFreeVars :: (MonadOhua m, MonadError String m) => Binding -> [Binding] -> Seq LetExpr -> m (Seq LetExpr)
 replicateFreeVars countSource_ initialBindings exprs = do

@@ -15,10 +15,9 @@
 -- The ALang IR is transformed straight into the dataflow IR.
 -- One important aspect of DFLang: it does not define any abstractions, i.e., there are no function definitions.
 --
-
 module Ohua.DFLang.Lang where
 
-
+import           Data.Hashable
 import           Data.Sequence
 import           Ohua.ALang.Lang
 import           Ohua.Types
@@ -48,3 +47,7 @@ data DFVar
     = DFEnvVar HostExpr
     | DFVar Binding
     deriving Eq
+
+instance Hashable DFVar where
+   hashWithSalt s (DFVar v) = hashWithSalt s (0::Int, v)
+   hashWithSalt s (DFEnvVar e) = hashWithSalt s (1::Int, e)

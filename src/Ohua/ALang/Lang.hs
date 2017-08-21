@@ -13,6 +13,7 @@ module Ohua.ALang.Lang where
 
 import           Control.DeepSeq
 import           Data.Functor.Identity
+import           Data.Hashable
 import           Data.String
 import           Ohua.Types
 
@@ -27,6 +28,7 @@ newtype HostExpr = HostExpr { unwrapHostExpr :: Int } deriving (Show, Eq, Ord)
 
 -- Only exists to allow literal integers to be interpreted as host expressions
 instance Num HostExpr where fromInteger = HostExpr . fromInteger
+instance Hashable HostExpr where hashWithSalt s = hashWithSalt s . unwrapHostExpr
 
 -- (Sebastian) can we treat opaque JVM objects here somehow?
 -- (Justus) Several. Well have to discus what the best option is at some point,
