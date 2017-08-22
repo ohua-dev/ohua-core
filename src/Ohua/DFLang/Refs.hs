@@ -1,9 +1,9 @@
 module Ohua.DFLang.Refs where
 
 
-import Ohua.DFLang.Lang
-import Ohua.Types
-import Prelude hiding (id)
+import           Ohua.DFLang.Lang
+import           Ohua.Types
+import           Prelude          hiding (id)
 
 
 oneToN :: DFFnRef
@@ -14,7 +14,7 @@ size :: DFFnRef
 size = EmbedSf "com.ohua.lang/size"
 
 
-collect :: DFFnRef 
+collect :: DFFnRef
 collect = DFFunction "com.ohua.lang/collect"
 
 

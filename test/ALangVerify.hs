@@ -1,8 +1,3 @@
-{-# LANGUAGE ExplicitForAll      #-}
-{-# LANGUAGE OverloadedLists     #-}
-{-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-
 module ALangVerify where
 
 import           Control.Arrow

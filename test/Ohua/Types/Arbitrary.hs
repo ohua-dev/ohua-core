@@ -1,11 +1,11 @@
 module Ohua.Types.Arbitrary where
 
 
-import Ohua.Types
-import Ohua.ALang.Lang
-import Test.QuickCheck
+import           Control.Monad
+import           Ohua.ALang.Lang
 import           Ohua.IR.Functions
-import Control.Monad
+import           Ohua.Types
+import           Test.QuickCheck
 
 
 instance Arbitrary Binding where

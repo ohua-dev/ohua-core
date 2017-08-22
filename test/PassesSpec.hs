@@ -9,7 +9,6 @@
 
 -- This source code is licensed under the terms described in the associated LICENSE.TXT file
 {-# LANGUAGE FlexibleContexts  #-}
-{-# LANGUAGE OverloadedStrings #-}
 module PassesSpec (passesSpec) where
 
 import           Control.DeepSeq
@@ -28,7 +27,7 @@ import           Test.Hspec.QuickCheck
 import           Test.QuickCheck
 import           Test.QuickCheck.Property as P
 
-import Ohua.Types.Arbitrary
+import           Ohua.Types.Arbitrary
 
 
 -- newtype ApplyOnlyExpr = ApplyOnlyExpr { unApplyOnlyExpr :: Expression } deriving (Eq, Show)
