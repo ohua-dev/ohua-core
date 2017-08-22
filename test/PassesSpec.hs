@@ -28,41 +28,7 @@ import           Test.Hspec.QuickCheck
 import           Test.QuickCheck
 import           Test.QuickCheck.Property as P
 
-
-instance Arbitrary Binding where
-    arbitrary = oneof $ map pure
-        [ "x", "y", "z", "a", "b", "c"
-        ]
-
-instance Arbitrary FnName where
-    arbitrary = oneof $ map pure [pmapName, pCollectName, smapIOName, flattenerName, seqName, idName]
-
-instance Arbitrary FnId where
-    arbitrary = FnId <$> arbitrary
-
-instance Arbitrary ResolvedSymbol where
-    arbitrary = oneof
-        [ Local <$> arbitrary
-        , Sf <$> arbitrary <*> arbitrary
-        , Algo <$> arbitrary
-        -- , pure $ Env $ error "host expr"
-        ]
-
-instance Arbitrary Assignment where
-    arbitrary = oneof [Direct <$> arbitrary, Destructure <$> arbitrary]
-
-instance Arbitrary a => Arbitrary (Expr a) where
-    arbitrary = sized expr
-      where
-        expr 0 = Var <$> arbitrary
-        expr n = oneof
-            [ liftM3 Let arbitrary nestExpr nestExpr
-            , liftM2 Apply nestExpr nestExpr
-            , liftM2 Lambda arbitrary nestExpr
-            , Var <$> arbitrary
-            ]
-          where
-            nestExpr = expr $ n `div` 2
+import Ohua.Types.Arbitrary
 
 
 -- newtype ApplyOnlyExpr = ApplyOnlyExpr { unApplyOnlyExpr :: Expression } deriving (Eq, Show)
@@ -146,7 +112,6 @@ passesSpec = do
 
         let lambdaStaysInput (Apply _ (Lambda _ (Lambda _ _))) = False
             lambdaStaysInput (Apply (Var (Sf _ _)) (Lambda _ _)) = True
-            lambdaStaysInput (Apply (Var (Algo _)) (Lambda _ _)) = True
             lambdaStaysInput (Let _ expr _) = lambdaStaysInput expr
             lambdaStaysInput (Apply _ body) = lambdaStaysInput body
             lambdaStaysInput _ = False

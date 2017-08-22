@@ -37,30 +37,12 @@ import           Ohua.ALang.Lang
 import           Ohua.DFLang.HOF      as HOF
 import           Ohua.DFLang.HOF.If
 import           Ohua.DFLang.HOF.Smap
+import           Ohua.DFLang.HOF.Seq
 import           Ohua.DFLang.Lang     (DFExpr (..), DFFnRef (..), DFVar (..),
                                        LetExpr (..))
 import           Ohua.Monad
 import           Ohua.Types
 import           Ohua.Util
-
-
--- class LoweringPass a where
---   -- sfn :: String
---   pass :: a -> Seq LetExpr
---   -- scope m ::
---   -- contextify ::
---
--- data SFRef = SFRef { fname::FnName, fid::FnId, as::Assignment, es::[Expression] }
--- type Cond = SFRef
--- -- smap = SFRef { fname = FnName "com.ohua.lang" "smap" }
--- -- cond = SFRef { fname = FnName "com.ohua.lang" "if"}
---
--- instance LoweringPass SMap where
---   -- pass :: FnName -> FnId -> Assignment -> [Expression] -> Seq LetExpr
---   pass s = undefined
---
--- instance LoweringPass Cond where
---   pass i = undefined
 
 
 type Pass m = FnName -> FnId -> Assignment -> [Expression] -> m (Seq LetExpr)
@@ -226,7 +208,7 @@ hofs :: [WHOF]
 hofs =
     [ WHOF (Proxy :: Proxy IfFn)
     , WHOF (Proxy :: Proxy SmapFn)
-    -- , WHOF (Proxy :: Proxy SeqFn)
+    , WHOF (Proxy :: Proxy SeqFn)
     ]
 
 hofNames :: HM.HashMap FnName WHOF

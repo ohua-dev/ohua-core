@@ -22,6 +22,8 @@ import           Ohua.DFLang.Passes
 import           Ohua.Monad
 import           Ohua.Types
 import           Test.Hspec
+import Data.Foldable
+import Data.List
 
 
 newtype OhuaGrGraph = OhuaGrGraph { unGr :: Gr FnName OhuaGrEdgeLabel } deriving Eq
@@ -32,7 +34,11 @@ data OhuaGrEdgeLabel = OhuaGrEdgeLabel
     , targetIndex :: !Int
     } deriving (Eq, Show, Ord)
 
-
+instance Show DFExpr where
+    show (DFExpr e v) = intercalate "\n" (map show (toList e)) ++ "\n" ++ show v
+deriving instance Show LetExpr
+deriving instance Show DFVar
+deriving instance Show DFFnRef
 
 instance Show OhuaGrGraph where
     show = prettify . unGr
@@ -50,9 +56,11 @@ toFGLGraph (OutGraph ops arcs) = OhuaGrGraph $ mkGraph nodes edges
 
     edges = map toEdge arcs
 
-    toEdge (Arc s t) = (unFnId $ operator s, unFnId $ operator t, OhuaGrEdgeLabel (index s) (index t))
-    toEdge (EnvArc t a) = (envId, unFnId $ operator t, OhuaGrEdgeLabel (unwrapHostExpr a) (index t))
-
+    toEdge (Arc t s) = (sourceOp, unFnId $ operator t, OhuaGrEdgeLabel sourceIdx (index t))
+      where 
+        (sourceOp, sourceIdx) = case s of 
+            LocalSource (Target op idx) -> (unFnId op, idx)
+            EnvSource e -> (envId, unwrapHostExpr e)
 
 
 shouldSatisfyRet :: Show a => IO a -> (a -> Bool) -> Expectation
@@ -87,10 +95,13 @@ smapLowering = describe "lowering smap constructs" $ do
             Let "x" ("com.ohua.lang/smap" `Apply` Lambda "y" (Let "z" (Apply "some.module/inc" "y") "z") `Apply` "coll")
             "x"
     let targetExpr = DFExpr
-            [ LetExpr 0 "coll" (EmbedSf "com.ohua.lang/id") [DFEnvVar (HostExpr 0)] Nothing
-            , LetExpr 1 "y" (DFFunction "com.ohua.lang/smap-fun") [DFVar "coll"] Nothing
-            , LetExpr 2 "z" (EmbedSf "some.module/inc") [DFVar "y"] Nothing
-            , LetExpr 3 "x" (DFFunction "com.ohua.lang/collect") [DFVar "z"] Nothing
+            [ LetExpr 0 "coll" (EmbedSf "com.ohua.lang/id") [0] Nothing
+            , LetExpr 4 "a" (EmbedSf "com.ohua.lang/size") ["coll"] Nothing
+            , LetExpr 5 "b" (DFFunction "com.ohua.lang/one-to-n") ["a", "coll"] Nothing
+            , LetExpr 1 "y" (DFFunction "com.ohua.lang/smap-fun") ["b"] Nothing
+            , LetExpr 2 "z" (EmbedSf "some.module/inc") ["y"] Nothing
+            , LetExpr 6 "c" (DFFunction "com.ohua.lang/one-to-n") ["a", "a"] Nothing
+            , LetExpr 3 "x" (DFFunction "com.ohua.lang/collect") ["c", "z"] Nothing
             ]
             "x"
     lowerAndValidate sourceExpr targetExpr "smap"

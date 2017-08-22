@@ -35,9 +35,11 @@ library
     , Ohua.ALang.Optimizations
     , Ohua.ALang.Util
     , Ohua.DFLang.Lang
+    , Ohua.DFLang.Refs
     , Ohua.DFLang.HOF
     , Ohua.DFLang.HOF.Smap
     , Ohua.DFLang.HOF.If
+    , Ohua.DFLang.HOF.Seq
     , Ohua.DFLang.Passes
     , Ohua.DFLang.Optimizations
     , Ohua.DFGraph
@@ -53,7 +55,7 @@ library
     , mtl
     , hashable
     , containers
-    , extra
+    -- , extra
     , monad-loops
     , deepseq
   hs-source-dirs:      src
@@ -90,6 +92,7 @@ test-suite ohua-tests
     , DFLowering
     , TestALangUtils
     , ALangVerify
+    , Ohua.Types.Arbitrary
   hs-source-dirs:      test
   build-depends:       
       base >=4.8 && <5
@@ -102,6 +105,8 @@ test-suite ohua-tests
     , fgl
   type:                exitcode-stdio-1.0
   default-language:    Haskell2010
+  default-extensions:
+    OverloadedStrings
 
 -- test-suite ouha-test
 --  main-is:             Spec.hs
