@@ -32,11 +32,13 @@ library
     , Ohua.ALang.Show
     , Ohua.ALang.Passes
     , Ohua.ALang.Passes.SSA
+    , Ohua.ALang.Passes.TailRec
     , Ohua.ALang.Optimizations
     , Ohua.ALang.Util
     , Ohua.DFLang.Lang
     , Ohua.DFLang.Refs
     , Ohua.DFLang.HOF
+    , Ohua.DFLang.HOF.TailRec
     , Ohua.DFLang.HOF.Smap
     , Ohua.DFLang.HOF.If
     , Ohua.DFLang.HOF.Seq
