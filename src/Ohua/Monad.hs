@@ -115,23 +115,24 @@ fromState l = (^. l) <$> getState
 -- Creates the state from the tree being passed in
 -- If there are any errors during the compilation they are reported together at the end
 runOhuaT :: Monad ctxt => (Expression -> OhuaT ctxt result) -> Expression -> ctxt result
-runOhuaT f tree = do
-    (val, errors) <- evalRWST (runOhuaT' (f tree)) (error "Ohua has no environment!") (CompilerState nameGen 0)
+runOhuaT f tree = runOhuaT0 (f tree) $ HS.fromList $ extractBindings tree
+
+runOhuaT0 :: Monad ctxt => OhuaT ctxt result -> HS.HashSet Binding -> ctxt result
+runOhuaT0 f taken = do
+    (val, errors) <- evalRWST (runOhuaT' f) (error "Ohua has no environment!") (CompilerState nameGen 0)
 #ifdef DEBUG
     unless (null errors) $ error $ intercalate "\n" errors
 #endif
     return val
   where
-    nameGen = initNameGen tree
+    nameGen = initNameGen taken
 
-initNameGen :: Expression -> NameGenerator
-initNameGen t = NameGenerator taken
+initNameGen :: HS.HashSet Binding -> NameGenerator
+initNameGen taken = NameGenerator taken
     [ Binding $ char : maybe [] show num
     | num <- Nothing : map Just [(0 :: Integer)..]
     , char <- ['a'..'z']
     ]
-  where
-    taken = HS.fromList $ extractBindings t
 
 generateBinding :: MonadOhua m => m Binding
 generateBinding = do

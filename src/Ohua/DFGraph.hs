@@ -72,9 +72,10 @@ toGraph (DFExpr lets _) = OutGraph ops arcs
     toArc l =
         [ Arc target $
             case arg of
-                DFVar v ->  LocalSource $ fromMaybe (error "Undefined Binding") (HM.lookup v sources)
+                DFVar v -> LocalSource $ fromMaybe (error "Undefined Binding") (HM.lookup v sources)
                 DFEnvVar envExpr -> EnvSource envExpr
-        | (arg, index) <- maybe id ((:) . (,-1) . DFVar) (contextArg l) -- prepend (ctxBinding, -1) if there is a context arc
+        | (arg, index) <- maybe id ((:) . (,-1) . DFVar) (contextArg l) 
+                          -- prepend (ctxBinding, -1) if there is a context arc
                             $ zip (callArguments l) [0..]
         , let target = Target (callSiteId l) index
         ]
