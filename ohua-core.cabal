@@ -51,6 +51,7 @@ library
     , transformers
     , microlens
     , microlens-mtl
+    , text
     , unordered-containers
     , mtl
     , hashable

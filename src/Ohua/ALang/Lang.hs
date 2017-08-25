@@ -16,6 +16,7 @@ import           Data.Functor.Identity
 import           Data.Hashable
 import           Data.String
 import           Ohua.Types
+import qualified Data.Text as T
 
 
 -- bindingType is the type of general bindings

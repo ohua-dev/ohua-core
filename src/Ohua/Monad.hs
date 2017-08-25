@@ -14,7 +14,7 @@
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE UndecidableInstances       #-}
 module Ohua.Monad
-    ( OhuaT, runOhuaT
+    ( OhuaT, runOhuaT, runOhuaT0
     , MonadOhua(modifyState, getState, recordError)
     , generateBinding, generateBindingWith, generateId
     , MonadIO(..)
@@ -29,6 +29,8 @@ import           Lens.Micro
 import           Ohua.ALang.Lang
 import           Ohua.LensClasses
 import           Ohua.Types
+import Data.Monoid
+import qualified Data.Text as T
 
 
 type Error = String
@@ -129,7 +131,7 @@ runOhuaT0 f taken = do
 
 initNameGen :: HS.HashSet Binding -> NameGenerator
 initNameGen taken = NameGenerator taken
-    [ Binding $ char : maybe [] show num
+    [ Binding $ T.pack $ char : maybe [] show num
     | num <- Nothing : map Just [(0 :: Integer)..]
     , char <- ['a'..'z']
     ]
@@ -145,10 +147,10 @@ generateBinding = do
 generateBindingWith :: MonadOhua m => Binding -> m Binding
 generateBindingWith (Binding prefix) = do
     taken <- fromState $ nameGenerator . takenNames
-    let (h:_) = dropWhile (`HS.member` taken) $ map (Binding . (prefix' ++) . show) ([0..] :: [Int])
+    let (h:_) = dropWhile (`HS.member` taken) $ map (Binding . (prefix' <>) . T.pack . show) ([0..] :: [Int])
     modifyState $ nameGenerator . takenNames %~ HS.insert h
     return h
-  where prefix' = prefix ++ "_"
+  where prefix' = prefix <> "_"
 
 generateId :: MonadOhua m => m FnId
 generateId = do
