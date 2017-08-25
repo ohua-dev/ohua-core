@@ -19,6 +19,7 @@ module Ohua.DFLang.Lang where
 
 import           Data.Hashable
 import           Data.Sequence
+import           Data.Foldable
 import           Data.String
 import           Ohua.ALang.Lang
 import           Ohua.Types
@@ -56,3 +57,16 @@ instance Hashable DFVar where
 
 instance IsString DFVar where fromString = DFVar . fromString
 instance Num DFVar where fromInteger = DFEnvVar . fromInteger
+
+
+findUsages :: Binding -> DFExpr -> [LetExpr]
+findUsages binding = toList . Data.Sequence.filter (elem (DFVar binding) . callArguments) . letExprs
+
+findDefinition :: Binding -> DFExpr -> Maybe LetExpr
+findDefinition binding = find g . letExprs where
+    g :: LetExpr -> Bool
+    g expr = case returnAssignment expr of Direct b -> b == binding
+                                           Destructure bindings -> binding `elem` bindings
+
+findExpr :: DFFnRef -> DFExpr -> Maybe LetExpr
+findExpr fnRef = find ((== fnRef) . functionRef) . letExprs

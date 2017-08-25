@@ -84,6 +84,7 @@ lowerALang expr = do
   where
     go  (Var (Local bnd)) = return bnd
     go  (Var _) = throwError "Non local return binding"
+    go  (Let (Recursive binding) expr rest) = undefined -- TODO
     go  (Let assign expr rest) = do
         (fn, fnId, args) <- handleApplyExpr expr
         case HM.lookup fn hofNames of

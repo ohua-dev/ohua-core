@@ -78,6 +78,7 @@ instance ExtractBindings a => ExtractBindings [a] where extractBindings = concat
 
 data Assignment
     = Direct !Binding
+    | Recursive !Binding
     | Destructure ![Binding]
     deriving (Eq)
 
