@@ -35,6 +35,7 @@ inlineLambdaRefs :: MonadError Error m => Expression -> m Expression
 inlineLambdaRefs (Let assignment l@(Lambda _ _) body) =
     case assignment of
         Direct bnd -> inlineLambdaRefs $ substitute bnd l body
+        Recursive bnd -> return $ Let assignment l body
         _ -> throwError "invariant broken, cannot destructure lambda"
 inlineLambdaRefs (Let assignment value body) = Let assignment <$> inlineLambdaRefs value <*> inlineLambdaRefs body
 inlineLambdaRefs (Apply body argument) = liftM2 Apply (inlineLambdaRefs body) (inlineLambdaRefs argument)
