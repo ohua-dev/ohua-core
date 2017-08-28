@@ -1,16 +1,15 @@
 {-# LANGUAGE BangPatterns        #-}
-{-# LANGUAGE ExplicitForAll      #-}
-{-# LANGUAGE OverloadedLists     #-}
-{-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving  #-}
+{-# LANGUAGE FlexibleInstances #-}
 module DFLowering where
 
 import           Control.Arrow
 import           Control.Monad.Except
+import           Data.Foldable
 import           Data.Function
 import           Data.Graph.Inductive.Graph
 import           Data.Graph.Inductive.PatriciaTree
+import           Data.List
 import qualified Data.Map.Strict                   as Map
 import           Data.Maybe
 import           Data.String
@@ -22,8 +21,6 @@ import           Ohua.DFLang.Passes
 import           Ohua.Monad
 import           Ohua.Types
 import           Test.Hspec
-import Data.Foldable
-import Data.List
 
 
 newtype OhuaGrGraph = OhuaGrGraph { unGr :: Gr FnName OhuaGrEdgeLabel } deriving Eq
@@ -43,6 +40,10 @@ deriving instance Show DFFnRef
 instance Show OhuaGrGraph where
     show = prettify . unGr
 
+instance IsString DFFnRef where fromString = EmbedSf . fromString
+instance Num ResolvedSymbol where fromInteger = Env . fromInteger
+instance Num Expression where fromInteger = Var . fromInteger
+
 -- To handle env args i generate one new node which is source for all env args.
 -- The source index is the env arc number
 toFGLGraph :: OutGraph -> OhuaGrGraph
@@ -57,10 +58,10 @@ toFGLGraph (OutGraph ops arcs) = OhuaGrGraph $ mkGraph nodes edges
     edges = map toEdge arcs
 
     toEdge (Arc t s) = (sourceOp, unFnId $ operator t, OhuaGrEdgeLabel sourceIdx (index t))
-      where 
-        (sourceOp, sourceIdx) = case s of 
+      where
+        (sourceOp, sourceIdx) = case s of
             LocalSource (Target op idx) -> (unFnId op, idx)
-            EnvSource e -> (envId, unwrapHostExpr e)
+            EnvSource e                 -> (envId, unwrapHostExpr e)
 
 
 shouldSatisfyRet :: Show a => IO a -> (a -> Bool) -> Expectation
@@ -91,15 +92,15 @@ lowerAndValidate sourceExpr targetExpr statementType = do
 smapLowering :: Spec
 smapLowering = describe "lowering smap constructs" $ do
     let sourceExpr =
-            Let "coll" ("com.ohua.lang/id" `Apply` Var (Env 0)) $
-            Let "x" ("com.ohua.lang/smap" `Apply` Lambda "y" (Let "z" (Apply "some.module/inc" "y") "z") `Apply` "coll")
+            Let "coll" ("com.ohua.lang/id" `Apply` 0) $
+            Let "x" ("com.ohua.lang/smap" `Apply` Lambda "y" (Let "z" ("some.module/inc" `Apply` "y") "z") `Apply` "coll")
             "x"
     let targetExpr = DFExpr
-            [ LetExpr 0 "coll" (EmbedSf "com.ohua.lang/id") [0] Nothing
-            , LetExpr 4 "a" (EmbedSf "com.ohua.lang/size") ["coll"] Nothing
+            [ LetExpr 0 "coll" "com.ohua.lang/id" [0] Nothing
+            , LetExpr 4 "a" "com.ohua.lang/size" ["coll"] Nothing
             , LetExpr 5 "b" (DFFunction "com.ohua.lang/one-to-n") ["a", "coll"] Nothing
             , LetExpr 1 "y" (DFFunction "com.ohua.lang/smap-fun") ["b"] Nothing
-            , LetExpr 2 "z" (EmbedSf "some.module/inc") ["y"] Nothing
+            , LetExpr 2 "z" "some.module/inc" ["y"] Nothing
             , LetExpr 6 "c" (DFFunction "com.ohua.lang/one-to-n") ["a", "a"] Nothing
             , LetExpr 3 "x" (DFFunction "com.ohua.lang/collect") ["c", "z"] Nothing
             ]
@@ -112,9 +113,9 @@ smapSpec = smapLowering
 ifLowering :: Spec
 ifLowering = describe "lowering conditionals" $ do
     let sourceExpr =
-          Let "a" ("com.ohua.lang/id" `Apply` (Var $ Env 0)) $
-          Let "b" ("com.ohua.lang/id" `Apply` (Var $ Env 1)) $
-          Let "c" ("com.ohua.lang/id" `Apply` (Var $ Env 2)) $
+          Let "a" ("com.ohua.lang/id" `Apply` 0) $
+          Let "b" ("com.ohua.lang/id" `Apply` 1) $
+          Let "c" ("com.ohua.lang/id" `Apply` 2) $
           Let "z" (Apply (Apply (Apply "com.ohua.lang/if" "c")
                                 (Lambda "then" (Let "p" (Apply "some-ns/+" "a")
                                                     (Let "f" (Apply "p" "b") "f"))))
@@ -122,12 +123,12 @@ ifLowering = describe "lowering conditionals" $ do
                                              (Let "f" (Apply "m" "b") "f"))))
           "z"
     let targetExpr = DFExpr
-          [ LetExpr 0 "a" (EmbedSf "com.ohua.lang/id") [0] Nothing
-          , LetExpr 1 "b" (EmbedSf "com.ohua.lang/id") [1] Nothing
-          , LetExpr 2 "c" (EmbedSf "com.ohua.lang/id") [2] Nothing
+          [ LetExpr 0 "a" "com.ohua.lang/id" [0] Nothing
+          , LetExpr 1 "b" "com.ohua.lang/id" [1] Nothing
+          , LetExpr 2 "c" "com.ohua.lang/id" [2] Nothing
           , LetExpr 3 "s" (DFFunction "com.ohua.lang/ifThenElse") ["c"] Nothing
-          , LetExpr 4 "d" (EmbedSf "some-ns/+") ["a", "b"] Nothing
-          , LetExpr 5 "e" (EmbedSf "some-ns/-") ["a", "b"] Nothing
+          , LetExpr 4 "d" "some-ns/+" ["a", "b"] Nothing
+          , LetExpr 5 "e" "some-ns/-" ["a", "b"] Nothing
           , LetExpr 6 "z" (DFFunction "com.ohua.lang/switch") ["s", "d", "e"] Nothing
           ]
           "z"
@@ -139,17 +140,20 @@ generalLowering :: Spec
 generalLowering = do
     describe "lowering a stateful function" $ do
         it "lowers a function with one argument" $
-            Let "a" ("com.ohua.lang/id" `Apply` Var (Env 0)) (Let "x" ("some/function" `Apply` "a") "x")
+            Let "a" ("com.ohua.lang/id" `Apply` 0) (Let "x" ("some/function" `Apply` "a") "x")
             `shouldLowerTo`
-            DFExpr [ LetExpr 1 "a" (EmbedSf "com.ohua.lang/id") [0] Nothing, LetExpr 0 "x" (EmbedSf "some/function") ["a"] Nothing ] "x"
+            DFExpr
+                [ LetExpr 1 "a" "com.ohua.lang/id" [0] Nothing
+                , LetExpr 0 "x" "some/function" ["a"] Nothing
+                ] "x"
         it "lowers a function with one env argument" $
-            Let "x" ("some/function" `Apply` Var (Env 0)) "x"
+            Let "x" ("some/function" `Apply` 0) "x"
             `shouldLowerTo`
-            DFExpr [ LetExpr 0 "x" (EmbedSf "some/function") [0] Nothing ] "x"
+            DFExpr [ LetExpr 0 "x" "some/function" [0] Nothing ] "x"
         it "lowers a function with no arguments" $
             Let "x" "some/function" "x"
             `shouldLowerTo`
-            DFExpr [ LetExpr 0 "x" (EmbedSf "some/function") [] Nothing ] "x"
+            DFExpr [ LetExpr 0 "x" "some/function" [] Nothing ] "x"
 
 
 ifSpec :: Spec
@@ -163,9 +167,16 @@ seqSpec :: Spec
 seqSpec = do
     describe "seq lowering" $ do
         it "lowers a simple seq" $
-            Let "y" ("com.ohua.lang/id" `Apply` Var (Env 0)) (Let "x" ("com.ohua.lang/seq" `Apply` "y" `Apply` Lambda "_" (Let "p" "some/function" "p")) "x")
+            (   Let "y" ("com.ohua.lang/id" `Apply` 0) $
+                Let "x" ("com.ohua.lang/seq" `Apply` "y" `Apply` Lambda "_" (Let "p" "some/function" "p"))
+                    "x"
+            )
             `shouldLowerTo`
-            DFExpr [ LetExpr 1 "y" (EmbedSf "com.ohua.lang/id") [0] Nothing, LetExpr 0 "x" (EmbedSf "some/function") [] (Just "y"), LetExpr 2 "z" (EmbedSf "com.ohua.lang/id") ["x"] Nothing ] "x"
+            DFExpr
+                [ LetExpr 1 "y" (EmbedSf "com.ohua.lang/id") [0] Nothing
+                , LetExpr 0 "x" (EmbedSf "some/function") [] "y"
+                ]
+                "x"
 
 
 isIsomorphic :: (Eq a, Ord b) => Gr a b -> Gr a b -> Bool

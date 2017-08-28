@@ -17,9 +17,9 @@ import           Control.Monad.Except
 import           Control.Monad.State
 import           Ohua.DFLang.HOF
 import           Ohua.DFLang.Lang
+import qualified Ohua.DFLang.Refs     as Refs
 import           Ohua.Monad
 import           Ohua.Types
-import qualified Ohua.DFLang.Refs as Refs
 
 
 data IfFn = IfFn

@@ -54,11 +54,11 @@ library
     , transformers
     , microlens
     , microlens-mtl
+    , text
     , unordered-containers
     , mtl
     , hashable
     , containers
-    -- , extra
     , monad-loops
     , deepseq
   hs-source-dirs:      src
@@ -109,7 +109,9 @@ test-suite ohua-tests
   type:                exitcode-stdio-1.0
   default-language:    Haskell2010
   default-extensions:
-    OverloadedStrings
+      OverloadedStrings
+    , BangPatterns
+    , OverloadedLists
 
 -- test-suite ouha-test
 --  main-is:             Spec.hs

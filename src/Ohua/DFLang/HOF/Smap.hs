@@ -17,8 +17,8 @@ import           Control.Monad.Except
 import           Control.Monad.State
 import qualified Data.Sequence        as S
 import           Ohua.DFLang.HOF
-import qualified Ohua.DFLang.Refs as Refs
 import           Ohua.DFLang.Lang
+import qualified Ohua.DFLang.Refs     as Refs
 import           Ohua.Monad
 import           Ohua.Types
 

@@ -37,8 +37,8 @@ import           Ohua.ALang.Lang
 import           Ohua.DFLang.TailRec  (recursionLowering)
 import           Ohua.DFLang.HOF      as HOF
 import           Ohua.DFLang.HOF.If
-import           Ohua.DFLang.HOF.Smap
 import           Ohua.DFLang.HOF.Seq
+import           Ohua.DFLang.HOF.Smap
 import           Ohua.DFLang.Lang     (DFExpr (..), DFFnRef (..), DFVar (..),
                                        LetExpr (..))
 import           Ohua.DFLang.Util
@@ -180,7 +180,7 @@ lowerHOF _ assign args = do
             scopeUnbound <- contextifyUnboundFunctions lam
             let tieContext1 = case scopeUnbound of
                     Just bnd -> tieContext0 boundVars bnd
-                    Nothing -> id
+                    Nothing  -> id
             tell $ tieContext1 (renameWith (HM.fromList renaming) body)
         createContextExit assign >>= tell
   where
