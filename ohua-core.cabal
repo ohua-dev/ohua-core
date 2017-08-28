@@ -37,6 +37,7 @@ library
     , Ohua.ALang.Util
     , Ohua.DFLang.Lang
     , Ohua.DFLang.Refs
+    , Ohua.DFLang.Util
     , Ohua.DFLang.HOF
     , Ohua.DFLang.HOF.Smap
     , Ohua.DFLang.HOF.If

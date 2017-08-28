@@ -59,14 +59,14 @@ instance IsString DFVar where fromString = DFVar . fromString
 instance Num DFVar where fromInteger = DFEnvVar . fromInteger
 
 
-findUsages :: Binding -> DFExpr -> [LetExpr]
-findUsages binding = toList . Data.Sequence.filter (elem (DFVar binding) . callArguments) . letExprs
+findUsages :: Binding -> Seq LetExpr -> [LetExpr]
+findUsages binding = toList . Data.Sequence.filter (elem (DFVar binding) . callArguments)
 
-findDefinition :: Binding -> DFExpr -> Maybe LetExpr
-findDefinition binding = find g . letExprs where
+findDefinition :: Binding -> Seq LetExpr -> Maybe LetExpr
+findDefinition binding = find g where
     g :: LetExpr -> Bool
     g expr = case returnAssignment expr of Direct b -> b == binding
                                            Destructure bindings -> binding `elem` bindings
 
-findExpr :: DFFnRef -> DFExpr -> Maybe LetExpr
-findExpr fnRef = find ((== fnRef) . functionRef) . letExprs
+findExpr :: DFFnRef -> Seq LetExpr -> Maybe LetExpr
+findExpr fnRef = find ((== fnRef) . functionRef)

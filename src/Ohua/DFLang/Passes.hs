@@ -34,12 +34,14 @@ import           Data.Sequence        (Seq, (><))
 import qualified Data.Sequence        as S
 import           Lens.Micro
 import           Ohua.ALang.Lang
+import           Ohua.DFLang.TailRec  (recursionLowering)
 import           Ohua.DFLang.HOF      as HOF
 import           Ohua.DFLang.HOF.If
 import           Ohua.DFLang.HOF.Smap
 import           Ohua.DFLang.HOF.Seq
 import           Ohua.DFLang.Lang     (DFExpr (..), DFFnRef (..), DFVar (..),
                                        LetExpr (..))
+import           Ohua.DFLang.Util
 import           Ohua.Monad
 import           Ohua.Types
 import           Ohua.Util
@@ -84,12 +86,13 @@ lowerALang expr = do
   where
     go  (Var (Local bnd)) = return bnd
     go  (Var _) = throwError "Non local return binding"
-    go  (Let (Recursive binding) expr rest) = undefined -- TODO
     go  (Let assign expr rest) = do
         (fn, fnId, args) <- handleApplyExpr expr
-        case HM.lookup fn hofNames of
-            Just (WHOF (_ :: Proxy p)) -> lowerHOF (name :: TaggedFnName p) assign args
-            Nothing       -> tell =<< lowerDefault fn fnId assign args
+        case assign of
+            (Recursive binding) -> tell =<< (recursionLowering binding =<< lowerDefault fn fnId assign args)
+            _ -> case HM.lookup fn hofNames of
+                    Just (WHOF (_ :: Proxy p)) -> lowerHOF (name :: TaggedFnName p) assign args
+                    Nothing       -> tell =<< lowerDefault fn fnId assign args
         go rest
     go  _ = throwError "Expected `let` or binding"
 
@@ -117,18 +120,7 @@ tieContext0 bounds ctxSource = fmap go
     isBoundArg (DFVar v) = v `HS.member` bounds
     isBoundArg _         = False
 
--- | Find all locally bound variables.
-findBoundVars :: (Functor f, Foldable f) => f LetExpr -> HS.HashSet Binding
-findBoundVars = HS.fromList . fold . fmap (flattenAssign . returnAssignment)
-
-
-findFreeVars0 :: Foldable f => HS.HashSet Binding -> f LetExpr -> HS.HashSet Binding
-findFreeVars0 boundVars = HS.fromList . concatMap (mapMaybe f . callArguments)
-  where
-    f (DFVar b) | not (HS.member b boundVars) = Just b
-    f _         = Nothing
-
-
+-- FIXME this is only used by the smap lowering and should therefore be defined in this instance
 -- | Insert a `one-to-n` node for each free variable to scope them.
 replicateFreeVars :: (MonadOhua m, MonadError String m) => Binding -> [Binding] -> Seq LetExpr -> m (Seq LetExpr)
 replicateFreeVars countSource_ initialBindings exprs = do
@@ -136,7 +128,7 @@ replicateFreeVars countSource_ initialBindings exprs = do
     pure $ S.fromList replicators >< renameWith (HM.fromList $ zip freeVars replications) exprs
   where
     boundVars = findBoundVars exprs `mappend` HS.fromList initialBindings
-
+    -- FIXME duplicate code: delete and turn findFreeVars0 into findFreeVars
     freeVars = HS.toList $ HS.fromList $ concatMap (mapMaybe f . callArguments) exprs
 
     f (DFVar b) | not (HS.member b boundVars) = Just b
@@ -148,13 +140,8 @@ replicateFreeVars countSource_ initialBindings exprs = do
         pure (LetExpr id (Direct newVar) (DFFunction "com.ohua.lang/one-to-n") [DFVar countSource_, DFVar var] Nothing, newVar)
 
 
-renameWith :: Functor f => HM.HashMap Binding Binding -> f LetExpr -> f LetExpr
-renameWith m = fmap go
-  where
-    go e = e { callArguments = map (\case v@(DFVar var) -> maybe v DFVar $ HM.lookup var m; v -> v;) (callArguments e) }
 
-
--- | Ananlyze an apply expression, extracting the inner stateful function and the nested arguments as a list.
+-- | Analyze an apply expression, extracting the inner stateful function and the nested arguments as a list.
 -- Also generates a new function id for the inner function should it not have one yet.
 handleApplyExpr :: (MonadOhua m, MonadError String m) => Expression -> m (FnName, FnId, [Expression])
 handleApplyExpr (Apply fn arg) = go fn [arg]
