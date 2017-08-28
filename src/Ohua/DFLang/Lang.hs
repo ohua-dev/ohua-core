@@ -57,16 +57,3 @@ instance Hashable DFVar where
 
 instance IsString DFVar where fromString = DFVar . fromString
 instance Num DFVar where fromInteger = DFEnvVar . fromInteger
-
-
-findUsages :: Binding -> Seq LetExpr -> [LetExpr]
-findUsages binding = toList . Data.Sequence.filter (elem (DFVar binding) . callArguments)
-
-findDefinition :: Binding -> Seq LetExpr -> Maybe LetExpr
-findDefinition binding = find g where
-    g :: LetExpr -> Bool
-    g expr = case returnAssignment expr of Direct b -> b == binding
-                                           Destructure bindings -> binding `elem` bindings
-
-findExpr :: DFFnRef -> Seq LetExpr -> Maybe LetExpr
-findExpr fnRef = find ((== fnRef) . functionRef)

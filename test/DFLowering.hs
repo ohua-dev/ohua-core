@@ -178,6 +178,32 @@ seqSpec = do
                 ]
                 "x"
 
+-- (let [a (fn [i] (let [p (math/- i 10)]
+--                       (ohua.lang/if (math/< p 0)
+--                                     p
+--                                     (a p))))]
+--       (a 95))
+recurSpec :: Spec
+recurSpec = do
+    describe "recur lowering" $ do
+         it "lowers a simple recursion" $
+            (   Let "a" (Lambda "i" (Let "p" (("math/-" `Apply` "i") `Apply` 10)))
+                                          (("ohua.lang/if" `Apply` (("math/<" `Apply` "p") `Apply` 0)
+                                            `Apply` "p")
+                                            `Apply` ("a" `Apply` "p")
+            )
+            `shouldLowerTo`
+            DFExpr
+                [ LetExpr 0 "a" (EmbedSf "ohua.lang/id") [DFEnvVar 95] Nothing
+                , LetExpr 1 "p" (EmbedSf "math/-") [DFVar "i", DFEnvVar 10] Nothing
+                , LetExpr 2 "c" (EmbedSf "math/<") [DFVar "p", DFEnvVar 0] Nothing
+                , LetExpr 3 ["t" "f"] (DFFunction "ohua.lang/if") [DFVar "c"] Nothing
+                , LetExpr 4 "tr" (EmbedSf "ohua.lang/id") [DFVar "p"] Just "t"
+                , LetExpr 5 "recur-array" (EmbedSf "ohua.lang/array") [DFVar "p"] Just "f"
+                , LetExpr 6 "in-algo-array" (EmbedSf "ohua.lang/array") [DFVar "a"] Nothing
+                , LetExpr 7 "r" (DFFunction "ohua.lang/recur") [DFVar "c" DFVar "algo-in-array" DFVar "recur-array"] Nothing
+                ]
+                "tr"
 
 isIsomorphic :: (Eq a, Ord b) => Gr a b -> Gr a b -> Bool
 isIsomorphic gr1 gr2 = isJust $ isomorphicMapping gr1 gr2

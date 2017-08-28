@@ -120,26 +120,6 @@ tieContext0 bounds ctxSource = fmap go
     isBoundArg (DFVar v) = v `HS.member` bounds
     isBoundArg _         = False
 
--- FIXME this is only used by the smap lowering and should therefore be defined in this instance
--- | Insert a `one-to-n` node for each free variable to scope them.
-replicateFreeVars :: (MonadOhua m, MonadError String m) => Binding -> [Binding] -> Seq LetExpr -> m (Seq LetExpr)
-replicateFreeVars countSource_ initialBindings exprs = do
-    (replicators, replications) <- unzip <$> mapM mkReplicator freeVars
-    pure $ S.fromList replicators >< renameWith (HM.fromList $ zip freeVars replications) exprs
-  where
-    boundVars = findBoundVars exprs `mappend` HS.fromList initialBindings
-    -- FIXME duplicate code: delete and turn findFreeVars0 into findFreeVars
-    freeVars = HS.toList $ HS.fromList $ concatMap (mapMaybe f . callArguments) exprs
-
-    f (DFVar b) | not (HS.member b boundVars) = Just b
-    f _         = Nothing
-
-    mkReplicator var = do
-        id <- generateId
-        newVar <- generateBindingWith var
-        pure (LetExpr id (Direct newVar) (DFFunction "com.ohua.lang/one-to-n") [DFVar countSource_, DFVar var] Nothing, newVar)
-
-
 
 -- | Analyze an apply expression, extracting the inner stateful function and the nested arguments as a list.
 -- Also generates a new function id for the inner function should it not have one yet.
