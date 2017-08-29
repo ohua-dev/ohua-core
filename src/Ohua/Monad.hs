@@ -100,7 +100,7 @@ instance Monad m => MonadOhua (OhuaT m) where
     getState = OhuaT get
 
 -- A bit of magic to make every `MonadTrans` instance also a `MonadOhua` instance
-instance {-# OVERLAPPABLE #-} (MonadOhua m, MonadTrans t, Monad (t m)) => MonadOhua (t m) where
+instance {-# OVERLAPPABLE #-} (MonadOhua m, MonadTrans m0, Monad (m0 m)) => MonadOhua (m0 m) where
     recordError = lift . recordError
     modifyState = lift . modifyState
     getState = lift getState
