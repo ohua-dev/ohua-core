@@ -84,7 +84,7 @@ checkSSAExpr (DFExpr l _) = checkSSA l
 -- 'checkProgramValidity'.
 lowerALang :: (MonadOhua m, MonadError String m) => Expression -> m DFExpr
 lowerALang expr = do
-    (var, exprs) <- runWriterT $ (flip runReaderT (LetRec mempty) . runLetRecM . go) expr
+    (var, exprs) <- runWriterT $ (flip runReaderT (LetRec mempty) . runLetRecM . go0) expr
 --    (var, exprs) <- runWriterT (go expr)
 #ifdef DEBUG
     checkSSA exprs
@@ -92,18 +92,18 @@ lowerALang expr = do
     return $ DFExpr exprs var
 --  where
 
-go :: (MonadOhua m, MonadError String m) => Expression -> LetRecT m Binding
-go  (Var (Local bnd)) = return bnd
-go  (Var _) = lift $ throwError "Non local return binding"
-go  (Let assign expr rest) = do
+go0 :: (MonadOhua m, MonadError String m) => Expression -> LetRecT (WriterT (Seq LetExpr) m) Binding
+go0  (Var (Local bnd)) = return bnd
+go0  (Var _) = lift $ throwError "Non local return binding"
+go0  (Let assign expr rest) = do
     (fn, fnId, args) <- handleDefinitionalExpr assign expr
     case assign of
-        (Recursive binding) -> return $ tell =<< (recursionLowering binding =<< lowerDefault fn fnId assign args)
+        (Recursive binding) -> lift $ tell =<< (recursionLowering binding =<< lowerDefault fn fnId assign args)
         _ -> case HM.lookup fn hofNames of
-                Just (WHOF (_ :: Proxy p)) -> return $ lowerHOF (name :: TaggedFnName p) assign args
-                Nothing       -> return $ tell =<< lowerDefault fn fnId assign args
-    go rest
-go  _ = lift $ throwError "Expected `let` or binding"
+                Just (WHOF (_ :: Proxy p)) -> lift $ lowerHOF (name :: TaggedFnName p) assign args
+                Nothing       -> lift $ tell =<< lowerDefault fn fnId assign args
+    go0 rest
+go0  _ = lift $ throwError "Expected `let` or binding"
 
 
 handleDefinitionalExpr :: (MonadOhua m, MonadError String m) => Assignment -> Expression -> LetRecT m (FnName, FnId, [Expression])
@@ -138,16 +138,17 @@ tieContext0 bounds ctxSource = fmap go
 -- | Analyze an apply expression, extracting the inner stateful function and the nested arguments as a list.
 -- Also generates a new function id for the inner function should it not have one yet.
 handleApplyExpr :: (MonadOhua m, MonadError String m) => Expression -> LetRecT m (FnName, FnId, [Expression])
-handleApplyExpr (Apply fn arg) = do
+handleApplyExpr (Apply fn arg) = lift $ go fn [arg]
 --  let go :: Expression -> [Expression] -> m (FnName, FnId, [Expression])
-  let go (Var (Sf fn id)) args = (fn, , args) <$> maybe generateId return id
+  where
+   go (Var (Sf fn id)) args = (fn, , args) <$> maybe generateId return id
             -- reject algos for now
-  let go (Var v) _             = throwError $ "Expected Var Sf but got: Var " ++ show v -- FIXME there should be a special type of error here that takes the string and a value
-  let go (Apply fn arg) args   = go fn (arg:args)
-  let go x _                   = throwError $ "Expected Apply or Var but got: " ++ show x in
-    return $ go fn [arg]
+   go (Var v) _             = throwError $ "Expected Var Sf but got: Var " ++ show v -- FIXME there should be a special type of error here that takes the string and a value
+   go (Apply fn arg) args   = go fn (arg:args)
+   go x _                   = throwError $ "Expected Apply or Var but got: " ++ show x
+
 handleApplyExpr (Var (Sf fn id)) = (fn, , []) <$> maybe generateId return id
-handleApplyExpr g = throwError $ "Expected apply but got: " ++ show g
+handleApplyExpr g = lift $ throwError $ "Expected apply but got: " ++ show g
 
 
 -- | Analyze a lambda expression. Since we perform lambda inlining, this can only be a letrec.
