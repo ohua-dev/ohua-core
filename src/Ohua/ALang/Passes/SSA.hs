@@ -38,7 +38,7 @@ ssaResolve bnd = SSAM $ reader $ fromMaybe bnd <$> HM.lookup bnd . unLocalScope
 --
 -- Passing in the computation which is to be executed in the modified environment
 -- makes this function a bit harder to use (or rather the code using it less readable)
--- becuase it does a lot of passing functions as arguments, however it very nicely
+-- because it does a lot of passing functions as arguments, however it very nicely
 -- encapsulates the scope changes which means they will never leak from where they are
 -- supposed to be applied
 ssaRename :: MonadOhua m => Binding -> SSAT m a -> SSAT m (Binding, a)

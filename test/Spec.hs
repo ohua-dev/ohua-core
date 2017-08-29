@@ -14,5 +14,6 @@ main = hspec $ do
     DFLowering.ifSpec
     DFLowering.generalLowering
     DFLowering.seqSpec
+    DFLowering.recurSpec
     ALangVerify.currying
     TestALangUtils.spec
