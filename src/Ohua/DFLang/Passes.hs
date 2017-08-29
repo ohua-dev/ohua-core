@@ -84,32 +84,36 @@ checkSSAExpr (DFExpr l _) = checkSSA l
 -- 'checkProgramValidity'.
 lowerALang :: (MonadOhua m, MonadError String m) => Expression -> m DFExpr
 lowerALang expr = do
-    (var, exprs) <- runWriterT $ (flip runReaderT (LetRec mempty) . runLetRecM . go0) expr
+    (var, exprs) <- runWriterT $ (flip runReaderT (LetRec mempty) . runLetRecM . lowerToDF) expr
 --    (var, exprs) <- runWriterT (go expr)
 #ifdef DEBUG
     checkSSA exprs
 #endif
     return $ DFExpr exprs var
---  where
 
-go0 :: (MonadOhua m, MonadError String m) => Expression -> LetRecT (WriterT (Seq LetExpr) m) Binding
-go0  (Var (Local bnd)) = return bnd
-go0  (Var _) = lift $ throwError "Non local return binding"
-go0  (Let assign expr rest) = do
-    (fn, fnId, args) <- handleDefinitionalExpr assign expr
+lowerToDF :: (MonadOhua m, MonadError String m) => Expression -> LetRecT (WriterT (Seq LetExpr) m) Binding
+lowerToDF  (Var (Local bnd)) = return bnd
+lowerToDF  (Var _) = lift $ throwError "Non local return binding"
+lowerToDF  (Let assign expr rest) = handleDefinitionalExpr assign expr continuation
+  where
+    continuation = lowerToDF rest
+lowerToDF  _ = lift $ throwError "Expected `let` or binding"
+
+
+handleDefinitionalExpr :: (MonadOhua m, MonadError String m) => Assignment -> Expression -> LetRecT (WriterT (Seq LetExpr) m) Binding -> LetRecT (WriterT (Seq LetExpr) m) Binding
+handleDefinitionalExpr assign l@(Lambda _ _) cont = do
+    retResult <- handleLambdaExpr assign l
+    -- execute the rest of the traversal (the continuation) in the new LetRecT environment
+    LetRecM $ local (LetRec . HM.insert retResult retResult . unLetRec) (runLetRecM cont)
+handleDefinitionalExpr assign l@(Apply _ _) cont = do
+    (fn, fnId, args) <- handleApplyExpr l
     case assign of
         (Recursive binding) -> lift $ tell =<< (recursionLowering binding =<< lowerDefault fn fnId assign args)
         _ -> case HM.lookup fn hofNames of
                 Just (WHOF (_ :: Proxy p)) -> lift $ lowerHOF (name :: TaggedFnName p) assign args
                 Nothing       -> lift $ tell =<< lowerDefault fn fnId assign args
-    go0 rest
-go0  _ = lift $ throwError "Expected `let` or binding"
-
-
-handleDefinitionalExpr :: (MonadOhua m, MonadError String m) => Assignment -> Expression -> LetRecT m (FnName, FnId, [Expression])
-handleDefinitionalExpr assign l@(Apply _ _) = handleApplyExpr l
-handleDefinitionalExpr assign l@(Lambda _ _) = handleLambdaExpr assign l
-handleDefinitionalExpr _ e = lift $ throwError $ "Definitional expressions in a let can only be 'apply' or 'lambda' but got: " ++ show e
+    cont
+handleDefinitionalExpr _ e _ = lift $ throwError $ "Definitional expressions in a let can only be 'apply' or 'lambda' but got: " ++ show e
 
 -- | Lower any not specially treated function type.
 lowerDefault :: (MonadOhua m, MonadError String m) => Pass m
@@ -152,8 +156,9 @@ handleApplyExpr g = lift $ throwError $ "Expected apply but got: " ++ show g
 
 
 -- | Analyze a lambda expression. Since we perform lambda inlining, this can only be a letrec.
-handleLambdaExpr :: (MonadOhua m, MonadError String m) => Assignment -> Expression -> LetRecT m (FnName, FnId, [Expression])
-handleLambdaExpr (Recursive binding) expr = undefined
+handleLambdaExpr :: (MonadOhua m, MonadError String m) => Assignment -> Expression -> LetRecT (WriterT (Seq LetExpr) m) Binding
+handleLambdaExpr (Recursive binding) expr = lowerToDF expr
+
 handleLambdaExpr a _ = lift $ throwError $ "Expression was not inlined but assignment is not a 'letrec': " ++ show a
 
 -- | Inspect an expression expecting something which can be captured in a DFVar otherwies throws appropriate errors.
