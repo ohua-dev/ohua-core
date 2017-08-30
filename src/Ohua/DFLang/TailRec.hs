@@ -21,7 +21,6 @@ import qualified Data.HashMap.Strict  as HM
 
 -- the call in ALang is still (recur algoRef args).
 -- it needs to become (recur conditionOutput algoInArgs recurArgs).
--- it is not possible to perform this kind of transformation using the HOF type class.
 
 recursionLowering :: (MonadOhua m, MonadError String m) => Binding -> Seq LetExpr -> m (Seq LetExpr)
 recursionLowering binding = transformRecursiveTailCall
@@ -57,7 +56,7 @@ handleRecursiveTailCall dfExprs (Just recurFn) = do
 
     let rewiredTOutExps = flip renameWith minusSwitchExprs $ HM.singleton (unAssignment "switch" switchRet) (unDFVar terminationBranch)
 
-        -- get the algo-in vars. note that for the recursive case this includes all free vars (even those accessed via the lexical scope).
+    -- get the algo-in vars. note that for the recursive case this includes all free vars (even those accessed via the lexical scope).
     let algoInVars = HS.toList $ findFreeVars rewiredTOutExps
     algoInToRecurInVars <- foldM (\x y -> do s <- generateBindingWith y; return $ HM.insert y s x;) HM.empty algoInVars
     let updatedRecurExpr = renameWith algoInToRecurInVars rewiredTOutExps
