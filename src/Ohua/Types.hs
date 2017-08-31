@@ -86,9 +86,9 @@ data Assignment
     deriving (Eq)
 
 instance Show Assignment where
-    show (Direct b)      = show b
+    show (Direct b)      = "Direct " ++ show b
     show (Destructure d) = show d
-    show (Recursive b)   = show b
+    show (Recursive b)   = "Recursive " ++ show b
 
 instance IsString Assignment where
     fromString = Direct . fromString

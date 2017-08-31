@@ -1,5 +1,4 @@
 {-# LANGUAGE BangPatterns        #-}
-{-# LANGUAGE StandaloneDeriving  #-}
 {-# LANGUAGE FlexibleInstances #-}
 module DFLowering where
 
@@ -30,12 +29,6 @@ data OhuaGrEdgeLabel = OhuaGrEdgeLabel
     { sourceIndex :: !Int
     , targetIndex :: !Int
     } deriving (Eq, Show, Ord)
-
-instance Show DFExpr where
-    show (DFExpr e v) = intercalate "\n" (map show (toList e)) ++ "\n" ++ show v
-deriving instance Show LetExpr
-deriving instance Show DFVar
-deriving instance Show DFFnRef
 
 instance Show OhuaGrGraph where
     show = prettify . unGr

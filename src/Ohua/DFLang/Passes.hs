@@ -59,6 +59,8 @@ newtype LetRec m = LetRec { unLetRec :: HM.HashMap Binding (AlgoSpec m)}
 
 type LetRecT m a = ReaderT (LetRec m) m a
 
+traceState :: (MonadOhua m, MonadError String m, MonadWriter (Seq LetExpr) m) => LetRecT m a -> LetRecT m a
+traceState cont = (flip trace cont . ("State: " ++) . show . HM.keys . unLetRec) =<< ask
 
 -- | Check that a sequence of let expressions does not redefine bindings.
 checkSSA :: (Foldable f, MonadError String m) => f LetExpr -> m ()
@@ -92,7 +94,7 @@ lowerALang expr = do
 #ifdef DEBUG
     checkSSA exprs
 #endif
-    return $ DFExpr exprs var
+    return $ trace ("derived DFExpr: \n" ++ show (DFExpr exprs var)) $ DFExpr exprs var
 
 lowerToDF :: (MonadOhua m, MonadError String m, MonadWriter (Seq LetExpr) m) => Expression -> LetRecT m Binding
 lowerToDF (Var (Local bnd)) = return bnd
@@ -102,22 +104,25 @@ lowerToDF (Let assign expr rest) = trace "Lowering Let -->" $ traceState $ handl
     continuation = traceState $ lowerToDF rest
 lowerToDF g = lift $ throwError $ "Expected `let` or binding: " ++ show g
 
-traceState :: (MonadOhua m, MonadError String m, MonadWriter (Seq LetExpr) m) => LetRecT m a -> LetRecT m a
-traceState cont = (flip trace cont . ("State: " ++) . show . HM.keys . unLetRec) =<< ask
-
 handleDefinitionalExpr :: (MonadOhua m, MonadError String m, MonadWriter (Seq LetExpr) m) =>
                           Assignment -> Expression -> LetRecT m Binding -> LetRecT m Binding
 handleDefinitionalExpr assign l@(Lambda arg expr) cont = do
     -- TODO handle lambdas with multiple arguments
-    let unAssign x = case x of { Direct b -> b;
-                                 Recursive b -> b;
-                                g -> error $ "Unassign: Invariant broken: " ++ show g}
+    let unRecursive x = case x of { Recursive b -> b;
+                                              _ -> error $ "Invariant broken. Assignment should be a 'letrec' but was: " ++ show x}
+    let unDirect x = case x of { Direct b -> b;
+                                        _ -> error $ " Invariant broken. Assignment should be a 'Direct' but was: " ++ show x}
+    let continuation = do dfExpr <- lowerLambdaExpr assign expr
+                          tell =<< recursionLowering (unRecursive assign) (letExprs dfExpr)
+                          return dfExpr
+
     -- execute the rest of the traversal (the continuation) in the new LetRecT environment
-    trace "Exchanged state!" local (LetRec . HM.insert (unAssign assign) (AlgoSpec [unAssign arg] $ lowerLambdaExpr assign expr) . unLetRec) cont
+    trace "Exchanged state!" local (LetRec . HM.insert (unRecursive assign) (AlgoSpec [unDirect arg] continuation) . unLetRec) cont
 handleDefinitionalExpr assign l@(Apply _ _) cont = do
-    let go (fn, fnId, args) = case assign of
-                                  (Recursive binding) -> lift $ tell =<< (recursionLowering binding =<< lowerDefault fn fnId assign args)
-                                  _ -> case HM.lookup fn hofNames of
+    let go (fn, fnId, args) = --case assign of
+                                --  (Recursive binding) -> throwError "should execute recursion lowering!"--lift $ tell =<< (recursionLowering binding =<< lowerDefault fn fnId assign args)
+                                  --_ ->
+                                  case HM.lookup fn hofNames of
                                           Just (WHOF (_ :: Proxy p)) -> lift $ lowerHOF (name :: TaggedFnName p) assign args
                                           Nothing                    -> lift $ tell =<< lowerDefault fn fnId assign args
     go =<< trace ("lowering APPLY: " ++ show l) (handleApplyExpr assign l)
@@ -126,6 +131,7 @@ handleDefinitionalExpr _ e _ = lift $ throwError $ "Definitional expressions in 
 
 -- | Lower any not specially treated function type.
 lowerDefault :: (MonadOhua m, MonadError String m) => Pass m
+lowerDefault "ohua.lang/recur" fnId assign args = mapM expectVar args <&> \args' -> [LetExpr fnId assign (DFFunction "ohua.lang/recur") args' Nothing]
 lowerDefault fn fnId assign args = mapM expectVar args <&> \args' -> [LetExpr fnId assign (EmbedSf fn) args' Nothing]
 
 -- | Analyze an apply expression, extracting the inner stateful function and the nested arguments as a list.
@@ -140,7 +146,7 @@ handleApplyExpr assign l@(Apply fn arg) =
             -- reject algos for now
     go l@(Var v)                      args recAlgos =
           if HM.member (unwrapVar v) recAlgos then trace "Lowering rec call ..." $ traceState $ lowerRecAlgoCall (certainly $ HM.lookup (unwrapVar v) recAlgos) args assign
-                                              else throwError $ trace ("--> recAlgos" ++ (show $ HM.keys recAlgos)) $ "Expected Var Sf but got: " ++ show l -- FIXME there should be a special type of error here that takes the string and a value
+                                              else throwError $ trace ("--> recAlgos" ++ (show $ HM.keys recAlgos)) $ "Expected Var Sf but got: " ++ show l
     go (Apply fn arg@(Var resSymbol)) args recAlgos = go fn (arg:args) recAlgos
     go (Apply fn arg)                 args _        = throwError $ "Arg to apply should have been reduced to Var or EnvVar before df lowering. Found: " ++ show arg
     go x                              _    _        = throwError $ "Expected Apply or Var but got: " ++ show x in

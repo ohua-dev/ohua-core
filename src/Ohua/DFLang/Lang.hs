@@ -15,11 +15,13 @@
 -- The ALang IR is transformed straight into the dataflow IR.
 -- One important aspect of DFLang: it does not define any abstractions, i.e., there are no function definitions.
 --
+{-# LANGUAGE StandaloneDeriving  #-}
 module Ohua.DFLang.Lang where
 
 import           Data.Hashable
 import           Data.Sequence
 import           Data.Foldable
+import           Data.List
 import           Data.String
 import           Ohua.ALang.Lang
 import           Ohua.Types
@@ -29,7 +31,7 @@ data DFExpr = DFExpr
     { letExprs  :: Seq LetExpr
     , returnVar :: !Binding
     }
-    deriving Eq
+    deriving (Eq)
 
 data LetExpr = LetExpr
     { callSiteId       :: !FnId
@@ -38,17 +40,17 @@ data LetExpr = LetExpr
     , callArguments    :: ![DFVar]
     , contextArg       :: !(Maybe Binding)
     }
-    deriving Eq
+    deriving (Eq)
 
 data DFFnRef
     = DFFunction !FnName -- a build-in function of DFLang
     | EmbedSf !FnName -- an generic dataflow function that wraps a stateful function call
-    deriving Eq
+    deriving (Eq)
 
 data DFVar
     = DFEnvVar !HostExpr
     | DFVar !Binding
-    deriving Eq
+    deriving (Eq)
 
 
 instance Hashable DFVar where
@@ -57,3 +59,9 @@ instance Hashable DFVar where
 
 instance IsString DFVar where fromString = DFVar . fromString
 instance Num DFVar where fromInteger = DFEnvVar . fromInteger
+
+instance Show DFExpr where
+    show (DFExpr e v) = intercalate "\n" (map show (toList e)) ++ "\n" ++ show v
+deriving instance Show LetExpr
+deriving instance Show DFVar
+deriving instance Show DFFnRef
