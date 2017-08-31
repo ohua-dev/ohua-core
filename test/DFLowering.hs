@@ -187,11 +187,15 @@ recurSpec :: Spec
 recurSpec = do
     describe "recur lowering" $ do
          it "lowers a simple recursion" $
-            (   Let "a" (Lambda "i" (Let "p" (("math/-" `Apply` "i") `Apply` 10)
-                                          (("ohua.lang/if" `Apply` (("math/<" `Apply` "p") `Apply` 0)
-                                            `Apply` "p")
-                                            `Apply` ("a" `Apply` "p"))))
-                     ("a" `Apply` 95)
+            (   Let (Recursive (Binding "a"))
+                        (Lambda "i"
+                                (Let "p" (("math/-" `Apply` "i") `Apply` 10)
+                                     (Let "x" (("math/<" `Apply` "p") `Apply` 0)
+                                          (Let "r" (("ohua.lang/recur" `Apply` "a") `Apply` "p")
+                                               (Let "c" ((("ohua.lang/if" `Apply` "x") `Apply` "p") `Apply` "r")
+                                                    "c")))))
+                     (Let "y" ("a" `Apply` 95)
+                          "y")
             )
             `shouldLowerTo`
             DFExpr

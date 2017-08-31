@@ -88,6 +88,7 @@ data Assignment
 instance Show Assignment where
     show (Direct b)      = show b
     show (Destructure d) = show d
+    show (Recursive b)   = show b
 
 instance IsString Assignment where
     fromString = Direct . fromString
@@ -102,10 +103,12 @@ instance IsList Assignment where
 instance ExtractBindings Assignment where
     extractBindings (Direct bnd)       = [bnd]
     extractBindings (Destructure bnds) = bnds
+    extractBindings (Recursive bnd) = [bnd]
 
 instance NFData Assignment where
     rnf (Destructure ds) = rnf ds
     rnf (Direct d)       = rnf d
+    rnf (Recursive d)    = rnf d
 
 _Direct :: Prism' Assignment Binding
 _Direct = prism' Direct $ \case { Direct a -> Just a; _ -> Nothing }

@@ -148,7 +148,7 @@ removeUnusedBindings = fst . runWriter . go
 -- It only substitutes vars in the function positions of apply's
 -- hence it may produce an expression with undefined local bindings.
 -- It is recommended therefore to check this with 'noUndefinedBindings'.
--- If an undefined binging is left behind this indicates the source expression
+-- If an undefined binding is left behind which indicates the source expression
 -- was not fulfilling all its invariants.
 removeCurrying :: MonadError String m => Expression -> m Expression
 removeCurrying e = fst <$> evalRWST (inlinePartials e) mempty ()
