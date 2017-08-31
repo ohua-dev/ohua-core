@@ -36,3 +36,9 @@ switch = DFFunction "com.ohua.lang/switch"
 
 scope :: DFFnRef
 scope = DFFunction "com.ohua.lang/scope"
+
+recur :: DFFnRef
+recur = DFFunction "ohua.lang/recur"
+
+array :: DFFnRef
+array = EmbedSf "ohua.lang/array"

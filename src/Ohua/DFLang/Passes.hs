@@ -119,12 +119,9 @@ handleDefinitionalExpr assign l@(Lambda arg expr) cont = do
     -- execute the rest of the traversal (the continuation) in the new LetRecT environment
     trace "Exchanged state!" local (LetRec . HM.insert (unRecursive assign) (AlgoSpec [unDirect arg] continuation) . unLetRec) cont
 handleDefinitionalExpr assign l@(Apply _ _) cont = do
-    let go (fn, fnId, args) = --case assign of
-                                --  (Recursive binding) -> throwError "should execute recursion lowering!"--lift $ tell =<< (recursionLowering binding =<< lowerDefault fn fnId assign args)
-                                  --_ ->
-                                  case HM.lookup fn hofNames of
-                                          Just (WHOF (_ :: Proxy p)) -> lift $ lowerHOF (name :: TaggedFnName p) assign args
-                                          Nothing                    -> lift $ tell =<< lowerDefault fn fnId assign args
+    let go (fn, fnId, args) = case HM.lookup fn hofNames of
+                                   Just (WHOF (_ :: Proxy p)) -> lift $ lowerHOF (name :: TaggedFnName p) assign args
+                                   Nothing                    -> lift $ tell =<< lowerDefault fn fnId assign args
     go =<< trace ("lowering APPLY: " ++ show l) (handleApplyExpr assign l)
     cont
 handleDefinitionalExpr _ e _ = lift $ throwError $ "Definitional expressions in a let can only be 'apply' or 'lambda' but got: " ++ show e
@@ -147,8 +144,8 @@ handleApplyExpr assign l@(Apply fn arg) =
     go l@(Var v)                      args recAlgos =
           if HM.member (unwrapVar v) recAlgos then trace "Lowering rec call ..." $ traceState $ lowerRecAlgoCall (certainly $ HM.lookup (unwrapVar v) recAlgos) args assign
                                               else throwError $ trace ("--> recAlgos" ++ (show $ HM.keys recAlgos)) $ "Expected Var Sf but got: " ++ show l
-    go (Apply fn arg@(Var resSymbol)) args recAlgos = go fn (arg:args) recAlgos
-    go (Apply fn arg)                 args _        = throwError $ "Arg to apply should have been reduced to Var or EnvVar before df lowering. Found: " ++ show arg
+    go (Apply fn arg) args recAlgos | case arg of { Var _ -> True; Lambda _ _  -> True; _ -> False} = go fn (arg:args) recAlgos
+    go (Apply fn arg)                 args _        = throwError $ "Arg to apply should have been reduced to Var, EnvVar or Lambda before df lowering. Found: " ++ show arg
     go x                              _    _        = throwError $ "Expected Apply or Var but got: " ++ show x in
     do
       recAlgos <- ask

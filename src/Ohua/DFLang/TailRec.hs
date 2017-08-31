@@ -28,7 +28,7 @@ recursionLowering :: (MonadOhua m, MonadError String m) => Binding -> Seq LetExp
 recursionLowering binding = transformRecursiveTailCall . traceShowId
 
 transformRecursiveTailCall :: (MonadOhua m, MonadError String m) => Seq LetExpr -> m (Seq LetExpr)
-transformRecursiveTailCall exprs = handleRecursiveTailCall exprs $ findExpr (DFFunction "ohua.lang/recur") exprs
+transformRecursiveTailCall exprs = handleRecursiveTailCall exprs $ findExpr recur exprs
 
 handleRecursiveTailCall :: (MonadOhua m, MonadError String m) =>  Seq LetExpr -> Maybe LetExpr -> m (Seq LetExpr)
 handleRecursiveTailCall dfExprs Nothing = return $ trace "could not find recur!!!" dfExprs
@@ -42,7 +42,7 @@ handleRecursiveTailCall dfExprs (Just recurFn) = do
 
     -- get the condition result
     let usages = findUsages (unAssignment "recur" (returnAssignment recurFn)) dfExprs
-    let switchFn = unMaybe "switch not found" $ find ((== DFFunction "ohua.lang/switch") . functionRef) usages
+    let switchFn = unMaybe "switch not found" $ find ((== switch) . functionRef) $ trace ("usages: " ++ show usages) usages
     -- let conditionOutput :: DFVar
     let conditionOutput = case switchFn of
                                (LetExpr _ _ _ (c:_) _) -> c
@@ -68,7 +68,7 @@ handleRecursiveTailCall dfExprs (Just recurFn) = do
     algoInVarsArrayRet <- generateBindingWith "algo-in"
     recurInVarsArrayId <- generateId
     recurInVarsArrayRet <- generateBindingWith "recur-in"
-    let algoInVarsArray = LetExpr algoInVarsArrayId (Direct algoInVarsArrayRet) (EmbedSf "ohua.lang/array") (map DFVar algoInVars) Nothing
-    let recurInVarsArray = LetExpr recurInVarsArrayId (Direct recurInVarsArrayRet) (EmbedSf "ohua.lang/array") (map DFVar recurInVars) $ contextArg recurFn
+    let algoInVarsArray = LetExpr algoInVarsArrayId (Direct algoInVarsArrayRet) array (map DFVar algoInVars) Nothing
+    let recurInVarsArray = LetExpr recurInVarsArrayId (Direct recurInVarsArrayRet) array (map DFVar recurInVars) $ contextArg recurFn
     let updatedRecurExpr = LetExpr (callSiteId recurFn) (Destructure recurInVars) (functionRef recurFn) [conditionOutput, DFVar algoInVarsArrayRet, DFVar recurInVarsArrayRet] Nothing
     return $ algoInVarsArray <| (S.filter (/= recurFn) rewiredTOutExps |> recurInVarsArray |> updatedRecurExpr)
