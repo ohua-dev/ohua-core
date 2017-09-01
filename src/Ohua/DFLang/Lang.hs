@@ -44,7 +44,7 @@ data LetExpr = LetExpr
 
 data DFFnRef
     = DFFunction !FnName -- a build-in function of DFLang
-    | EmbedSf !FnName -- an generic dataflow function that wraps a stateful function call
+    | EmbedSf !FnName -- a generic dataflow function that wraps a stateful function call
     deriving (Eq)
 
 data DFVar

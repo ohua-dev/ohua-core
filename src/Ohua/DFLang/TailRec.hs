@@ -24,14 +24,18 @@ import Debug.Trace
 -- the call in ALang is still (recur algoRef args).
 -- it needs to become (recur conditionOutput algoInArgs recurArgs).
 
-recursionLowering :: (MonadOhua m, MonadError String m) => Binding -> Seq LetExpr -> m (Seq LetExpr)
-recursionLowering binding = transformRecursiveTailCall . traceShowId
+recursionLowering :: (MonadOhua m, MonadError String m) => Binding -> DFExpr -> m DFExpr
+--recursionLowering binding = (transformRecursiveTailCall
+recursionLowering binding dfExpr = do
+    generatedExprs <- transformRecursiveTailCall $ trace ("Lambda expression:\n" ++ show dfExpr) $ letExprs dfExpr
+    let result = DFExpr generatedExprs $ returnVar dfExpr
+    return $ trace ("-----\ngenerated tailrec transformation:\n" ++ show result) result
 
 transformRecursiveTailCall :: (MonadOhua m, MonadError String m) => Seq LetExpr -> m (Seq LetExpr)
-transformRecursiveTailCall exprs = handleRecursiveTailCall exprs $ findExpr recur exprs
+transformRecursiveTailCall exprs = handleRecursiveTailCall exprs $ traceShowId $ findExpr recur exprs
 
 handleRecursiveTailCall :: (MonadOhua m, MonadError String m) =>  Seq LetExpr -> Maybe LetExpr -> m (Seq LetExpr)
-handleRecursiveTailCall dfExprs Nothing = return $ trace "could not find recur!!!" dfExprs
+handleRecursiveTailCall dfExprs Nothing = throwError $ "could not find recur in DFExpr:\n" ++ show dfExprs
 handleRecursiveTailCall dfExprs (Just recurFn) = do
     -- helpers
     let unAssignment e x = case x of
@@ -42,7 +46,7 @@ handleRecursiveTailCall dfExprs (Just recurFn) = do
 
     -- get the condition result
     let usages = findUsages (unAssignment "recur" (returnAssignment recurFn)) dfExprs
-    let switchFn = unMaybe "switch not found" $ find ((== switch) . functionRef) $ trace ("usages: " ++ show usages) usages
+    let switchFn = unMaybe "switch does not use recur output" $ find ((== switch) . functionRef) $ trace ("usages: " ++ show usages) usages
     -- let conditionOutput :: DFVar
     let conditionOutput = case switchFn of
                                (LetExpr _ _ _ (c:_) _) -> c
@@ -52,8 +56,8 @@ handleRecursiveTailCall dfExprs (Just recurFn) = do
     let minusSwitchExprs = S.filter (/= switchFn) dfExprs
     let switchRet = returnAssignment switchFn
 
-    let d = HS.difference $ HS.fromList [conditionOutput, DFVar $ unAssignment "recur" $ returnAssignment recurFn]
-    let terminationBranchOut = d $ HS.fromList $ callArguments switchFn
+    let d = HS.difference $ HS.fromList $ callArguments switchFn
+    let terminationBranchOut = d $ HS.fromList [conditionOutput, DFVar $ unAssignment "recur" $ returnAssignment recurFn]
     let terminationBranch = head $ HS.toList $ assert  (1 == HS.size terminationBranchOut) terminationBranchOut
 
     let rewiredTOutExps = flip renameWith minusSwitchExprs $ HM.singleton (unAssignment "switch" switchRet) (unDFVar terminationBranch)

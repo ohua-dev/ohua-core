@@ -112,9 +112,7 @@ handleDefinitionalExpr assign l@(Lambda arg expr) cont = do
                                               _ -> error $ "Invariant broken. Assignment should be a 'letrec' but was: " ++ show x}
     let unDirect x = case x of { Direct b -> b;
                                         _ -> error $ " Invariant broken. Assignment should be a 'Direct' but was: " ++ show x}
-    let continuation = do dfExpr <- lowerLambdaExpr assign expr
-                          tell =<< recursionLowering (unRecursive assign) (letExprs dfExpr)
-                          return dfExpr
+    let continuation = recursionLowering (unRecursive assign) =<< lowerLambdaExpr assign expr
 
     -- execute the rest of the traversal (the continuation) in the new LetRecT environment
     trace "Exchanged state!" local (LetRec . HM.insert (unRecursive assign) (AlgoSpec [unDirect arg] continuation) . unLetRec) cont
