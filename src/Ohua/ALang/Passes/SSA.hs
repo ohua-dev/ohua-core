@@ -22,6 +22,8 @@ import           Data.Maybe           (fromMaybe)
 import           Ohua.ALang.Lang
 import           Ohua.Monad
 import           Ohua.Types
+import Ohua.Util
+import Data.Monoid
 
 
 type LocalScope = HM.HashMap Binding Binding
@@ -89,7 +91,7 @@ isSSA = either Just (const Nothing) . flip evalState mempty . runExceptT . go
     go (Var _) = return ()
 
 
-checkSSA :: MonadError String m => Expression -> m ()
-checkSSA = maybe (return ()) (throwError . mkMsg) . isSSA
+checkSSA :: MonadOhua m => Expression -> m ()
+checkSSA = maybe (return ()) (failWith . mkMsg) . isSSA
   where
-    mkMsg bnd = "Redefinition of binding " ++ show bnd
+    mkMsg bnd = "Redefinition of binding " <> showT bnd

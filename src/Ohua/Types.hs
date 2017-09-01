@@ -21,6 +21,7 @@ import           Ohua.Util
 import qualified Data.Text as T
 import Data.Monoid
 import Data.Maybe
+import qualified Data.HashSet             as HS
 
 
 newtype FnId = FnId { unFnId :: Int } deriving (Eq, Ord)
@@ -120,3 +121,26 @@ _Destructure = prism' Destructure $ \case { Destructure a -> Just a; _ -> Nothin
 
 flattenAssign :: Assignment -> [Binding]
 flattenAssign = extractBindings
+
+
+type Error = T.Text
+type Warning = T.Text
+type Warnings = [Warning]
+
+
+data CompilerState = CompilerState !NameGenerator !Int
+data CompilerEnv
+
+nameGenerator :: Lens' CompilerState NameGenerator
+nameGenerator f (CompilerState gen counter) = flip CompilerState counter <$> f gen
+
+idCounter :: Lens' CompilerState Int
+idCounter f (CompilerState gen counter) = CompilerState gen <$> f counter
+
+data NameGenerator = NameGenerator !(HS.HashSet Binding) [Binding]
+
+takenNames :: Lens' NameGenerator (HS.HashSet Binding)
+takenNames f (NameGenerator taken l) = flip NameGenerator l <$> f taken
+
+simpleNameList :: Lens' NameGenerator [Binding]
+simpleNameList f (NameGenerator taken l) = NameGenerator taken <$> f l

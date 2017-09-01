@@ -34,7 +34,7 @@ instance HigherOrderFunction IfFn where
     name = "com.ohua.lang/if"
 
     parseCallAndInitState [Variable v, LamArg thenBr, LamArg elseBr] = return $ IfFn v thenBr elseBr (error "return uninitialized")
-    parseCallAndInitState _ = throwError "Unexpected number or type of argument for if"
+    parseCallAndInitState _ = failWith "Unexpected number or type of argument for if"
 
     createContextEntry = do
         f <- get
@@ -66,5 +66,5 @@ instance HigherOrderFunction IfFn where
             )
 
     contextifyUnboundFunctions (Lam (Direct x) _) = return $ Just x
-    contextifyUnboundFunctions _ = throwError "Unexpected destructuring in begin assignment"
+    contextifyUnboundFunctions _ = failWith "Unexpected destructuring in begin assignment"
 

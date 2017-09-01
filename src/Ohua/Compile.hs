@@ -27,7 +27,7 @@ import           Ohua.Monad
 import           Ohua.Types
 
 
-pipeline :: (MonadError String m, MonadOhua m) => Expression -> m OutGraph
+pipeline :: MonadOhua m => Expression -> m OutGraph
 pipeline e = do
     ssaE <- performSSA e
     normalizedE <- normalize ssaE
@@ -59,26 +59,26 @@ pipeline e = do
     return $ toGraph optimizedDfE
 
 
-compile :: MonadError String m => Expression -> m OutGraph
-compile e = flip runOhuaT e pipeline
+compile :: MonadError Error m => Expression -> m OutGraph
+compile e = either throwError (return . fst) =<< flip runOhuaT e pipeline
 
 
 type SimplePass = Pass (OhuaT (Either String))
 
 
-checkHigherOrderFunctionSupport :: MonadError String m => Expression -> m ()
+checkHigherOrderFunctionSupport :: MonadOhua m => Expression -> m ()
 checkHigherOrderFunctionSupport (Let _ e rest) = do
     checkNestedExpr e
     checkHigherOrderFunctionSupport rest
   where
     checkNestedExpr (Apply f arg) = do
         supportsHOF <- checkNestedExpr f
-        when (isLambda arg && not supportsHOF) $ throwError "Lambdas may only be input to higher order functions!"
+        when (isLambda arg && not supportsHOF) $ failWith "Lambdas may only be input to higher order functions!"
         return True
     checkNestedExpr (Var (Sf n _)) = return $ HM.member n hofNames
     checkNestedExpr (Var _) = return False
-    checkNestedExpr _ = throwError "Expected var or apply expr"
+    checkNestedExpr _ = failWith "Expected var or apply expr"
     isLambda (Lambda _ _) = True
     isLambda _            = False
 checkHigherOrderFunctionSupport (Var _) = return ()
-checkHigherOrderFunctionSupport _ = throwError "Expected let or var"
+checkHigherOrderFunctionSupport _ = failWith "Expected let or var"

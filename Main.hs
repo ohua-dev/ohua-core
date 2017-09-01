@@ -55,7 +55,7 @@ expr5 =
 
 main = do
     for_ [expr, expr0, expr1] $ \expr -> do
-        let inlidedRefs = either error id $ inlineLambdaRefs expr
+        let inlidedRefs = inlineLambdaRefs expr
             inlined = inlineLambda inlidedRefs
         putStrLn $ showLambda expr
         putStrLn $ showLambda inlidedRefs

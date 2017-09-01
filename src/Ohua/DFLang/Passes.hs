@@ -49,7 +49,7 @@ type Pass m = FnName -> FnId -> Assignment -> [Expression] -> m (Seq LetExpr)
 
 
 -- | Check that a sequence of let expressions does not redefine bindings.
-checkSSA :: (Foldable f, MonadError String m) => f LetExpr -> m ()
+checkSSA :: (Foldable f, MonadOhua m) => f LetExpr -> m ()
 checkSSA = flip evalStateT mempty . mapM_ go
   where
     go le = do
@@ -58,7 +58,7 @@ checkSSA = flip evalStateT mempty . mapM_ go
             f a | HS.member a defined = Just a
             f _ = Nothing
         case msum $ map f produced of
-            Just b  -> throwError $ "Rebinding of " ++ show b
+            Just b  -> failWith $ "Rebinding of " <> showT b
             Nothing -> return ()
         modify (addAll produced)
 
@@ -66,7 +66,7 @@ checkSSA = flip evalStateT mempty . mapM_ go
 
 
 -- | Check that a DFExpression is in SSA form.
-checkSSAExpr :: MonadError String m => DFExpr -> m ()
+checkSSAExpr :: MonadOhua m => DFExpr -> m ()
 checkSSAExpr (DFExpr l _) = checkSSA l
 
 
@@ -74,7 +74,7 @@ checkSSAExpr (DFExpr l _) = checkSSA l
 -- This assumes a certain structure in the expression.
 -- This can be achieved with the 'normalize' and 'performSSA' functions and tested with
 -- 'checkProgramValidity'.
-lowerALang :: (MonadOhua m, MonadError String m) => Expression -> m DFExpr
+lowerALang :: MonadOhua m => Expression -> m DFExpr
 lowerALang expr = do
     (var, exprs) <- runWriterT (go expr)
 #ifdef DEBUG
@@ -83,18 +83,18 @@ lowerALang expr = do
     return $ DFExpr exprs var
   where
     go  (Var (Local bnd)) = return bnd
-    go  (Var _) = throwError "Non local return binding"
+    go  (Var _) = failWith "Non local return binding"
     go  (Let assign expr rest) = do
         (fn, fnId, args) <- handleApplyExpr expr
         case HM.lookup fn hofNames of
             Just (WHOF (_ :: Proxy p)) -> lowerHOF (name :: TaggedFnName p) assign args
             Nothing       -> tell =<< lowerDefault fn fnId assign args
         go rest
-    go  _ = throwError "Expected `let` or binding"
+    go  _ = failWith "Expected `let` or binding"
 
 
 -- | Lower any not specially treated function type.
-lowerDefault :: (MonadOhua m, MonadError String m) => Pass m
+lowerDefault :: MonadOhua m => Pass m
 lowerDefault fn fnId assign args = mapM expectVar args <&> \args' -> [LetExpr fnId assign (EmbedSf fn) args' Nothing]
 
     -- finds all functions that use vars from the lexical context and adds the context source to them.
@@ -129,7 +129,7 @@ findFreeVars0 boundVars = HS.fromList . concatMap (mapMaybe f . callArguments)
 
 
 -- | Insert a `one-to-n` node for each free variable to scope them.
-replicateFreeVars :: (MonadOhua m, MonadError String m) => Binding -> [Binding] -> Seq LetExpr -> m (Seq LetExpr)
+replicateFreeVars :: MonadOhua m => Binding -> [Binding] -> Seq LetExpr -> m (Seq LetExpr)
 replicateFreeVars countSource_ initialBindings exprs = do
     (replicators, replications) <- unzip <$> mapM mkReplicator freeVars
     pure $ S.fromList replicators >< renameWith (HM.fromList $ zip freeVars replications) exprs
@@ -155,27 +155,27 @@ renameWith m = fmap go
 
 -- | Ananlyze an apply expression, extracting the inner stateful function and the nested arguments as a list.
 -- Also generates a new function id for the inner function should it not have one yet.
-handleApplyExpr :: (MonadOhua m, MonadError String m) => Expression -> m (FnName, FnId, [Expression])
+handleApplyExpr :: MonadOhua m => Expression -> m (FnName, FnId, [Expression])
 handleApplyExpr (Apply fn arg) = go fn [arg]
   where
     go (Var (Sf fn id)) args = (fn, , args) <$> maybe generateId return id
             -- reject algos for now
-    go (Var v) _             = throwError $ "Expected Var Sf but got: Var " ++ show v -- FIXME there should be a special type of error here that takes the string and a value
+    go (Var v) _             = failWith $ "Expected Var Sf but got: Var " <> showT v -- FIXME there should be a special type of error here that takes the string and a value
     go (Apply fn arg) args   = go fn (arg:args)
-    go x _                   = throwError $ "Expected Apply or Var but got: " ++ show x
+    go x _                   = failWith $ "Expected Apply or Var but got: " <> showT x
 handleApplyExpr (Var (Sf fn id)) = (fn, , []) <$> maybe generateId return id
-handleApplyExpr g = throwError $ "Expected apply but got: " ++ show g
+handleApplyExpr g = failWith $ "Expected apply but got: " <> showT g
 
 
 -- | Inspect an expression expecting something which can be captured in a DFVar otherwies throws appropriate errors.
-expectVar :: MonadError String m => Expression -> m DFVar
+expectVar :: MonadOhua m => Expression -> m DFVar
 expectVar (Var (Local bnd)) = pure $ DFVar bnd
 expectVar (Var (Env i))     = pure $ DFEnvVar i
-expectVar (Var _)           = throwError "Var must be local or env"
-expectVar _                 = throwError "Argument must be var"
+expectVar (Var _)           = failWith "Var must be local or env"
+expectVar _                 = failWith "Argument must be var"
 
 
-lowerHOF :: forall f m . (MonadError String m, MonadOhua m, HigherOrderFunction f, MonadWriter (Seq LetExpr) m)
+lowerHOF :: forall f m . (MonadOhua m, HigherOrderFunction f, MonadWriter (Seq LetExpr) m)
          => TaggedFnName f -> Assignment -> [Expression] -> m ()
 lowerHOF _ assign args = do
     simpleArgs <- mapM handleArg args
@@ -201,7 +201,7 @@ lowerHOF _ assign args = do
     handleArg (Lambda assign body) = do
         DFExpr lets bnd <- lowerALang body
         return $ Right (Lam assign bnd, lets)
-    handleArg _ = throwError "unexpected type of argument"
+    handleArg _ = failWith "unexpected type of argument"
 
 
 hofs :: [WHOF]
