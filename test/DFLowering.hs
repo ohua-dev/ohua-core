@@ -78,6 +78,7 @@ runLowering :: Expression -> IO DFExpr
 runLowering = fmap (either (error . T.unpack) fst) . runOhuaT lowerALang
 
 
+-- | IMPORTANT: Both source and target expression must be in SSA form
 shouldLowerTo :: Expression -> DFExpr -> Expectation
 shouldLowerTo input expected = do
     gr1 <- fmap (toFGLGraph . toGraph) (runLowering input)
@@ -115,14 +116,12 @@ smapSpec = smapLowering
 ifLowering :: Spec
 ifLowering = describe "lowering conditionals" $ do
     let sourceExpr =
-          Let "a" ("ohua.lang/id" `Apply` 0) $
-          Let "b" ("ohua.lang/id" `Apply` 1) $
-          Let "c" ("ohua.lang/id" `Apply` 2) $
-          Let "z" (Apply (Apply (Apply "ohua.lang/if" "c")
-                                (Lambda "then" (Let "p" (Apply "some-ns/+" "a")
-                                                    (Let "f" (Apply "p" "b") "f"))))
-                         (Lambda "else" (Let "m" (Apply "some-ns/-" "a")
-                                             (Let "f" (Apply "m" "b") "f"))))
+          Let "a" ("com.ohua.lang/id" `Apply` 0) $
+          Let "b" ("com.ohua.lang/id" `Apply` 1) $
+          Let "c" ("com.ohua.lang/id" `Apply` 2) $
+          Let "z" (Apply (Apply (Apply "com.ohua.lang/if" "c")
+                                (Lambda "then" (Let "f" (Apply (Apply "some-ns/+" "a") "b") "f")))
+                                (Lambda "else" (Let "f0" (Apply (Apply "some-ns/-" "a") "b") "f0")))
           "z"
     let targetExpr = DFExpr
           [ LetExpr 0 "a" "ohua.lang/id" [0] Nothing
