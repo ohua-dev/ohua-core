@@ -22,7 +22,7 @@ import           Ohua.ALang.Util
 import           Ohua.IR.Functions
 import           Ohua.Monad
 import           Ohua.Types
-import Ohua.Util
+import           Ohua.Util
 
 
 
@@ -32,7 +32,7 @@ inlineLambdaRefs :: MonadOhua m => Expression -> m Expression
 inlineLambdaRefs (Let assignment l@(Lambda _ _) body) =
     case assignment of
         Direct bnd -> inlineLambdaRefs $ substitute bnd l body
-        _ -> failWith "invariant broken, cannot destructure lambda"
+        _          -> failWith "invariant broken, cannot destructure lambda"
 inlineLambdaRefs (Let assignment value body) = Let assignment <$> inlineLambdaRefs value <*> inlineLambdaRefs body
 inlineLambdaRefs (Apply body argument) = liftM2 Apply (inlineLambdaRefs body) (inlineLambdaRefs argument)
 inlineLambdaRefs (Lambda argument body) = Lambda argument <$> inlineLambdaRefs body

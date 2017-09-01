@@ -8,7 +8,7 @@
 -- Portability : portable
 
 -- This source code is licensed under the terms described in the associated LICENSE.TXT file
-{-# LANGUAGE FlexibleContexts  #-}
+{-# LANGUAGE FlexibleContexts #-}
 module PassesSpec (passesSpec) where
 
 import           Control.DeepSeq

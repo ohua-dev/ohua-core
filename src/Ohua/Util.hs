@@ -8,13 +8,14 @@
 -- Portability : portable
 
 -- This source code is licensed under the terms described in the associated LICENSE.TXT file
-{-# LANGUAGE Rank2Types, UndecidableInstances #-}
+{-# LANGUAGE Rank2Types           #-}
+{-# LANGUAGE UndecidableInstances #-}
 module Ohua.Util where
 
 import           Control.Exception
 import           Control.Monad.Except
+import qualified Data.Text            as T
 import           Lens.Micro
-import qualified Data.Text as T
 
 
 type Prism s t a b = Traversal s t a b
@@ -47,7 +48,7 @@ assertE False = throwError "AssertionError"
 
 
 mapLeft :: (a -> c) -> Either a b -> Either c b
-mapLeft f (Left l) = Left $ f l
+mapLeft f (Left l)  = Left $ f l
 mapLeft _ (Right r) = Right r
 
 

@@ -19,11 +19,11 @@ import           Control.Monad.State
 import qualified Data.HashMap.Strict  as HM
 import qualified Data.HashSet         as HS
 import           Data.Maybe           (fromMaybe)
+import           Data.Monoid
 import           Ohua.ALang.Lang
 import           Ohua.Monad
 import           Ohua.Types
-import Ohua.Util
-import Data.Monoid
+import           Ohua.Util
 
 
 type LocalScope = HM.HashMap Binding Binding

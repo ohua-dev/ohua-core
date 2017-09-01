@@ -13,15 +13,15 @@ module Ohua.Types where
 
 import           Control.DeepSeq
 import           Data.Hashable
+import qualified Data.HashSet     as HS
+import           Data.Maybe
+import           Data.Monoid
 import           Data.String
+import qualified Data.Text        as T
 import           GHC.Exts
 import           Lens.Micro
 import           Ohua.LensClasses
 import           Ohua.Util
-import qualified Data.Text as T
-import Data.Monoid
-import Data.Maybe
-import qualified Data.HashSet             as HS
 
 
 newtype FnId = FnId { unFnId :: Int } deriving (Eq, Ord)
@@ -71,14 +71,14 @@ symbolFromString s | T.null s = Left "Symbols cannot be empty"
         (name, ns) | T.null name -> Left "Unexpected '/' at start"
                    | T.null ns -> Right $ Right $ Binding name
         (ns, rest) | Just ('/', name) <- T.uncons rest ->
-            if '/' `textElem` name then 
+            if '/' `textElem` name then
                 Left "Too many '/' delimiters found."
-            else 
+            else
                 Right $ Left $ FnName ns name
         _ -> error "Leading slash expected after `break`"
 
   where
-    textElem c t = isJust $ (== c) `T.findIndex` t 
+    textElem c t = isJust $ (== c) `T.findIndex` t
 
 class ExtractBindings a where
     extractBindings :: a -> [Binding]

@@ -25,14 +25,14 @@ import           Control.Monad.Except
 import           Control.Monad.RWS.Strict hiding (fail)
 import qualified Data.HashSet             as HS
 import           Data.List                (intercalate)
+import           Data.Monoid
+import qualified Data.Text                as T
+import qualified Data.Text.IO             as T
+import           Lens.Micro
 import           Ohua.ALang.Lang
 import           Ohua.LensClasses
 import           Ohua.Types
-import Data.Monoid
-import qualified Data.Text as T
-import qualified Data.Text.IO as T
-import Ohua.Util
-import Lens.Micro
+import           Ohua.Util
 
 
 -- The compiler monad.
