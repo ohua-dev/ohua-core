@@ -21,6 +21,8 @@ import qualified Ohua.DFLang.Refs     as Refs
 import           Ohua.Monad
 import           Ohua.Types
 
+import           Debug.Trace
+
 
 data IfFn = IfFn
     { conditionVariable :: !DFVar
@@ -43,16 +45,13 @@ instance HigherOrderFunction IfFn where
         let Direct thenBnd = beginAssignment $ thenBranch f
             Direct elseBnd = beginAssignment $ elseBranch f
         modify $ \s -> s { ifRet = ifRet' }
-        return
-            -- not sure this has to be a dffunction
-            [ LetExpr ifId (Destructure [thenBnd, elseBnd]) Refs.ifThenElse [conditionVariable f] Nothing
-            ]
+        return [ LetExpr ifId (Destructure [thenBnd, elseBnd]) Refs.ifThenElse [conditionVariable f] Nothing ]
 
     createContextExit assignment = do
         switchId <- generateId
         IfFn {..} <- get
         return
-            [ LetExpr switchId assignment Refs.switch [DFVar ifRet, DFVar $ resultBinding thenBranch, DFVar $ resultBinding elseBranch] Nothing
+            [ LetExpr switchId assignment Refs.switch [conditionVariable, DFVar $ resultBinding thenBranch, DFVar $ resultBinding elseBranch] Nothing
             ]
 
     scopeFreeVariables lam freeVars = do
@@ -65,6 +64,6 @@ instance HigherOrderFunction IfFn where
             ,   zip freeVars selected
             )
 
-    contextifyUnboundFunctions (Lam (Direct x) _) = return $ Just x
+    contextifyUnboundFunctions (Lam (Direct x) _) = return $ Just $ trace ("should contextify var: " ++ show x) x
     contextifyUnboundFunctions _ = throwError "Unexpected destructuring in begin assignment"
 

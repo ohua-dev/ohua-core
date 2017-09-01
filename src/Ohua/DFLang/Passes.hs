@@ -214,20 +214,19 @@ lowerHOF _ assign args = do
         createContextEntry >>= tell
         let lambdas = rights simpleArgs
         for_ lambdas $ \(lam, body) -> do
-            let boundVars = findBoundVars body `mappend` HS.fromList (flattenAssign $ beginAssignment lam)
-            let freeVars = HS.toList $ findFreeVars0 boundVars body
+            let findBoundVars' b = findBoundVars b `mappend` HS.fromList (flattenAssign $ beginAssignment lam)
+            let freeVars = HS.toList $ flip findFreeVars0 body $ findBoundVars' body
             (scopers, renaming) <- scopeFreeVariables lam freeVars
             tell scopers
             scopeUnbound <- contextifyUnboundFunctions lam
             let tieContext1 = case scopeUnbound of
-                    Just bnd -> tieContext0 boundVars bnd
+                    Just bnd -> flip tieContext0 bnd $ findBoundVars' $ body >< scopers
                     Nothing  -> id
             tell $ tieContext1 (renameWith (HM.fromList renaming) body)
         createContextExit assign >>= tell
   where
     handleArg (Var (Local v)) = return $ Left $ DFVar v
     handleArg (Var (Env e)) = return $ Left $ DFEnvVar e
-    -- FIXME I think this can not happen anymore.
     handleArg (Lambda assign body) = do
         DFExpr lets bnd <- lowerALang body
         return $ Right (Lam assign bnd, lets)

@@ -110,19 +110,19 @@ ifLowering = describe "lowering conditionals" $ do
           Let "b" ("com.ohua.lang/id" `Apply` 1) $
           Let "c" ("com.ohua.lang/id" `Apply` 2) $
           Let "z" (Apply (Apply (Apply "com.ohua.lang/if" "c")
-                                (Lambda "then" (Let "p" (Apply "some-ns/+" "a")
-                                                    (Let "f" (Apply "p" "b") "f"))))
-                         (Lambda "else" (Let "m" (Apply "some-ns/-" "a")
-                                             (Let "f" (Apply "m" "b") "f"))))
+                                (Lambda "then" (Let "f" (Apply (Apply "some-ns/+" "a") "b") "f")))
+                                (Lambda "else" (Let "f" (Apply (Apply "some-ns/-" "a") "b") "f")))
           "z"
     let targetExpr = DFExpr
           [ LetExpr 0 "a" "com.ohua.lang/id" [0] Nothing
           , LetExpr 1 "b" "com.ohua.lang/id" [1] Nothing
           , LetExpr 2 "c" "com.ohua.lang/id" [2] Nothing
-          , LetExpr 3 "s" (DFFunction "com.ohua.lang/ifThenElse") ["c"] Nothing
-          , LetExpr 4 "d" "some-ns/+" ["a", "b"] Nothing
-          , LetExpr 5 "e" "some-ns/-" ["a", "b"] Nothing
-          , LetExpr 6 "z" (DFFunction "com.ohua.lang/switch") ["s", "d", "e"] Nothing
+          , LetExpr 3 ["t", "f"] (DFFunction "com.ohua.lang/ifThenElse") ["c"] Nothing
+          , LetExpr 4 ["at", "bt"] "com.ohua.lang/scope" ["a", "b"] $ Just "t"
+          , LetExpr 5 ["af", "bf"] "com.ohua.lang/scope" ["a", "b"] $ Just "f"
+          , LetExpr 6 "d" "some-ns/+" ["at", "bt"] Nothing
+          , LetExpr 7 "e" "some-ns/-" ["af", "bf"] Nothing
+          , LetExpr 8 "z" (DFFunction "com.ohua.lang/switch") ["c", "d", "e"] Nothing
           ]
           "z"
 
