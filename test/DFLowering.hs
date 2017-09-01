@@ -198,30 +198,20 @@ recurSpec = do
             )
             `shouldLowerTo`
             DFExpr
-                [ LetExpr 0 "a" Refs.id [DFEnvVar 95] Nothing
+                [ LetExpr 0 "i_0" Refs.id [DFEnvVar 95] Nothing -- this adapts the actual to the formal that goes into algo-in and then becomes "i"
+                -- inside the lambda everything is left untouched.
                 , LetExpr 1 "p" (EmbedSf "math/-") [DFVar "i", DFEnvVar 10] Nothing
-                , LetExpr 2 "c" (EmbedSf "math/<") [DFVar "p", DFEnvVar 0] Nothing
-                , LetExpr 3 ["t", "f"] Refs.ifThenElse [DFVar "c"] Nothing
-                , LetExpr 4 ["p0"] Refs.scope [DFVar "p"] $ Just "t"
-                , LetExpr 5 "tr" Refs.id [DFVar "p0"] Nothing
-                , LetExpr 6 ["p1"] Refs.scope [DFVar "p"] $ Just "t"
-                , LetExpr 7 "recur-array" Refs.array [DFVar "p1"] Nothing
-                , LetExpr 8 "algo-array" Refs.array [DFVar "a"] Nothing
-                , LetExpr 9 "i" Refs.recur [DFVar "c", DFVar "algo-array", DFVar "recur-array"] Nothing
-                , LetExpr 5 "y" Refs.id [DFVar "tr"] Nothing -- this adapts the output formal to the output actual
---                , LetExpr {callSiteId = 1, returnAssignment = Direct i, functionRef = EmbedSf ohua.lang/id, callArguments = [DFEnvVar (HostExpr {unwrapHostExpr = 95})], contextArg = Nothing}
---                , LetExpr {callSiteId = 2, returnAssignment = Direct p, functionRef = EmbedSf math/-, callArguments = [DFVar i,DFEnvVar (HostExpr {unwrapHostExpr = 10})], contextArg = Nothing}
---                , LetExpr {callSiteId = 3, returnAssignment = Direct x, functionRef = EmbedSf math/<, callArguments = [DFVar p,DFEnvVar (HostExpr {unwrapHostExpr = 0})], contextArg = Nothing}
---                , LetExpr {callSiteId = 7, returnAssignment = [then,else], functionRef = EmbedSf com.ohua.lang/ifThenElse, callArguments = [DFVar x], contextArg = Nothing}
---                , LetExpr {callSiteId = 8, returnAssignment = [p_0], functionRef = DFFunction com.ohua.lang/scope, callArguments = [DFVar p], contextArg = Just then}
---                , LetExpr {callSiteId = 5, returnAssignment = Direct t, functionRef = EmbedSf ohua.lang/id, callArguments = [DFVar p_0], contextArg = Nothing}
---                , LetExpr {callSiteId = 9, returnAssignment = [p_1], functionRef = DFFunction com.ohua.lang/scope, callArguments = [DFVar p], contextArg = Just else}
---                , LetExpr {callSiteId = 11, returnAssignment = Direct algo-in_0, functionRef = EmbedSf ohua.lang/array, callArguments = [DFVar i], contextArg = Nothing}
---                , LetExpr {callSiteId = 12, returnAssignment = Direct recur-in_0, functionRef = EmbedSf ohua.lang/array, callArguments = [DFVar i_0], contextArg = Nothing}
---                , LetExpr {callSiteId = 6, returnAssignment = [i_0], functionRef = DFFunction ohua.lang/recur, callArguments = [DFVar x,DFVar algo-in_0,DFVar recur-in_0], contextArg = Nothing}
---                , LetExpr {callSiteId = 13, returnAssignment = Direct y, functionRef = EmbedSf ohua.lang/id, callArguments = [DFVar t], contextArg = Nothing}
---                y
-
+                , LetExpr 2 "x" (EmbedSf "math/<") [DFVar "p", DFEnvVar 0] Nothing
+                , LetExpr 3 ["then", "else"] Refs.ifThenElse [DFVar "x"] Nothing
+                , LetExpr 4 ["p_0"] Refs.scope [DFVar "p"] $ Just "then"
+                , LetExpr 5 "t" Refs.id [DFVar "p_0"] Nothing
+                , LetExpr 6 ["p_1"] Refs.scope [DFVar "p"] $ Just "else"
+                -- the two functions to gather the parameters for the call to recur
+                , LetExpr 7 "recur-in_0" Refs.array [DFVar "p_1"] Nothing
+                , LetExpr 8 "algo-in_0" Refs.array [DFVar "i_0"] Nothing
+                -- note: recur produces finally the formal input vars of the lambda
+                , LetExpr 9 ["i"] Refs.recur [DFVar "x", DFVar "algo-in_0", DFVar "recur-in_0"] Nothing
+                , LetExpr 5 "y" Refs.id [DFVar "t"] Nothing -- this adapts the output formal to the output actual
                 ]
                 "y"
 

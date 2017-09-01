@@ -24,18 +24,23 @@ import Debug.Trace
 -- the call in ALang is still (recur algoRef args).
 -- it needs to become (recur conditionOutput algoInArgs recurArgs).
 
-recursionLowering :: (MonadOhua m, MonadError String m) => DFExpr -> m DFExpr
+data RecursiveLambdaSpec = RecursiveLambdaSpec {
+                          formalInputs :: [Binding], -- as defined by the expression
+                 lambdaFormalsToAlgoIn :: HM.HashMap Binding Binding,
+                                dfExpr :: DFExpr } deriving Show
+
+recursionLowering :: (MonadOhua m, MonadError String m) => [Binding] -> DFExpr -> m RecursiveLambdaSpec
 --recursionLowering binding = (transformRecursiveTailCall
-recursionLowering dfExpr = do
-    result <- transformRecursiveTailCall $ trace ("Lambda expression:\n" ++ show dfExpr) dfExpr
+recursionLowering lambdaFormals dfExpr = do
+    result <- transformRecursiveTailCall lambdaFormals $ trace ("Lambda expression:\n" ++ show dfExpr) dfExpr
     return $ trace ("-----\ngenerated tailrec transformation:\n" ++ show result) result
 
-transformRecursiveTailCall :: (MonadOhua m, MonadError String m) => DFExpr -> m DFExpr
-transformRecursiveTailCall exprs = handleRecursiveTailCall exprs $ traceShowId $ findExpr Refs.recur $ letExprs exprs
+transformRecursiveTailCall :: (MonadOhua m, MonadError String m) => [Binding] -> DFExpr -> m RecursiveLambdaSpec
+transformRecursiveTailCall lambdaFormals exprs = handleRecursiveTailCall lambdaFormals exprs $ traceShowId $ findExpr Refs.recur $ letExprs exprs
 
-handleRecursiveTailCall :: (MonadOhua m, MonadError String m) =>  DFExpr -> Maybe LetExpr -> m DFExpr
-handleRecursiveTailCall dfExpr Nothing = throwError $ "could not find recur in DFExpr:\n" ++ show dfExpr
-handleRecursiveTailCall dfExpr (Just recurFn) = do
+handleRecursiveTailCall :: (MonadOhua m, MonadError String m) => [Binding] -> DFExpr -> Maybe LetExpr -> m RecursiveLambdaSpec
+handleRecursiveTailCall _ dfExpr Nothing = throwError $ "could not find recur in DFExpr:\n" ++ show dfExpr
+handleRecursiveTailCall lambdaFormals dfExpr (Just recurFn) = do
     let dfExprs = letExprs dfExpr
     -- helpers
     let unAssignment e x = case x of
@@ -65,19 +70,25 @@ handleRecursiveTailCall dfExpr (Just recurFn) = do
     let newLambdaRetVar = unDFVar $ flip assert terminationBranch $ returnVar dfExpr == switchRetBnd
 
     -- get the algo-in vars. note that for the recursive case this includes all free vars (even those accessed via the lexical scope).
-    let algoInVars = HS.toList $ findFreeVars rewiredTOutExps
-    algoInToRecurInVars <- foldM (\x y -> do s <- generateBindingWith y; return $ HM.insert y s x;) HM.empty algoInVars
-    let updatedRecurExpr = renameWith algoInToRecurInVars rewiredTOutExps
+    let lambdaInVars = HS.toList $ findFreeVars rewiredTOutExps
+    lambdaInToRecurInVars <- foldM (\x y -> do s <- generateBindingWith y; return $ HM.insert y s x;) HM.empty lambdaInVars -- TODO beware to pertain the ordering here!
+    let updatedRecurExpr = renameWith lambdaInToRecurInVars rewiredTOutExps
 
-    let recurInVars = map (unMaybe "input into recur not found" . flip HM.lookup algoInToRecurInVars) algoInVars
+    let recurInVars = callArguments recurFn
+--    let recursionInVars = map (unMaybe "input into recur not found" . flip HM.lookup algoInToRecurInVars) $ trace ("algoInToRecurVars: " ++ show algoInToRecurInVars) algoInVars
     algoInVarsArrayId <- generateId
     algoInVarsArrayRet <- generateBindingWith "algo-in"
     recurInVarsArrayId <- generateId
     recurInVarsArrayRet <- generateBindingWith "recur-in"
-    let algoInVarsArray = LetExpr algoInVarsArrayId (Direct algoInVarsArrayRet) Refs.array (map DFVar algoInVars) Nothing
-    let recurInVarsArray = LetExpr recurInVarsArrayId (Direct recurInVarsArrayRet) Refs.array (map DFVar recurInVars) $ contextArg recurFn
-    let updatedRecurExpr = LetExpr (callSiteId recurFn) (Destructure recurInVars) (functionRef recurFn) [conditionOutput, DFVar algoInVarsArrayRet, DFVar recurInVarsArrayRet] Nothing
-    return $ flip DFExpr
+    -- the args that are input to the algo-in-array function must come from the outside. hence the need to use the var that will later be bound to the actuals! (instead of the formal var)
+    let algoInVarsArray = LetExpr algoInVarsArrayId (Direct algoInVarsArrayRet) Refs.array (map (DFVar . unMaybe "formal args" . flip HM.lookup lambdaInToRecurInVars) lambdaInVars) Nothing
+    let recurInVarsArray = LetExpr recurInVarsArrayId (Direct recurInVarsArrayRet) Refs.array recurInVars $ contextArg recurFn
+    -- remember: 'recur' produces the formals used inside the lambda expression!
+    let updatedRecurExpr = LetExpr (callSiteId recurFn) (Destructure lambdaFormals) (functionRef recurFn) [conditionOutput, DFVar algoInVarsArrayRet, DFVar recurInVarsArrayRet] Nothing
+    return $ RecursiveLambdaSpec
+            lambdaFormals
+            lambdaInToRecurInVars
+            $ flip DFExpr
               (trace ("new return var: " ++ show newLambdaRetVar) newLambdaRetVar)
               $ algoInVarsArray <| (S.filter (/= recurFn) rewiredTOutExps |> recurInVarsArray |> updatedRecurExpr)
 

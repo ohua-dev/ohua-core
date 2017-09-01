@@ -38,7 +38,7 @@ import           Lens.Micro
 import           Ohua.ALang.Lang
 import qualified Ohua.ALang.Refs      as ALangRefs
 import qualified Ohua.DFLang.Refs     as Refs
-import           Ohua.DFLang.TailRec  (recursionLowering)
+import           Ohua.DFLang.TailRec  --(recursionLowering, RecursiveLambdaSpec)
 import           Ohua.DFLang.HOF      as HOF
 import           Ohua.DFLang.HOF.If
 import           Ohua.DFLang.HOF.Seq
@@ -54,10 +54,10 @@ import           Debug.Trace
 
 type Pass m = FnName -> FnId -> Assignment -> [Expression] -> m (Seq LetExpr)
 
-data AlgoSpec m = AlgoSpec { formalInputVars :: [Binding],
-                             dfExpr :: m DFExpr }
+--data AlgoSpec m = AlgoSpec { formalInputVars :: [Binding],
+--                             dfExpr :: m DFExpr }
 
-newtype LetRec m = LetRec { unLetRec :: HM.HashMap Binding (AlgoSpec m)}
+newtype LetRec m = LetRec { unLetRec :: HM.HashMap Binding (m RecursiveLambdaSpec) }
 
 type LetRecT m a = ReaderT (LetRec m) m a
 
@@ -114,10 +114,10 @@ handleDefinitionalExpr assign l@(Lambda arg expr) cont = do
                                               _ -> error $ "Invariant broken. Assignment should be a 'letrec' but was: " ++ show x}
     let unDirect x = case x of { Direct b -> b;
                                         _ -> error $ " Invariant broken. Assignment should be a 'Direct' but was: " ++ show x}
-    let continuation = recursionLowering =<< lowerLambdaExpr assign expr
+    let continuation = recursionLowering [unDirect arg] =<< lowerLambdaExpr assign expr
 
     -- execute the rest of the traversal (the continuation) in the new LetRecT environment
-    trace "Exchanged state!" local (LetRec . HM.insert (unRecursive assign) (AlgoSpec [unDirect arg] continuation) . unLetRec) cont
+    trace "Exchanged state!" local (LetRec . HM.insert (unRecursive assign) continuation . unLetRec) cont
 handleDefinitionalExpr assign l@(Apply _ _) cont = do
     let go (fn, fnId, args) = case HM.lookup fn hofNames of
                                    Just (WHOF (_ :: Proxy p)) -> lift $ lowerHOF (name :: TaggedFnName p) assign args
@@ -142,7 +142,7 @@ handleApplyExpr assign l@(Apply fn arg) =
     go (Var (Sf fn id))               args _        = (fn, , args) <$> maybe generateId return id
             -- reject algos for now
     go l@(Var v)                      args recAlgos =
-          if HM.member (unwrapVar v) recAlgos then trace "Lowering rec call ..." $ traceState $ lowerRecAlgoCall (certainly $ HM.lookup (unwrapVar v) recAlgos) args assign
+          if HM.member (unwrapVar v) recAlgos then lowerRecAlgoCall args assign =<< lift (certainly $ HM.lookup (unwrapVar v) recAlgos) -- Justus, you should be proud of me for this line ;)
                                               else throwError $ trace ("--> recAlgos" ++ show (HM.keys recAlgos)) $ "Expected Var Sf but got: " ++ show l
     go (Apply fn arg) args recAlgos | case arg of { Var _ -> True; Lambda _ _  -> True; _ -> False} = go fn (arg:args) recAlgos
     go (Apply fn arg)                 args _        = throwError $ "Arg to apply should have been reduced to Var, EnvVar or Lambda before df lowering. Found: " ++ show arg
@@ -153,24 +153,27 @@ handleApplyExpr assign l@(Apply fn arg) =
 handleApplyExpr _ (Var (Sf fn id))  = (fn, , []) <$> maybe generateId return id -- what is this?
 handleApplyExpr _ g                 = lift $ throwError $ "Expected apply but got: " ++ show g
 
+-- TODO move this function over to TailRec.hs
 lowerRecAlgoCall :: (MonadOhua m, MonadError String m, MonadWriter (Seq LetExpr) m) =>
-                            AlgoSpec m -> [Expression] -> Assignment -> LetRecT m (FnName, FnId, [Expression])
-lowerRecAlgoCall algoFormals actuals callAssignment =
-  let inputFormals = formalInputVars algoFormals
+                            [Expression] -> Assignment -> RecursiveLambdaSpec -> LetRecT m (FnName, FnId, [Expression])
+lowerRecAlgoCall actuals callAssignment recLambdaSpec =
+  -- FIXME this does not treat environment args properly!
+  let
       mkIdFn id i o = lowerDefault ALangRefs.id id o [i] in
       do
         -- input side
+        let RecursiveLambdaSpec formalInputs lambdaFormalsToAlgoIn dfExpr = recLambdaSpec
+        let algoInInputFormals = map (fromMaybe (error "Invariant broken") . flip HM.lookup lambdaFormalsToAlgoIn) formalInputs
         mapM_ (uncurry (\x y -> do
           id <- generateId
-          (tell. traceShowId) =<< mkIdFn id x y)) $ zip actuals $ map Direct $ trace ("input formals: " ++ show inputFormals) inputFormals
+          (tell. traceShowId) =<< mkIdFn id x y)) $ zip actuals $ map Direct $ trace ("input formals: " ++ show algoInInputFormals) algoInInputFormals
 
         -- recreate the body and 'tell' it to the writer
-        ls <- lift $ dfExpr algoFormals
-        tell $ letExprs ls
+        tell $ letExprs dfExpr
 
         -- output side
         id <- generateId
-        return $ trace ("output side: " ++ show (returnVar ls)) $ (ALangRefs.id, id, [Var $ Local $ returnVar ls])
+        return $ trace ("output side: " ++ show (returnVar dfExpr)) $ (ALangRefs.id, id, [Var $ Local $ returnVar dfExpr])
 
 
 -- | Analyze a lambda expression. Since we perform lambda inlining, this can only be a letrec.
