@@ -17,6 +17,8 @@ import           Ohua.ALang.Lang
 import           Ohua.DFGraph
 import           Ohua.DFLang.Lang
 import           Ohua.DFLang.Passes
+import qualified Ohua.ALang.Refs                  as ALangRefs
+import qualified Ohua.DFLang.Refs                  as Refs
 import           Ohua.Monad
 import           Ohua.Types
 import           Test.Hspec
@@ -184,27 +186,43 @@ recurSpec = do
                         (Lambda "i"
                                 (Let "p" (("math/-" `Apply` "i") `Apply` 10)
                                      (Let "x" (("math/<" `Apply` "p") `Apply` 0)
-                                          (Let "c" (Apply (Apply (Apply "com.ohua.lang/if" "x")
-                                                (Lambda "then" (Let "t" (Apply "ohua.lang/id" "p")
-                                                                    "t")))
-                                                (Lambda "else" (Let "r" ("ohua.lang/recur" `Apply` "p") -- (("ohua.lang/recur" `Apply` "a") `Apply` "p")
-                                                                    "r")))
+                                          (Let "c" (Apply (Apply (Apply (Var $ Sf ALangRefs.ifThenElse Nothing) "x")
+                                                                        (Lambda "then" (Let "t" (Apply (Var $ Sf ALangRefs.id Nothing) "p")
+                                                                                            "t")))
+                                                                        (Lambda "else" (Let "r" ((Var $ Sf ALangRefs.recur Nothing) `Apply` "p")
+                                                                                            "r")))
                                                 "c"))))
                      (Let "y" ("a" `Apply` 95)
                           "y")
             )
             `shouldLowerTo`
             DFExpr
-                [ LetExpr 0 "a" (EmbedSf "ohua.lang/id") [DFEnvVar 95] Nothing
+                [ LetExpr 0 "a" Refs.id [DFEnvVar 95] Nothing
                 , LetExpr 1 "p" (EmbedSf "math/-") [DFVar "i", DFEnvVar 10] Nothing
                 , LetExpr 2 "c" (EmbedSf "math/<") [DFVar "p", DFEnvVar 0] Nothing
-                , LetExpr 3 ["t", "f"] (DFFunction "ohua.lang/if") [DFVar "c"] Nothing
-                , LetExpr 4 "tr" (EmbedSf "ohua.lang/id") [DFVar "p"] $ Just "t"
-                , LetExpr 5 "recur-array" (EmbedSf "ohua.lang/array") [DFVar "p"] $ Just "f"
-                , LetExpr 6 "in-algo-array" (EmbedSf "ohua.lang/array") [DFVar "a"] Nothing
-                , LetExpr 7 "r" (DFFunction "ohua.lang/recur") [DFVar "c", DFVar "algo-in-array", DFVar "recur-array"] Nothing
+                , LetExpr 3 ["t", "f"] Refs.ifThenElse [DFVar "c"] Nothing
+                , LetExpr 4 ["p0"] Refs.scope [DFVar "p"] $ Just "t"
+                , LetExpr 5 "tr" Refs.id [DFVar "p0"] Nothing
+                , LetExpr 6 ["p1"] Refs.scope [DFVar "p"] $ Just "t"
+                , LetExpr 7 "recur-array" Refs.array [DFVar "p1"] Nothing
+                , LetExpr 8 "algo-array" Refs.array [DFVar "a"] Nothing
+                , LetExpr 9 "i" Refs.recur [DFVar "c", DFVar "algo-array", DFVar "recur-array"] Nothing
+                , LetExpr 5 "y" Refs.id [DFVar "tr"] Nothing -- this adapts the output formal to the output actual
+--                , LetExpr {callSiteId = 1, returnAssignment = Direct i, functionRef = EmbedSf ohua.lang/id, callArguments = [DFEnvVar (HostExpr {unwrapHostExpr = 95})], contextArg = Nothing}
+--                , LetExpr {callSiteId = 2, returnAssignment = Direct p, functionRef = EmbedSf math/-, callArguments = [DFVar i,DFEnvVar (HostExpr {unwrapHostExpr = 10})], contextArg = Nothing}
+--                , LetExpr {callSiteId = 3, returnAssignment = Direct x, functionRef = EmbedSf math/<, callArguments = [DFVar p,DFEnvVar (HostExpr {unwrapHostExpr = 0})], contextArg = Nothing}
+--                , LetExpr {callSiteId = 7, returnAssignment = [then,else], functionRef = EmbedSf com.ohua.lang/ifThenElse, callArguments = [DFVar x], contextArg = Nothing}
+--                , LetExpr {callSiteId = 8, returnAssignment = [p_0], functionRef = DFFunction com.ohua.lang/scope, callArguments = [DFVar p], contextArg = Just then}
+--                , LetExpr {callSiteId = 5, returnAssignment = Direct t, functionRef = EmbedSf ohua.lang/id, callArguments = [DFVar p_0], contextArg = Nothing}
+--                , LetExpr {callSiteId = 9, returnAssignment = [p_1], functionRef = DFFunction com.ohua.lang/scope, callArguments = [DFVar p], contextArg = Just else}
+--                , LetExpr {callSiteId = 11, returnAssignment = Direct algo-in_0, functionRef = EmbedSf ohua.lang/array, callArguments = [DFVar i], contextArg = Nothing}
+--                , LetExpr {callSiteId = 12, returnAssignment = Direct recur-in_0, functionRef = EmbedSf ohua.lang/array, callArguments = [DFVar i_0], contextArg = Nothing}
+--                , LetExpr {callSiteId = 6, returnAssignment = [i_0], functionRef = DFFunction ohua.lang/recur, callArguments = [DFVar x,DFVar algo-in_0,DFVar recur-in_0], contextArg = Nothing}
+--                , LetExpr {callSiteId = 13, returnAssignment = Direct y, functionRef = EmbedSf ohua.lang/id, callArguments = [DFVar t], contextArg = Nothing}
+--                y
+
                 ]
-                "tr"
+                "y"
 
 isIsomorphic :: (Eq a, Ord b) => Gr a b -> Gr a b -> Bool
 isIsomorphic gr1 gr2 = isJust $ isomorphicMapping gr1 gr2

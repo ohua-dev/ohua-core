@@ -36,6 +36,8 @@ import           Data.Sequence        (Seq, (><), (|>))
 import qualified Data.Sequence        as S
 import           Lens.Micro
 import           Ohua.ALang.Lang
+import qualified Ohua.ALang.Refs      as ALangRefs
+import qualified Ohua.DFLang.Refs     as Refs
 import           Ohua.DFLang.TailRec  (recursionLowering)
 import           Ohua.DFLang.HOF      as HOF
 import           Ohua.DFLang.HOF.If
@@ -126,7 +128,7 @@ handleDefinitionalExpr _ e _ = lift $ throwError $ "Definitional expressions in 
 
 -- | Lower any not specially treated function type.
 lowerDefault :: (MonadOhua m, MonadError String m) => Pass m
-lowerDefault "ohua.lang/recur" fnId assign args = mapM expectVar args <&> \args' -> [LetExpr fnId assign (DFFunction "ohua.lang/recur") args' Nothing]
+lowerDefault "ohua.lang/recur" fnId assign args = mapM expectVar args <&> \args' -> [LetExpr fnId assign Refs.recur args' Nothing]
 lowerDefault fn fnId assign args = mapM expectVar args <&> \args' -> [LetExpr fnId assign (EmbedSf fn) args' Nothing]
 
 -- | Analyze an apply expression, extracting the inner stateful function and the nested arguments as a list.
@@ -141,7 +143,7 @@ handleApplyExpr assign l@(Apply fn arg) =
             -- reject algos for now
     go l@(Var v)                      args recAlgos =
           if HM.member (unwrapVar v) recAlgos then trace "Lowering rec call ..." $ traceState $ lowerRecAlgoCall (certainly $ HM.lookup (unwrapVar v) recAlgos) args assign
-                                              else throwError $ trace ("--> recAlgos" ++ (show $ HM.keys recAlgos)) $ "Expected Var Sf but got: " ++ show l
+                                              else throwError $ trace ("--> recAlgos" ++ show (HM.keys recAlgos)) $ "Expected Var Sf but got: " ++ show l
     go (Apply fn arg) args recAlgos | case arg of { Var _ -> True; Lambda _ _  -> True; _ -> False} = go fn (arg:args) recAlgos
     go (Apply fn arg)                 args _        = throwError $ "Arg to apply should have been reduced to Var, EnvVar or Lambda before df lowering. Found: " ++ show arg
     go x                              _    _        = throwError $ "Expected Apply or Var but got: " ++ show x in
@@ -155,12 +157,12 @@ lowerRecAlgoCall :: (MonadOhua m, MonadError String m, MonadWriter (Seq LetExpr)
                             AlgoSpec m -> [Expression] -> Assignment -> LetRecT m (FnName, FnId, [Expression])
 lowerRecAlgoCall algoFormals actuals callAssignment =
   let inputFormals = formalInputVars algoFormals
-      mkIdFn id i o = lowerDefault "ohua.lang/id" id o [i] in
+      mkIdFn id i o = lowerDefault ALangRefs.id id o [i] in
       do
         -- input side
         mapM_ (uncurry (\x y -> do
           id <- generateId
-          tell =<< mkIdFn id x y)) $ zip actuals $ map Direct inputFormals
+          (tell. traceShowId) =<< mkIdFn id x y)) $ zip actuals $ map Direct $ trace ("input formals: " ++ show inputFormals) inputFormals
 
         -- recreate the body and 'tell' it to the writer
         ls <- lift $ dfExpr algoFormals
@@ -168,8 +170,7 @@ lowerRecAlgoCall algoFormals actuals callAssignment =
 
         -- output side
         id <- generateId
-
-        return ("ohua.lang/id", id, [Var $ Local $ returnVar ls])
+        return $ trace ("output side: " ++ show (returnVar ls)) $ (ALangRefs.id, id, [Var $ Local $ returnVar ls])
 
 
 -- | Analyze a lambda expression. Since we perform lambda inlining, this can only be a letrec.

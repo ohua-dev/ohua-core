@@ -78,7 +78,7 @@ handleRecursiveTailCall dfExpr (Just recurFn) = do
     let recurInVarsArray = LetExpr recurInVarsArrayId (Direct recurInVarsArrayRet) Refs.array (map DFVar recurInVars) $ contextArg recurFn
     let updatedRecurExpr = LetExpr (callSiteId recurFn) (Destructure recurInVars) (functionRef recurFn) [conditionOutput, DFVar algoInVarsArrayRet, DFVar recurInVarsArrayRet] Nothing
     return $ flip DFExpr
-              newLambdaRetVar
+              (trace ("new return var: " ++ show newLambdaRetVar) newLambdaRetVar)
               $ algoInVarsArray <| (S.filter (/= recurFn) rewiredTOutExps |> recurInVarsArray |> updatedRecurExpr)
 
 

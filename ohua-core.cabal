@@ -29,6 +29,7 @@ library
     , Ohua.Monad
     , Ohua.IR.Functions
     , Ohua.ALang.Lang
+    , Ohua.ALang.Refs
     , Ohua.ALang.Show
     , Ohua.ALang.Passes
     , Ohua.ALang.Passes.SSA
