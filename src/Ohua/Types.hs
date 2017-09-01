@@ -20,6 +20,7 @@ import           Ohua.LensClasses
 import           Ohua.Util
 import qualified Data.Text as T
 import Data.Monoid
+import Data.Maybe
 
 
 newtype FnId = FnId { unFnId :: Int } deriving (Eq, Ord)
@@ -41,7 +42,7 @@ instance NFData Binding where rnf (Binding b) = rnf b
 
 
 instance IsString Binding where
-    fromString = either error (either (const $ error "Binding must not be fully qualified") id) . symbolFromString
+    fromString = either error (either (const $ error "Binding must not be fully qualified") id) . symbolFromString . fromString
 
 data FnName = FnName
     { fnNameNamespace :: !T.Text
@@ -60,19 +61,23 @@ instance Show FnName where
         | otherwise = T.unpack $ n^.namespace <> "/" <> n^.name
 
 instance IsString FnName where
-    fromString = either error (either id (const $ error "Function name must be fully qualified")) . symbolFromString
+    fromString = either error (either id (const $ error "Function name must be fully qualified")) . symbolFromString . fromString
 
-symbolFromString :: String -> Either String (Either FnName Binding)
-symbolFromString [] = Left "Symbols cannot be empty"
-symbolFromString s =
-    case break (== '/') s of
-        ([], _) -> Left "Unexpected '/' at start"
-        (name,[]) -> Right $ Right $ Binding  $ T.pack name
-        (ns, '/':name)
-            | '/' `elem` name -> Left "Too many '/' delimiters found."
-            | otherwise -> Right $ Left $ FnName (T.pack ns) (T.pack name)
+symbolFromString :: T.Text -> Either String (Either FnName Binding)
+symbolFromString s | T.null s = Left "Symbols cannot be empty"
+                   | otherwise =
+    case T.break (== '/') s of
+        (name, ns) | T.null name -> Left "Unexpected '/' at start"
+                   | T.null ns -> Right $ Right $ Binding name
+        (ns, rest) | Just ('/', name) <- T.uncons rest ->
+            if '/' `textElem` name then 
+                Left "Too many '/' delimiters found."
+            else 
+                Right $ Left $ FnName ns name
         _ -> error "Leading slash expected after `break`"
 
+  where
+    textElem c t = isJust $ (== c) `T.findIndex` t 
 
 class ExtractBindings a where
     extractBindings :: a -> [Binding]

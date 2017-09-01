@@ -56,7 +56,7 @@ data ResolvedSymbol
     deriving (Show, Eq)
 
 instance IsString ResolvedSymbol where
-    fromString = either error (either (`Sf` Nothing) Local) . symbolFromString
+    fromString = either error (either (`Sf` Nothing) Local) . symbolFromString . fromString
 
 instance ExtractBindings ResolvedSymbol where
     extractBindings (Local l) = return l
