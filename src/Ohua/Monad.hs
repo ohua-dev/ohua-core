@@ -8,13 +8,12 @@
 -- Portability : POSIX
 
 -- This source code is licensed under the terms described in the associated LICENSE.TXT file
-{-# LANGUAGE CPP                        #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE Rank2Types                 #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE UndecidableInstances       #-}
 module Ohua.Monad
-    ( OhuaT, runOhuaT, runOhuaT0
+    ( OhuaT, runOhuaT, runOhuaT0, runOhuaT0IO
     , MonadOhua(modifyState, getState, recordWarning, failWith)
     , generateBinding, generateBindingWith, generateId
     , MonadIO(..)

@@ -4,13 +4,13 @@
 module DFLowering where
 
 import           Control.Arrow
-import           Control.Monad.Except
 import           Data.Foldable
 import           Data.Function
 import           Data.Graph.Inductive.Graph
 import           Data.Graph.Inductive.PatriciaTree
 import           Data.List
-import qualified Data.Map.Strict                   as Map
+import qualified Data.IntMap.Strict                   as IntMap
+import qualified Data.IntSet                   as IntSet
 import           Data.Maybe
 import           Data.String
 import           Debug.Trace
@@ -21,6 +21,9 @@ import           Ohua.DFLang.Passes
 import           Ohua.Monad
 import           Ohua.Types
 import           Test.Hspec
+import Control.Monad
+import Data.Functor.Identity
+import qualified Data.Text as T
 
 
 newtype OhuaGrGraph = OhuaGrGraph { unGr :: Gr FnName OhuaGrEdgeLabel } deriving Eq
@@ -72,15 +75,14 @@ traceGr g = trace (prettify $ unGr g) g
 
 
 runLowering :: Expression -> IO DFExpr
-runLowering = runOhuaT (fmap (either error id) . runExceptT . lowerALang)
+runLowering = fmap (either (error . T.unpack) fst) . runOhuaT lowerALang
 
 
 shouldLowerTo :: Expression -> DFExpr -> Expectation
 shouldLowerTo input expected = do
     gr1 <- fmap (toFGLGraph . toGraph) (runLowering input)
     let gr2 = toFGLGraph $ toGraph expected
-    unless (gr1 `matches` gr2) $ expectationFailure (show gr1 ++ "\nis not isomorph to\n\n" ++ show gr2)
-  where matches = isIsomorphic `on` unGr
+    (matchAndReport `on` unGr) gr1 gr2
 
 
 lowerAndValidate :: Expression -> DFExpr -> String -> Spec
@@ -179,23 +181,61 @@ seqSpec = do
                 "x"
 
 
+
 isIsomorphic :: (Eq a, Ord b) => Gr a b -> Gr a b -> Bool
 isIsomorphic gr1 gr2 = isJust $ isomorphicMapping gr1 gr2
 
-isomorphicMapping :: (Eq a, Ord b) => Gr a b -> Gr a b -> Maybe (Map.Map Int Int)
-isomorphicMapping gr1 gr2 | order gr1 /= order gr2 || size gr1 /= size gr2 = Nothing
-isomorphicMapping gr1 gr2 = go (nodes gr1) [] [] mempty
+isomorphicMapping :: (Eq a, Ord b) => Gr a b -> Gr a b -> Maybe IsoMap
+isomorphicMapping g1 g2 = either (const Nothing) Just $ matchGraph g1 g2
+
+
+type IsoMap = IntMap.IntMap Int
+
+plusEither :: Monoid a => Either a b -> Either a b -> Either a b
+plusEither (Left a) (Left a2) = Left $ a `mappend` a2
+plusEither r@(Right _) _ = r
+plusEither _ b = b
+
+emptyEither :: Monoid a => Either a b
+emptyEither = Left mempty
+
+sumEither :: (Monoid a, Foldable f) => f (Either a b) -> Either a b
+sumEither = foldl' plusEither emptyEither
+
+matchGraph :: (Eq a, Ord b) => Gr a b -> Gr a b -> Either [IsoMap] IsoMap
+matchGraph gr1 gr2 = go (nodes gr1) [] [] mempty
   where
+    go :: [Int] -> [Int] -> [Int] -> IsoMap -> Either [IsoMap] IsoMap
     go rest !gr1Selected !gr2Selected !mapping | gr1Subgr == rename mapping (subgraph gr2Selected gr2) = descend rest
       where
         gr1Subgr = subgraph gr1Selected gr1
-        descend [] | gr1Subgr == gr1 = Just mapping
-        descend (x:xs) = msum $ map selectX (nodes gr2)
-          where selectX k = go xs (x:gr1Selected) (k:gr2Selected) (Map.insert k x mapping)
-    go _ _ _ _ = Nothing
+        descend [] | gr1Subgr == gr1 && order gr2 == order gr1Subgr = Right mapping
+                   | otherwise = Left [mapping]
+        descend (x:xs) = sumEither $ map selectX (nodes gr2)
+          where selectX k = go xs (x:gr1Selected) (k:gr2Selected) (IntMap.insert k x mapping)
+    go _ _ _ m = Left [m]
 
     rename mapping gr = mkGraph ns es
       where
         ns = map (first newName) (labNodes gr)
         es = map (\(a, b, c) -> (newName a, newName b, c)) (labEdges gr)
-        newName node = fromMaybe (error $ "Invariant broken: missing mapping for node " ++ show node) $ Map.lookup node mapping
+        newName node = fromMaybe (error $ "Invariant broken: missing mapping for node " ++ show node) $ IntMap.lookup node mapping
+
+matchAndReport :: (Eq a, Ord b, Show a, Show b) => Gr a b -> Gr a b -> Expectation
+matchAndReport gr1 gr2 =
+    case matchGraph gr1 gr2 of
+        Right match -> return ()
+        Left [] -> putStrLn "I could not match any part of the two graphs"
+        Left matches -> 
+            let largest = maximumBy (compare `on` IntMap.size) matches
+                selectedGr1Nodes = IntMap.elems largest
+                selectedGr2Nodes = IntMap.keys largest
+            in do
+                putStrLn "The largest match was between\n"
+                putStrLn $ prettify (subgraph selectedGr1Nodes gr1)
+                putStrLn $ "\nand\n"
+                putStrLn $ prettify (subgraph selectedGr2Nodes gr2)
+                putStrLn $ "\nI could not match the nodes\n"
+                putStrLn $ show $ filter (not . flip IntSet.member (IntSet.fromList selectedGr1Nodes) . fst) (labNodes gr1)
+                putStrLn $ "\nwith\n"
+                putStrLn $ show $ filter (not . flip IntSet.member (IntMap.keysSet largest) . fst) (labNodes gr2)
