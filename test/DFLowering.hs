@@ -4,15 +4,18 @@
 module DFLowering where
 
 import           Control.Arrow
+import           Control.Monad
 import           Data.Foldable
 import           Data.Function
+import           Data.Functor.Identity
 import           Data.Graph.Inductive.Graph
 import           Data.Graph.Inductive.PatriciaTree
+import qualified Data.IntMap.Strict                as IntMap
+import qualified Data.IntSet                       as IntSet
 import           Data.List
-import qualified Data.IntMap.Strict                   as IntMap
-import qualified Data.IntSet                   as IntSet
 import           Data.Maybe
 import           Data.String
+import qualified Data.Text                         as T
 import           Debug.Trace
 import           Ohua.ALang.Lang
 import           Ohua.DFGraph
@@ -21,9 +24,6 @@ import           Ohua.DFLang.Passes
 import           Ohua.Monad
 import           Ohua.Types
 import           Test.Hspec
-import Control.Monad
-import Data.Functor.Identity
-import qualified Data.Text as T
 
 
 newtype OhuaGrGraph = OhuaGrGraph { unGr :: Gr FnName OhuaGrEdgeLabel } deriving Eq
@@ -199,8 +199,8 @@ type IsoFailData = (IsoMap, Maybe (Int, Int))
 
 plusEither :: Either IsoFailData b -> Either IsoFailData b -> Either IsoFailData b
 plusEither (Left a) (Left a2) = Left $ maxOn (IntMap.size . fst) a a2
-plusEither r@(Right _) _ = r
-plusEither _ b = b
+plusEither r@(Right _) _      = r
+plusEither _ b                = b
 
 emptyEither :: Either IsoFailData b
 emptyEither = Left (mempty, Nothing)
@@ -237,7 +237,7 @@ matchAndReport :: (Eq a, Ord b, Show a, Show b) => Gr a b -> Gr a b -> Expectati
 matchAndReport gr1 gr2 =
     case matchGraph gr1 gr2 of
         Right match -> return ()
-        Left (largest, keys) -> 
+        Left (largest, keys) ->
             let selectedGr1Nodes = IntMap.elems largest
                 selectedGr2Nodes = IntMap.keys largest
                 unselectedGr1Nodes = filter (not . flip IntSet.member (IntSet.fromList selectedGr1Nodes) . fst) (labNodes gr1)
