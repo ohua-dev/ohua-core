@@ -70,6 +70,7 @@ handleRecursiveTailCall lambdaFormals dfExpr (Just recurFn) = do
     let newLambdaRetVar = unDFVar $ flip assert terminationBranch $ returnVar dfExpr == switchRetBnd
 
     -- get the algo-in vars. note that for the recursive case this includes all free vars (even those accessed via the lexical scope).
+    -- FIXME this should not be necessary once we implemented lambda lifting on ALang!
     let lambdaInVars = HS.toList $ findFreeVars rewiredTOutExps
     lambdaInToRecurInVars <- foldM (\x y -> do s <- generateBindingWith y; return $ HM.insert y s x;) HM.empty lambdaInVars -- TODO beware to pertain the ordering here!
     let updatedRecurExpr = renameWith lambdaInToRecurInVars rewiredTOutExps

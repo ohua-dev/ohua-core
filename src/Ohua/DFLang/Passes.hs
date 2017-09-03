@@ -109,7 +109,7 @@ lowerToDF g = lift $ throwError $ "Expected `let` or binding: " ++ show g
 handleDefinitionalExpr :: (MonadOhua m, MonadError String m, MonadWriter (Seq LetExpr) m) =>
                           Assignment -> Expression -> LetRecT m Binding -> LetRecT m Binding
 handleDefinitionalExpr assign l@(Lambda arg expr) cont = do
-    -- TODO handle lambdas with multiple arguments
+    -- TODO handle lambdas with multiple arguments -> this requires some ALang transformation to always get the form Lambda a Lambda b ...
     let unRecursive x = case x of { Recursive b -> b;
                                               _ -> error $ "Invariant broken. Assignment should be a 'letrec' but was: " ++ show x}
     let unDirect x = case x of { Direct b -> b;
@@ -157,7 +157,6 @@ handleApplyExpr _ g                 = lift $ throwError $ "Expected apply but go
 lowerRecAlgoCall :: (MonadOhua m, MonadError String m, MonadWriter (Seq LetExpr) m) =>
                             [Expression] -> Assignment -> RecursiveLambdaSpec -> LetRecT m (FnName, FnId, [Expression])
 lowerRecAlgoCall actuals callAssignment recLambdaSpec =
-  -- FIXME this does not treat environment args properly!
   let
       mkIdFn id i o = lowerDefault ALangRefs.id id o [i] in
       do
