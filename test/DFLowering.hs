@@ -1,17 +1,21 @@
-{-# LANGUAGE BangPatterns        #-}
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE BangPatterns       #-}
+{-# LANGUAGE FlexibleInstances  #-}
+{-# LANGUAGE StandaloneDeriving #-}
 module DFLowering where
 
 import           Control.Arrow
-import           Control.Monad.Except
+import           Control.Monad
 import           Data.Foldable
 import           Data.Function
+import           Data.Functor.Identity
 import           Data.Graph.Inductive.Graph
 import           Data.Graph.Inductive.PatriciaTree
+import qualified Data.IntMap.Strict                as IntMap
+import qualified Data.IntSet                       as IntSet
 import           Data.List
-import qualified Data.Map.Strict                   as Map
 import           Data.Maybe
 import           Data.String
+import qualified Data.Text                         as T
 import           Debug.Trace
 import           Ohua.ALang.Lang
 import           Ohua.DFGraph
@@ -67,7 +71,7 @@ traceGr g = trace (prettify $ unGr g) g
 
 
 runLowering :: Expression -> IO DFExpr
-runLowering = runOhuaT (fmap (either error id) . runExceptT . lowerALang)
+runLowering = fmap (either (error . T.unpack) fst) . runOhuaT lowerALang
 
 
 -- | IMPORTANT: Both source and target expression must be in SSA form
@@ -75,8 +79,7 @@ shouldLowerTo :: Expression -> DFExpr -> Expectation
 shouldLowerTo input expected = do
     gr1 <- fmap (toFGLGraph . toGraph) (runLowering input)
     let gr2 = toFGLGraph $ toGraph expected
-    unless (gr1 `matches` gr2) $ expectationFailure (show gr1 ++ "\nis not isomorph to\n\n" ++ show gr2)
-  where matches = isIsomorphic `on` unGr
+    (matchAndReport `on` unGr) gr1 gr2
 
 
 lowerAndValidate :: Expression -> DFExpr -> String -> Spec
@@ -215,23 +218,91 @@ recurSpec = do
                 ]
                 "y"
 
+
 isIsomorphic :: (Eq a, Ord b) => Gr a b -> Gr a b -> Bool
 isIsomorphic gr1 gr2 = isJust $ isomorphicMapping gr1 gr2
 
-isomorphicMapping :: (Eq a, Ord b) => Gr a b -> Gr a b -> Maybe (Map.Map Int Int)
-isomorphicMapping gr1 gr2 | order gr1 /= order gr2 || size gr1 /= size gr2 = Nothing
-isomorphicMapping gr1 gr2 = go (nodes gr1) [] [] mempty
+isomorphicMapping :: (Eq a, Ord b) => Gr a b -> Gr a b -> Maybe IsoMap
+isomorphicMapping g1 g2 = either (const Nothing) Just $ matchGraph g1 g2
+
+
+type IsoMap = IntMap.IntMap Int
+
+maxOn :: Ord b => (a -> b) -> a -> a -> a
+maxOn f a0 a1 | ((>=) `on` f) a0 a1 = a0
+              | otherwise = a1
+
+type IsoFailData = (IsoMap, Maybe (Int, Int))
+
+plusEither :: Either IsoFailData b -> Either IsoFailData b -> Either IsoFailData b
+plusEither (Left a) (Left a2) = Left $ maxOn (IntMap.size . fst) a a2
+plusEither r@(Right _) _      = r
+plusEither _ b                = b
+
+emptyEither :: Either IsoFailData b
+emptyEither = Left (mempty, Nothing)
+
+sumEither :: Foldable f => f (Either IsoFailData b) -> Either IsoFailData b
+sumEither = foldl' plusEither emptyEither
+
+mapsEither :: Foldable f => (a -> Either IsoFailData b) -> f a -> Either IsoFailData b
+mapsEither f = foldl' (\a b -> plusEither a (f b)) emptyEither
+
+matchGraph :: (Eq a, Ord b) => Gr a b -> Gr a b -> Either IsoFailData IsoMap
+matchGraph gr1 gr2 | (x:xs) <- nodes gr1 = (\k -> go xs [] [] mempty k x) `mapsEither` nodes gr2
   where
-    go rest !gr1Selected !gr2Selected !mapping | gr1Subgr == rename mapping (subgraph gr2Selected gr2) = descend rest
+    go :: [Int] -> [Int] -> [Int] -> IsoMap -> Int -> Int -> Either IsoFailData IsoMap
+    go rest !gr1Selected !gr2Selected !oldMapping !oldK !oldX | gr1Subgr == rename mapping (subgraph gr2Selected gr2) = descend rest
       where
         gr1Subgr = subgraph gr1Selected gr1
-        descend [] | gr1Subgr == gr1 = Just mapping
-        descend (x:xs) = msum $ map selectX (nodes gr2)
-          where selectX k = go xs (x:gr1Selected) (k:gr2Selected) (Map.insert k x mapping)
-    go _ _ _ _ = Nothing
+        descend [] | gr1Subgr == gr1 && order gr2 == order gr1Subgr = Right mapping
+                   | otherwise = Left (oldMapping, Just (oldK, oldX))
+        descend (x:xs) = selectX `mapsEither` nodes gr2
+          where selectX k = go xs (oldX:gr1Selected) (oldK:gr2Selected) mapping k x
+        !mapping = IntMap.insert oldK oldX oldMapping
+    go _ _ _ m k x = Left (m, Just (k, x))
 
     rename mapping gr = mkGraph ns es
       where
-        ns = map (first newName) (labNodes gr)
+        ns = first newName <$> labNodes gr
         es = map (\(a, b, c) -> (newName a, newName b, c)) (labEdges gr)
-        newName node = fromMaybe (error $ "Invariant broken: missing mapping for node " ++ show node) $ Map.lookup node mapping
+        newName node = fromMaybe (error $ "Invariant broken: missing mapping for node " ++ show node) $ IntMap.lookup node mapping
+matchGraph gr1 gr2 | order gr1 == 0 && order gr2 == 0 = Right mempty
+matchGraph _ _ = emptyEither
+
+matchAndReport :: (Eq a, Ord b, Show a, Show b) => Gr a b -> Gr a b -> Expectation
+matchAndReport gr1 gr2 =
+    case matchGraph gr1 gr2 of
+        Right match -> return ()
+        Left (largest, keys) ->
+            let selectedGr1Nodes = IntMap.elems largest
+                selectedGr2Nodes = IntMap.keys largest
+                unselectedGr1Nodes = filter (not . flip IntSet.member (IntSet.fromList selectedGr1Nodes) . fst) (labNodes gr1)
+                unselectedGr2Nodes = filter (not . flip IntSet.member (IntMap.keysSet largest) . fst) (labNodes gr2)
+            in do
+                expectationFailure $ unlines
+                    [ "Graphs weren't isomorphic."
+                    , "The largest match was between"
+                    , ""
+                    , prettify (subgraph selectedGr1Nodes gr1)
+                    , ""
+                    , "and"
+                    , ""
+                    , prettify (subgraph selectedGr2Nodes gr2)
+                    , ""
+                    , "I could not match the nodes"
+                    , ""
+                    , show $ unselectedGr1Nodes
+                    , ""
+                    , "with"
+                    , ""
+                    , show $ unselectedGr2Nodes
+                    , case keys of
+                        Nothing -> ""
+                        Just (k, x) -> unlines
+                            [ ""
+                            , "I failed when matching"
+                            , show $ filter ((== x) . fst) unselectedGr1Nodes
+                            , show $ filter ((== k) . fst) unselectedGr1Nodes
+                            ]
+                    ]

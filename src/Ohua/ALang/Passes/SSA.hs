@@ -19,18 +19,17 @@ import           Control.Monad.State
 import qualified Data.HashMap.Strict  as HM
 import qualified Data.HashSet         as HS
 import           Data.Maybe           (fromMaybe)
+import           Data.Monoid
 import           Ohua.ALang.Lang
 import           Ohua.Monad
 import           Ohua.Types
+import           Ohua.Util
 
 
-newtype LocalScope = LocalScope { unLocalScope :: HM.HashMap Binding Binding } deriving (Eq, Show)
+type LocalScope = HM.HashMap Binding Binding
 
-newtype SSAT m a = SSAM { runSSAM :: ReaderT LocalScope m a }
-    deriving (Functor, Applicative, Monad, MonadTrans)
-
-ssaResolve :: Monad m => Binding -> SSAT m Binding
-ssaResolve bnd = SSAM $ reader $ fromMaybe bnd <$> HM.lookup bnd . unLocalScope
+ssaResolve :: MonadReader LocalScope m => Binding -> m Binding
+ssaResolve bnd = reader $ fromMaybe bnd <$> HM.lookup bnd
 
 -- | Generate a new name for the provided binding and run the inner computation with
 -- that name in scope to replace the provided binding
@@ -41,18 +40,18 @@ ssaResolve bnd = SSAM $ reader $ fromMaybe bnd <$> HM.lookup bnd . unLocalScope
 -- because it does a lot of passing functions as arguments, however it very nicely
 -- encapsulates the scope changes which means they will never leak from where they are
 -- supposed to be applied
-ssaRename :: MonadOhua m => Binding -> SSAT m a -> SSAT m (Binding, a)
+ssaRename :: (MonadOhua m, MonadReader LocalScope m) => Binding -> m a -> m (Binding, a)
 ssaRename oldBnd cont = do
     newBnd <- generateBindingWith oldBnd
-    SSAM $ (newBnd,) <$> local (LocalScope . HM.insert oldBnd newBnd . unLocalScope) (runSSAM cont)
+    (newBnd,) <$> local (HM.insert oldBnd newBnd) cont
 
 performSSA :: MonadOhua m => Expression -> m Expression
-performSSA = flip runReaderT (LocalScope mempty) . runSSAM . ssa
+performSSA = flip runReaderT mempty . ssa
 
 flattenTuple :: (a, ([a], b)) -> ([a], b)
 flattenTuple (a, (as, r)) = (a:as, r)
 
-ssa :: MonadOhua m => Expression -> SSAT m Expression
+ssa :: (MonadOhua m, MonadReader LocalScope m) => Expression -> m Expression
 ssa (Var abstrBinding) = Var <$>
     case abstrBinding of
         Local bnd -> Local <$> ssaResolve bnd
@@ -66,7 +65,7 @@ ssa (Let assignment value body) = do
 -- As you can see the destructuring makes writing some stuff quite difficult.
 -- I wonder if it might not be easier to represent destructuring with a builtin function
 -- instead and collapse it down at the very end ...
-handleAssignment :: MonadOhua m => Assignment -> SSAT m t -> SSAT m (Assignment, t)
+handleAssignment :: (MonadOhua m, MonadReader LocalScope m) => Assignment -> m t -> m (Assignment, t)
 handleAssignment (Direct d) = fmap (first Direct) . ssaRename d
 handleAssignment (Destructure ds) = fmap (first Destructure) . foldl (\f bnd -> f . fmap flattenTuple . ssaRename bnd) id ds . fmap ([],)
 
@@ -92,7 +91,7 @@ isSSA = either Just (const Nothing) . flip evalState mempty . runExceptT . go
     go (Var _) = return ()
 
 
-checkSSA :: MonadError String m => Expression -> m ()
-checkSSA = maybe (return ()) (throwError . mkMsg) . isSSA
+checkSSA :: MonadOhua m => Expression -> m ()
+checkSSA = maybe (return ()) (failWith . mkMsg) . isSSA
   where
-    mkMsg bnd = "Redefinition of binding " ++ show bnd
+    mkMsg bnd = "Redefinition of binding " <> showT bnd

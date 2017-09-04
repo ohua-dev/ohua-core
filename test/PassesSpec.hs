@@ -15,6 +15,7 @@ module PassesSpec (passesSpec) where
 import           Control.DeepSeq
 import           Control.Monad.Except
 import           Data.Either
+import           Data.Functor.Identity
 import           Debug.Trace
 import           Ohua.ALang.Lang
 import qualified Ohua.ALang.Refs            as ALangRefs
@@ -43,7 +44,7 @@ import           Ohua.Types.Arbitrary
 instance Num ResolvedSymbol where fromInteger = Env . fromInteger
 instance Num Expression where fromInteger = Var . fromInteger
 
-runPasses expr = flip runOhuaT expr $ performSSA >=> runExceptT . (normalize >=> \e -> checkProgramValidity e >> return e)
+runPasses expr = flip runOhuaT expr $ performSSA >=> (normalize >=> \e -> checkProgramValidity e >> return e)
 
 type ALangCheck = Either String
 
@@ -70,7 +71,6 @@ checkInvariants :: Expression -> ALangCheck ()
 checkInvariants expr = do
     noNestedLets expr
     everyLetBindsCall expr
-    hasFinalLet expr
     maybe (return ()) (throwError . show) $ isSSA expr
 
 prop_passes :: Expression -> Property
@@ -78,11 +78,11 @@ prop_passes input = ioProperty $ do
     () <- return $ input `deepseq` ()
     transformed <- runPasses input
     return $ case transformed of
-        Left msg -> succeeded { abort = True }
-        Right program ->
+        Right (program, _) ->
             case checkInvariants program of
                 Left err -> failed { P.reason = err }
                 Right _  -> succeeded
+        _ -> succeeded { abort = True }
 
 
 shouldSatisfyRet :: Show a => IO a -> (a -> Bool) -> Expectation
@@ -121,9 +121,9 @@ passesSpec = do
             lambdaStaysInput _ = False
 
         it "Reduces lambdas as far as possible but does not remove them when argument" $
-            runPasses lambda_with_app_as_arg `shouldSatisfyRet` either (const False) lambdaStaysInput
+            runPasses lambda_with_app_as_arg `shouldSatisfyRet` either (const False) (lambdaStaysInput . fst)
 
-        let normalize' = runOhuaT normalize
+        let normalize' = fmap fst . runIdentity . runOhuaT normalize
             e = Let "f" (Lambda "x" ("some/fn" `Apply` "x")) $
                 Let "g" ("f" `Apply` "a")
                 "g" `Apply` "b"
@@ -134,6 +134,7 @@ passesSpec = do
 
 
     describe "remove currying pass" $ do
+        let removeCurrying = fmap fst . runIdentity . flip runOhuaT0 mempty . Ohua.ALang.Passes.removeCurrying
         it "inlines curring" $
             removeCurrying (Let "a" ("mod/fun" `Apply` "b") ("a" `Apply` "c"))
             `shouldBe`

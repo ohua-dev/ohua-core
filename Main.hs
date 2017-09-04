@@ -53,27 +53,5 @@ expr5 =
     Apply (Lambda (Direct "c") (Var (Sf "com.ohua.lang/smap-io-fun" Nothing))) (Lambda (Direct "c") (Var (Sf  "com.ohua.lang/pcollect" Nothing)))
 
 
-main = do
-    for_ [expr, expr0, expr1] $ \expr -> do
-        let inlidedRefs = either error id $ inlineLambdaRefs expr
-            inlined = inlineLambda inlidedRefs
-        putStrLn $ showLambda expr
-        putStrLn $ showLambda inlidedRefs
-        putStrLn $ showLambda inlined
-
-    res <- runOhuaT performSSA expr2
-    putStrLn $ showLambda res
-    print $ isSSA expr2
-    print $ isSSA res
-
-    putStrLn $ showLambda expr3
-
-    processed <- flip runOhuaT expr3 (performSSA >=> runExceptT . normalize)
-    putStrLn $ either id showLambda $ processed
-
-    putStrLn $ showLambda $ letLift $ inlineLambda expr4
-
-    processed <- flip runOhuaT expr5 (performSSA >=> runExceptT . normalize)
-    putStrLn $ showLambda expr5
-    putStrLn $ either id showLambda $ processed
+main = return ()
 

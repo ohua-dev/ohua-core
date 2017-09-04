@@ -15,8 +15,8 @@ import           Control.DeepSeq
 import           Data.Functor.Identity
 import           Data.Hashable
 import           Data.String
+import qualified Data.Text             as T
 import           Ohua.Types
-import qualified Data.Text as T
 
 
 -- bindingType is the type of general bindings
@@ -56,7 +56,7 @@ data ResolvedSymbol
     deriving (Show, Eq)
 
 instance IsString ResolvedSymbol where
-    fromString = either error (either (`Sf` Nothing) Local) . symbolFromString
+    fromString = either error (either (`Sf` Nothing) Local) . symbolFromString . fromString
 
 instance ExtractBindings ResolvedSymbol where
     extractBindings (Local l) = return l

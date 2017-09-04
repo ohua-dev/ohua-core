@@ -30,6 +30,7 @@ library
     , Ohua.IR.Functions
     , Ohua.ALang.Lang
     , Ohua.ALang.Refs
+    , Ohua.ALang.NS
     , Ohua.ALang.Show
     , Ohua.ALang.Passes
     , Ohua.ALang.Passes.SSA
@@ -107,6 +108,7 @@ test-suite ohua-tests
     , QuickCheck
     , containers
     , fgl
+    , text
   type:                exitcode-stdio-1.0
   default-language:    Haskell2010
   default-extensions:

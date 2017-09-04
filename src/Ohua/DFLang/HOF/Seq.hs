@@ -27,7 +27,7 @@ instance HigherOrderFunction SeqFn where
   name = "com.ohua.lang/seq"
 
   parseCallAndInitState [Variable (DFVar before), LamArg after] = return $ SeqFn before after
-  parseCallAndInitState as = throwError "seq not defined for arguments: " -- TODO ++ show as
+  parseCallAndInitState as = failWith "seq not defined for arguments: " -- TODO ++ show as
 
   createContextEntry = return S.empty
 

@@ -12,9 +12,6 @@ module Ohua.LensClasses where
 
 import           Lens.Micro
 
-class HasNameGenerator s a | s -> a where nameGenerator :: Lens' s a
-class HasTakenNames s a | s -> a where takenNames :: Lens' s a
-class HasSimpleNameList s a | s -> a where simpleNameList :: Lens' s a
 class HasIdField s a | s -> a where idField :: Lens' s a
 class HasName s a | s -> a where name :: Lens' s a
 class HasArguments s a | s -> a where arguments :: Lens' s a
@@ -27,4 +24,3 @@ class HasBindingSupplier s a | s -> a where bindingSupplier :: Lens' s a
 class HasIdSupplier s a | s -> a where idSupplier :: Lens' s a
 class HasOther s a | s -> a where other :: Lens' s a
 class HasNamespace s a | s -> a where namespace :: Lens' s a
-class HasIdCounter s a | s -> a where idCounter :: Lens' s a

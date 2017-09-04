@@ -75,7 +75,7 @@ toGraph a@(DFExpr lets _) = trace ("DFExpr to convert to graph:\n" ++ show a) $ 
             case arg of
                 DFVar v -> LocalSource $ fromMaybe (error $ "Undefined Binding: DFVar " ++ show v ++ " defined vars: " ++ show sources) $ HM.lookup v sources
                 DFEnvVar envExpr -> EnvSource envExpr
-        | (arg, index) <- maybe id ((:) . (,-1) . DFVar) (contextArg l) 
+        | (arg, index) <- maybe id ((:) . (,-1) . DFVar) (contextArg l)
                           -- prepend (ctxBinding, -1) if there is a context arc
                             $ zip (callArguments l) [0..]
         , let target = Target (callSiteId l) index

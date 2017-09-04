@@ -16,5 +16,5 @@ import           Ohua.ALang.Lang
 import           Ohua.Monad
 
 
-runOptimizations :: (MonadError String m, MonadOhua m) => Expression -> m Expression
+runOptimizations :: MonadOhua m => Expression -> m Expression
 runOptimizations = return

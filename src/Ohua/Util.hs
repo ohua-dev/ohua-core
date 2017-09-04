@@ -8,11 +8,13 @@
 -- Portability : portable
 
 -- This source code is licensed under the terms described in the associated LICENSE.TXT file
-{-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE Rank2Types           #-}
+{-# LANGUAGE UndecidableInstances #-}
 module Ohua.Util where
 
 import           Control.Exception
 import           Control.Monad.Except
+import qualified Data.Text            as T
 import           Lens.Micro
 
 
@@ -43,3 +45,15 @@ assertE :: MonadError String m => Bool -> m ()
 assertE True  = return ()
 assertE False = throwError "AssertionError"
 {-# INLINE assertE #-}
+
+
+mapLeft :: (a -> c) -> Either a b -> Either c b
+mapLeft f (Left l)  = Left $ f l
+mapLeft _ (Right r) = Right r
+
+
+class ShowT a where
+    showT :: a -> T.Text
+
+instance {-# OVERLAPPABLE #-} Show a => ShowT a where
+    showT = T.pack . show

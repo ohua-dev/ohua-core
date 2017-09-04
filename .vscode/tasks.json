@@ -7,18 +7,14 @@
             "taskName": "test",
             "command": "stack",
             "args": [
-                "test",
-                "--flag",
-                "ohua-core:debug"
+                "test"
             ]
         },
         {
             "taskName": "build",
             "command": "stack",
             "args": [
-                "build",
-                "--flag",
-                "ohua-core:debug"
+                "build"
             ],
             "type": "shell",
             "group": {

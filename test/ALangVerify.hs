@@ -14,7 +14,7 @@ import           Ohua.Types
 import           Test.Hspec
 
 -- OhuaT Expr (Either [Char] Expression)
-justTrace :: Expression -> Expectation
+justTrace :: Show e => e -> Expectation
 justTrace e = traceShow e $ return ()
 
 --f :: Expression -> OhuaT m a
