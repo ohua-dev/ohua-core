@@ -249,18 +249,28 @@ mapsEither :: Foldable f => (a -> Either IsoFailData b) -> f a -> Either IsoFail
 mapsEither f = foldl' (\a b -> plusEither a (f b)) emptyEither
 
 matchGraph :: (Eq a, Ord b) => Gr a b -> Gr a b -> Either IsoFailData IsoMap
-matchGraph gr1 gr2 | (x:xs) <- nodes gr1 = (\k -> go xs [] [] mempty k x) `mapsEither` nodes gr2
+matchGraph gr1 gr2 = go (nodes gr1) [] [] mempty
   where
-    go :: [Int] -> [Int] -> [Int] -> IsoMap -> Int -> Int -> Either IsoFailData IsoMap
-    go rest !gr1Selected !gr2Selected !oldMapping !oldK !oldX | gr1Subgr == rename mapping (subgraph gr2Selected gr2) = descend rest
+    go :: [Int] -> [Int] -> [Int] -> IsoMap -> Either IsoFailData IsoMap
+    go rest !gr1Selected !gr2Selected !mapping =
+        if gr1Subgr == rename mapping (subgraph gr2Selected gr2) then 
+            descend rest
+        else 
+            fail
       where
         gr1Subgr = subgraph gr1Selected gr1
         descend [] | gr1Subgr == gr1 && order gr2 == order gr1Subgr = Right mapping
-                   | otherwise = Left (oldMapping, Just (oldK, oldX))
+                   | otherwise = fail
         descend (x:xs) = selectX `mapsEither` nodes gr2
-          where selectX k = go xs (oldX:gr1Selected) (oldK:gr2Selected) mapping k x
-        !mapping = IntMap.insert oldK oldX oldMapping
-    go _ _ _ m k x = Left (m, Just (k, x))
+          where selectX k = go xs (x:gr1Selected) (k:gr2Selected) $ IntMap.insert k x mapping
+
+        fail = Left (lastMapping, lastSelects)
+
+        lastSelects = case (gr1Selected, gr2Selected) of
+            (x:_, k:_) -> Just (k, x)
+            _ -> Nothing
+        
+        lastMapping = maybe id (IntMap.delete . fst) lastSelects mapping
 
     rename mapping gr = mkGraph ns es
       where
