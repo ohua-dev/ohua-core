@@ -214,7 +214,7 @@ recurSpec = do
                 , LetExpr 8 "algo-in_0" Refs.array [DFVar "i_0"] Nothing
                 -- note: recur produces finally the formal input vars of the lambda
                 , LetExpr 9 ["i"] Refs.recur [DFVar "x", DFVar "algo-in_0", DFVar "recur-in_0"] Nothing
-                , LetExpr 5 "y" Refs.id [DFVar "t"] Nothing -- this adapts the output formal to the output actual
+                , LetExpr 10 "y" Refs.id [DFVar "t"] Nothing -- this adapts the output formal to the output actual
                 ]
                 "y"
 
@@ -272,14 +272,18 @@ matchGraph _ _ = emptyEither
 
 matchAndReport :: (Eq a, Ord b, Show a, Show b) => Gr a b -> Gr a b -> Expectation
 matchAndReport gr1 gr2 =
-    case matchGraph gr1 gr2 of
+      -- TODO add a check here to verify that all nodes have unique function IDs
+--matchAndReport g1 g2 =
+--    let gr1 = trace ("Graph #1: " ++ show g1) g1
+--        gr2 = trace ("Graph #2: " ++ show g2) g2 in
+      case matchGraph gr1 gr2 of
         Right match -> return ()
         Left (largest, keys) ->
             let selectedGr1Nodes = IntMap.elems largest
                 selectedGr2Nodes = IntMap.keys largest
                 unselectedGr1Nodes = filter (not . flip IntSet.member (IntSet.fromList selectedGr1Nodes) . fst) (labNodes gr1)
                 unselectedGr2Nodes = filter (not . flip IntSet.member (IntMap.keysSet largest) . fst) (labNodes gr2)
-            in do
+            in
                 expectationFailure $ unlines
                     [ "Graphs weren't isomorphic."
                     , "The largest match was between"
@@ -304,5 +308,7 @@ matchAndReport gr1 gr2 =
                             , "I failed when matching"
                             , show $ filter ((== x) . fst) unselectedGr1Nodes
                             , show $ filter ((== k) . fst) unselectedGr1Nodes
+                            , show x
+                            , show k
                             ]
                     ]
