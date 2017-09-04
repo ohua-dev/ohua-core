@@ -11,8 +11,8 @@ import qualified TestALangUtils
 main = hspec $ do
 --    passesSpec
 --    DFLowering.smapSpec
---    DFLowering.ifSpec
---    DFLowering.generalLowering
+    DFLowering.ifSpec
+    DFLowering.generalLowering
 --    DFLowering.seqSpec
     DFLowering.recurSpec
 --    ALangVerify.currying

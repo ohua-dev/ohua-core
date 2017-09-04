@@ -317,8 +317,9 @@ matchAndReport gr1 gr2 =
                             [ ""
                             , "I failed when matching"
                             , show $ filter ((== x) . fst) unselectedGr1Nodes
-                            , show $ filter ((== k) . fst) unselectedGr1Nodes
-                            , show x
+--                            , show $ filter ((== k) . fst) unselectedGr2Nodes
+                            , show unselectedGr2Nodes
                             , show k
                             ]
+                    , show largest
                     ]
