@@ -43,7 +43,7 @@ instance NFData Binding where rnf (Binding b) = rnf b
 
 
 instance IsString Binding where
-    fromString = either error (either (const $ error "Binding must not be fully qualified") id) . symbolFromString . fromString
+    fromString = Binding . fromString
 
 newtype FnName = FnName { unwrapFnName :: T.Text } deriving (Eq, Ord)
 
