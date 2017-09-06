@@ -8,6 +8,7 @@
 -- Portability : portable
 
 -- This source code is licensed under the terms described in the associated LICENSE.TXT file
+{-# LANGUAGE DeriveGeneric #-}
 module Ohua.ALang.Lang where
 
 
@@ -16,6 +17,7 @@ import           Data.Functor.Identity
 import           Data.Hashable
 import           Data.String
 import qualified Data.Text             as T
+import           GHC.Generics
 import           Ohua.Types
 
 
@@ -25,7 +27,7 @@ import           Ohua.Types
 -- I revised the proposal.
 -- I got rid of `Fn`. Not because of cyclic dependencies but because I think that function application can be more general.
 
-newtype HostExpr = HostExpr { unwrapHostExpr :: Int } deriving (Show, Eq, Ord)
+newtype HostExpr = HostExpr { unwrapHostExpr :: Int } deriving (Show, Eq, Ord, Generic)
 
 -- Only exists to allow literal integers to be interpreted as host expressions
 instance Num HostExpr where fromInteger = HostExpr . fromInteger

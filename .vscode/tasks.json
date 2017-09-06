@@ -8,7 +8,11 @@
             "command": "stack",
             "args": [
                 "test"
-            ]
+            ],
+            "group": {
+                "kind": "test",
+                "isDefault": true
+            }
         },
         {
             "taskName": "build",

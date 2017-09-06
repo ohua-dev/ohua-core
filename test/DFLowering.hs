@@ -216,9 +216,9 @@ matchGraph gr1 gr2 = go (nodes gr1) [] [] mempty
   where
     go :: [Int] -> [Int] -> [Int] -> IsoMap -> Either IsoFailData IsoMap
     go rest !gr1Selected !gr2Selected !mapping =
-        if gr1Subgr == rename mapping (subgraph gr2Selected gr2) then 
+        if gr1Subgr == rename mapping (subgraph gr2Selected gr2) then
             descend rest
-        else 
+        else
             fail
       where
         gr1Subgr = subgraph gr1Selected gr1
@@ -231,8 +231,8 @@ matchGraph gr1 gr2 = go (nodes gr1) [] [] mempty
 
         lastSelects = case (gr1Selected, gr2Selected) of
             (x:_, k:_) -> Just (k, x)
-            _ -> Nothing
-        
+            _          -> Nothing
+
         lastMapping = maybe id (IntMap.delete . fst) lastSelects mapping
 
     rename mapping gr = mkGraph ns es

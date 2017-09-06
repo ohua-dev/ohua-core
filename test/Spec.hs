@@ -4,6 +4,7 @@ import qualified ALangVerify
 import qualified DFLowering
 import           PassesSpec
 import           Test.Hspec
+import qualified TestAesonConvert
 import qualified TestALangUtils
 
 
@@ -16,3 +17,4 @@ main = hspec $ do
     DFLowering.seqSpec
     ALangVerify.currying
     TestALangUtils.spec
+    TestAesonConvert.spec

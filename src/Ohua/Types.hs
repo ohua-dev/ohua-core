@@ -8,6 +8,7 @@
 -- Portability : portable
 
 -- This source code is licensed under the terms described in the associated LICENSE.TXT file
+{-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Ohua.Types where
 
@@ -19,12 +20,13 @@ import           Data.Monoid
 import           Data.String
 import qualified Data.Text        as T
 import           GHC.Exts
+import           GHC.Generics
 import           Lens.Micro
 import           Ohua.LensClasses
 import           Ohua.Util
 
 
-newtype FnId = FnId { unFnId :: Int } deriving (Eq, Ord)
+newtype FnId = FnId { unFnId :: Int } deriving (Eq, Ord, Generic)
 
 -- Only here so we can write literals and have them convert automatically
 instance Num FnId where
@@ -36,7 +38,7 @@ instance Hashable FnId where hashWithSalt s = hashWithSalt s . unFnId
 instance NFData FnId where rnf (FnId i) = rnf i
 
 newtype Binding = Binding { unBinding :: T.Text }
-    deriving (Eq, Hashable)
+    deriving (Eq, Hashable, Generic, Ord)
 
 instance Show Binding where show = T.unpack . unBinding
 instance NFData Binding where rnf (Binding b) = rnf b
@@ -45,7 +47,7 @@ instance NFData Binding where rnf (Binding b) = rnf b
 instance IsString Binding where
     fromString = Binding . fromString
 
-newtype FnName = FnName { unwrapFnName :: T.Text } deriving (Eq, Ord)
+newtype FnName = FnName { unwrapFnName :: T.Text } deriving (Eq, Ord, Generic)
 
 instance HasName FnName T.Text where name = lens unwrapFnName (const FnName)
 instance NFData FnName where rnf (FnName n) = rnf n

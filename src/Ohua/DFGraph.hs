@@ -5,15 +5,17 @@
 -- License     : EPL-1.0
 -- Maintainer  : sebastian.ertel@gmail.com, dev@justus.science
 -- Stability   : experimental
--- Portability : portable
 
 -- This source code is licensed under the terms described in the associated LICENSE.TXT file
+{-# LANGUAGE DeriveGeneric #-}
 module Ohua.DFGraph where
 
 
+import           Data.Aeson
 import           Data.Foldable
 import qualified Data.HashMap.Strict as HM
 import           Data.Maybe
+import           GHC.Generics
 import           Ohua.ALang.Lang
 import           Ohua.DFLang.Lang
 import           Ohua.Types
@@ -23,31 +25,29 @@ import           Ohua.Types
 data Operator = Operator
     { operatorId   :: !FnId
     , operatorType :: !FnName
-    } deriving Eq
-
+    } deriving (Eq, Generic, Show)
 
 data Target = Target
     { operator :: !FnId
     , index    :: !Int
-    } deriving Eq
+    } deriving (Eq, Generic, Show)
 
 
 data Arc = Arc
     { target :: !Target
     , source :: !Source
-    } deriving Eq
+    } deriving (Eq, Generic, Show)
 
 data Source
     = LocalSource !Target
     | EnvSource !HostExpr
-    deriving Eq
+    deriving (Eq, Generic, Show)
 
 
 data OutGraph = OutGraph
     { operators :: [Operator]
     , arcs      :: [Arc]
-    } deriving Eq
-
+    } deriving (Eq, Generic, Show)
 
 
 toGraph :: DFExpr -> OutGraph
