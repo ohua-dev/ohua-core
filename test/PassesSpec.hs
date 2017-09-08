@@ -95,7 +95,7 @@ bound_lambda_as_argument = Let "f" (Lambda "a" "a") (Apply "some/function" "f")
 
 calculated_lambda_as_argument = Let "f" (Lambda "a" "a") $ Let "z" (Lambda "a" "a") $ Let "g" (Apply "f" "z") $ (Apply "some/function" "g")
 
-lambda_with_app_as_arg = Apply "some/func" $ Apply (Lambda "a" (Lambda "b" "a")) "b"
+lambda_with_app_as_arg = Apply "some/func" $ Apply (Lambda "a" (Lambda "b" "a")) $ Var $ Env 10
 
 passesSpec = do
     describe "normalization" $ do
@@ -109,11 +109,11 @@ passesSpec = do
         it "doesn't reject a program where calculated lambda is input" $
             doesn't_reject calculated_lambda_as_argument
 
-        let lambdaStaysInput (Apply _ (Lambda _ (Lambda _ _))) = False
-            lambdaStaysInput (Apply (Var (Sf _ _)) (Lambda _ _)) = True
+        let lambdaStaysInput e@(Apply _ (Lambda _ (Lambda _ _))) = False
+            lambdaStaysInput e@(Apply (Var (Sf _ _)) (Lambda _ _)) = True
             lambdaStaysInput (Let _ expr _) = lambdaStaysInput expr
             lambdaStaysInput (Apply _ body) = lambdaStaysInput body
-            lambdaStaysInput _ = False
+            lambdaStaysInput e = False
 
         it "Reduces lambdas as far as possible but does not remove them when argument" $
             runPasses lambda_with_app_as_arg `shouldSatisfyRet` either (const False) (lambdaStaysInput . fst)

@@ -86,12 +86,12 @@ rlPrewalkExprM f e = f e >>= \case
     e' -> return e'
 
 
--- | Same as 'lrPrewalkExprM' but does not carry a monaic value.
+-- | Same as 'lrPrewalkExprM' but does not carry a monadic value.
 lrPrewalkExpr :: (Expr b -> (Expr b)) -> Expr b -> (Expr b)
 lrPrewalkExpr f = runIdentity . lrPrewalkExprM (return . f)
 
 
--- | Same as 'rlPrewalkExprM' but does not carry a monaic value.
+-- | Same as 'rlPrewalkExprM' but does not carry a monadic value.
 rlPrewalkExpr :: (Expr b -> (Expr b)) -> Expr b -> (Expr b)
 rlPrewalkExpr f = runIdentity . rlPrewalkExprM (return . f)
 
@@ -164,10 +164,6 @@ foldlExpr f b e = runIdentity $ foldlExprM (\x y -> return $ f x y) b e
 -- | Same as 'foldrExprM' but does not carry a monad.
 foldrExpr :: (a -> Expr b -> a) -> Expr b -> a -> a
 foldrExpr f e b = runIdentity $ foldrExprM (\x y -> return $ f x y) e b
-
--- (Sebastian) TODO: In Clojure, every variable/binding, even local ones, are namespaced. Should we go down this path too, i.e., change Binding to take FnReference/Reference?
--- (Justus)    AFAIK The local ones aren't namespaced ... Apart from that since we distinguish between local and
---             env bindings already it seems redundant to me to namespace them too.
 
 -- IMPORTANT: we need this to be polymorphic over `bindingType` or at least I would very much
 -- recommend that, because then we can separate the generation of the algorithms language
@@ -243,54 +239,3 @@ instance NFData a => NFData (Expr a) where
 
 type Expression = Expr ResolvedSymbol
 
-
--- (Sebastian) TODO: I think there needs to be a clear distinction between stateful functions and algos.
---             Only lambdas for algos are allowed.
--- (Justus)    In my mind `Lambda` is always an algo. An inline clojure function is an env arg with the function expression.
--- (Sebastian) I think, if possible, we should make that explicit in the language. The point is that the language currently
---             does not say whether it is Apply Algo or Apply Sfn. I therefore added another symbol below for that.
---             We can discuss whether a mapping should already have to inline all algos but I believe not requiring
---             that makes adapting a new language easier. Plus: we are in control in case we ever want to change that.
--- (Justus)    The issue is that depending on our constraints on runtime algos it may not always be possible to determine
---             whether something is an algo or sfn application if the application target is dynamically provided at runtime.
--- (Sebastian) True. Should we add basic type info to the language then? Something like only 2 types: Sfn and Algo?
---             Hence, when a Clojure is called which returns something to be invoked then one has to provide type information
---             because the compiler can not infer it. Potentially inside the algorithm itself in order to support calling
---             functions define in a library that we can not edit. The compiler could request that information on demand.
-
--- example
-
--- (let [x (sfn 5 0)
---       [y z] (sfn4 "string")]
---   ((algo [a] (functionF a)) (functionA (functionB y) (functionC x z))))
-
--- with SimpleBinding
--- Object represented as quoted clojure expressions
--- Binding represented through strings
-
--- firstConversionPass :: Expression RawSymbol
--- firstConversionPass =
---     Let [ (Direct "x", Apply (Var "sfn") [Var 5, Var 0])
---         , (Destructure ["y", "z"], Apply (Var "sfn4") [Var "string"])
---         ]
---         (Apply
---             (Lambda ["a"] (Apply (Var "functionF") [Var "a"]))
---             (Apply
---                 (Var "functionA")
---                 [ Apply (Var "functionB") [Var "y"]
---                 , Apply (Var "functionC") [Var "x", Var "z"]
---                 ]))
-
--- with ResolvedBindings
--- resolvePass :: Expression ResolvedSymbol
--- resolvePass =
---     Let [ (Direct "x", Apply (Var "sfn") [Var (Env 5), Var (Env 0)])
---         , (Destructure ["y", "z"], Apply (Var "sfn4") [Var (Env "string")])
---         ]
---         (Apply
---             (Lambda [Direct "a"] (Apply (Var (Sfn "functionF")) [Var (Local "a")]))
---             (Apply
---                 (Var (Sfn "functionA"))
---                 [ Apply (Var (Sfn "functionB")) [Var (Local "y")]
---                 , Apply (Var (Sfn "functionC")) [Var (Local "x"), Var (Local "z")]
---                 ]))
