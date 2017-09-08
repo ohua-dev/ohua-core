@@ -23,29 +23,30 @@ import           Ohua.Types
 data Operator = Operator
     { operatorId   :: !FnId
     , operatorType :: !FnName
-    }
+    } deriving Eq
 
 
 data Target = Target
     { operator :: !FnId
     , index    :: !Int
-    }
+    } deriving Eq
 
 
 data Arc = Arc
     { target :: !Target
     , source :: !Source
-    }
+    } deriving Eq
 
 data Source
     = LocalSource !Target
     | EnvSource !HostExpr
+    deriving Eq
 
 
 data OutGraph = OutGraph
     { operators :: [Operator]
     , arcs      :: [Arc]
-    }
+    } deriving Eq
 
 
 

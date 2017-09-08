@@ -43,23 +43,16 @@ instance NFData Binding where rnf (Binding b) = rnf b
 
 
 instance IsString Binding where
-    fromString = either error (either (const $ error "Binding must not be fully qualified") id) . symbolFromString . fromString
+    fromString = Binding . fromString
 
-data FnName = FnName
-    { fnNameNamespace :: !T.Text
-    , fnNameName      :: !T.Text
-    } deriving (Eq, Ord)
+newtype FnName = FnName { unwrapFnName :: T.Text } deriving (Eq, Ord)
 
-instance HasName FnName T.Text where name = lens fnNameName (\s a -> s {fnNameName=a})
-instance NFData FnName where rnf (FnName ns n) = rnf ns `seq` rnf n
-instance Hashable FnName where hashWithSalt s (FnName a b) = hashWithSalt s (a, b)
-
-instance HasNamespace FnName T.Text where namespace = lens fnNameNamespace (\s a -> s {fnNameNamespace=a})
+instance HasName FnName T.Text where name = lens unwrapFnName (const FnName)
+instance NFData FnName where rnf (FnName n) = rnf n
+instance Hashable FnName where hashWithSalt s (FnName n) = hashWithSalt s n
 
 instance Show FnName where
-    show n
-        | T.null (n^.name) = T.unpack $ n^.namespace
-        | otherwise = T.unpack $ n^.namespace <> "/" <> n^.name
+    show = T.unpack . unwrapFnName
 
 instance IsString FnName where
     fromString = either error (either id (const $ error "Function name must be fully qualified")) . symbolFromString . fromString
@@ -74,7 +67,7 @@ symbolFromString s | T.null s = Left "Symbols cannot be empty"
             if '/' `textElem` name then
                 Left "Too many '/' delimiters found."
             else
-                Right $ Left $ FnName ns name
+                Right $ Left $ FnName s
         _ -> error "Leading slash expected after `break`"
 
   where

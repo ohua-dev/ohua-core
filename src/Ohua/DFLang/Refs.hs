@@ -7,32 +7,32 @@ import           Prelude          hiding (id)
 
 
 oneToN :: DFFnRef
-oneToN = DFFunction "com.ohua.lang/one-to-n"
+oneToN = DFFunction "ohua.lang/one-to-n"
 
 
 size :: DFFnRef
-size = EmbedSf "com.ohua.lang/size"
+size = EmbedSf "ohua.lang/size"
 
 
 collect :: DFFnRef
-collect = DFFunction "com.ohua.lang/collect"
+collect = DFFunction "ohua.lang/collect"
 
 
 smapFun :: DFFnRef
-smapFun = DFFunction "com.ohua.lang/smap-fun"
+smapFun = DFFunction "ohua.lang/smap-fun"
 
 
 id :: DFFnRef
-id = EmbedSf "com.ohua.lang/id"
+id = EmbedSf "ohua.lang/id"
 
 
 ifThenElse :: DFFnRef
-ifThenElse = EmbedSf "com.ohua.lang/ifThenElse"
+ifThenElse = EmbedSf "ohua.lang/ifThenElse"
 
 
 switch ::DFFnRef
-switch = DFFunction "com.ohua.lang/switch"
+switch = DFFunction "ohua.lang/switch"
 
 
 scope :: DFFnRef
-scope = DFFunction "com.ohua.lang/scope"
+scope = DFFunction "ohua.lang/scope"
