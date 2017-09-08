@@ -40,7 +40,7 @@ instance Hashable HostExpr where hashWithSalt s = hashWithSalt s . unwrapHostExp
 -- some types for `bindingType`
 
 type RawSymbol = HostExpr
-data ResolvedSymbol
+data Symbol a
 
        -- the basic symbols occuring in the algorithm language
 
@@ -48,7 +48,7 @@ data ResolvedSymbol
 
         -- a variable/binding in the algorithm language
 
-    | Sf !FnName !(Maybe FnId)
+    | Sf !a !(Maybe FnId)
 
         -- reference to a stateful function
 
@@ -56,6 +56,9 @@ data ResolvedSymbol
 
         -- reference to an environment object. this maybe a var or any other term of the host language.
     deriving (Show, Eq)
+
+
+type ResolvedSymbol = Symbol FnName
 
 instance IsString ResolvedSymbol where
     fromString = either error (either (`Sf` Nothing) Local) . symbolFromString . fromString

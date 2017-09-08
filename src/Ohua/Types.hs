@@ -24,6 +24,7 @@ import           GHC.Generics
 import           Lens.Micro
 import           Ohua.LensClasses
 import           Ohua.Util
+import qualified Data.Vector as V
 
 
 newtype FnId = FnId { unFnId :: Int } deriving (Eq, Ord, Generic)
@@ -38,26 +39,49 @@ instance Hashable FnId where hashWithSalt s = hashWithSalt s . unFnId
 instance NFData FnId where rnf (FnId i) = rnf i
 
 newtype Binding = Binding { unBinding :: T.Text }
-    deriving (Eq, Hashable, Generic, Ord)
+    deriving (Eq, Hashable, Generic, Ord, Monoid)
 
 instance Show Binding where show = T.unpack . unBinding
 instance NFData Binding where rnf (Binding b) = rnf b
 
-
 instance IsString Binding where
     fromString = Binding . fromString
 
-newtype FnName = FnName { unwrapFnName :: T.Text } deriving (Eq, Ord, Generic)
+type FnName = Binding
 
-instance HasName FnName T.Text where name = lens unwrapFnName (const FnName)
-instance NFData FnName where rnf (FnName n) = rnf n
-instance Hashable FnName where hashWithSalt s (FnName n) = hashWithSalt s n
+unwrapFnName :: FnName -> Binding
+unwrapFnName = id
+{-# DEPRECATED unwrapFnName "Use Binding or QualifiedBinding instead" #-}
 
-instance Show FnName where
-    show = T.unpack . unwrapFnName
+newtype NSRef = NSRef { unwrapNSRef :: V.Vector Binding } 
+    deriving (Show, Eq, Generic)
 
-instance IsString FnName where
-    fromString = either error (either id (const $ error "Function name must be fully qualified")) . symbolFromString . fromString
+listToNSRef :: [Binding] -> NSRef
+listToNSRef = NSRef . V.fromList
+
+nsREfToList :: NSRef -> [Binding]
+nsREfToList = V.toList . unwrapNSRef
+
+instance Hashable NSRef where
+    hashWithSalt salt = hashWithSalt salt . nsREfToList
+    {-# INLINE hashWithSalt #-}
+
+data QualifiedBinding = QualifiedBinding
+    { qbNamespace :: NSRef
+    , qbName :: Binding
+    } deriving (Show, Eq, Generic)
+
+instance Hashable QualifiedBinding where
+    hashWithSalt s (QualifiedBinding a b) = hashWithSalt s (a, b)
+
+data SomeBinding
+    = Unqual Binding
+    | Qual QualifiedBinding
+    deriving (Eq, Show)
+
+instance Hashable SomeBinding where
+    hashWithSalt s (Unqual b) = hashWithSalt s (0 :: Int, b)
+    hashWithSalt s (Qual b) = hashWithSalt s (1 :: Int, b)
 
 symbolFromString :: T.Text -> Either String (Either FnName Binding)
 symbolFromString s | T.null s = Left "Symbols cannot be empty"
@@ -69,7 +93,7 @@ symbolFromString s | T.null s = Left "Symbols cannot be empty"
             if '/' `textElem` name then
                 Left "Too many '/' delimiters found."
             else
-                Right $ Left $ FnName s
+                Right $ Left $ Binding s
         _ -> error "Leading slash expected after `break`"
 
   where
