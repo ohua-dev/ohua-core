@@ -31,7 +31,7 @@ data IfFn = IfFn
 
 
 instance HigherOrderFunction IfFn where
-    name = "com.ohua.lang/if"
+    name = "ohua.lang/if"
 
     parseCallAndInitState [Variable v, LamArg thenBr, LamArg elseBr] = return $ IfFn v thenBr elseBr (error "return uninitialized")
     parseCallAndInitState _ = failWith "Unexpected number or type of argument for if"

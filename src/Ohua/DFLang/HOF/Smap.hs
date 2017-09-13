@@ -31,7 +31,7 @@ data SmapFn = SmapFn
 
 
 instance HigherOrderFunction SmapFn where
-    name = "com.ohua.lang/smap"
+    name = "ohua.lang/smap"
 
     parseCallAndInitState [LamArg lam, Variable v] = return $ SmapFn v lam (error "size uninitialized")
     parseCallAndInitState _ = failWith "Unexpected number/type of arguments to smap"

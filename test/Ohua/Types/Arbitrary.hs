@@ -2,12 +2,12 @@ module Ohua.Types.Arbitrary where
 
 
 import           Control.Monad
+import qualified Data.Text         as T
 import           Ohua.ALang.Lang
+import           Ohua.DFGraph
 import           Ohua.IR.Functions
 import           Ohua.Types
 import           Test.QuickCheck
-import Ohua.DFGraph
-import qualified Data.Text as T
 
 instance Arbitrary T.Text where arbitrary = T.pack <$> arbitrary
 instance Arbitrary Operator where
@@ -19,10 +19,11 @@ instance Arbitrary OutGraph where arbitrary = liftM2 OutGraph arbitrary arbitrar
 
 
 instance Arbitrary Binding where arbitrary = Binding <$> arbitrary
-instance Arbitrary FnName where arbitrary = FnName <$> arbitrary
+instance Arbitrary QualifiedBinding where arbitrary = QualifiedBinding <$> arbitrary <*> arbitrary
+instance Arbitrary NSRef where arbitrary = nsRefFromList <$> arbitrary
 instance Arbitrary FnId where arbitrary = FnId <$> arbitrary
 instance Arbitrary HostExpr where arbitrary = HostExpr <$> arbitrary
-instance Arbitrary ResolvedSymbol where
+instance Arbitrary a => Arbitrary (Symbol a) where
     arbitrary = oneof
         [ Local <$> arbitrary
         , Sf <$> arbitrary <*> arbitrary
@@ -42,8 +43,8 @@ instance Arbitrary a => Arbitrary (Expr a) where
             ]
           where
             nestExpr = expr $ n `div` 2
-    shrink (Let _ _ b) = b: shrink b
-    shrink (Apply _ a) = a:shrink a
+    shrink (Let _ _ b)  = b: shrink b
+    shrink (Apply _ a)  = a:shrink a
     shrink (Lambda _ a) = a:shrink a
-    shrink _ = []
-    
+    shrink _            = []
+

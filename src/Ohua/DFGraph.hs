@@ -24,7 +24,7 @@ import           Ohua.Types
 
 data Operator = Operator
     { operatorId   :: !FnId
-    , operatorType :: !FnName
+    , operatorType :: !QualifiedBinding
     } deriving (Eq, Generic, Show)
 
 data Target = Target

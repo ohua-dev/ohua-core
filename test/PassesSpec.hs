@@ -20,7 +20,6 @@ import           Ohua.ALang.Lang
 import           Ohua.ALang.Passes
 import           Ohua.ALang.Passes.SSA
 import           Ohua.ALang.Show
-import           Ohua.IR.Functions
 import           Ohua.Monad
 import           Ohua.Types
 import           Test.Hspec
@@ -30,6 +29,9 @@ import           Test.QuickCheck.Property as P
 
 import           Ohua.Types.Arbitrary
 
+
+smapName :: QualifiedBinding
+smapName = "ohua.lang/smap"
 
 -- newtype ApplyOnlyExpr = ApplyOnlyExpr { unApplyOnlyExpr :: Expression } deriving (Eq, Show)
 
@@ -126,6 +128,13 @@ passesSpec = do
         it "reduces curried functions which are produced by a lambda" $
             normalize' e `shouldBe` Right (Let "c" ("some/fn" `Apply` "a" `Apply` "b" ) "c")
 
+    describe "reassignment inlining" $ do
+        it "inlines reassignments in argument lambdas" $
+            inlineReassignments ("ohua.lang/smap" `Apply` Lambda "i_0" (Let "x_1" "i_0" ("ohua.math/add" `Apply` "x_1" `Apply` "x_1")) `Apply` "x")
+            `shouldBe`
+            ("ohua.lang/smap" `Apply` Lambda "i_0" ("ohua.math/add" `Apply` "i_0" `Apply` "i_0") `Apply` "x")
+        it "inlines reassignments in argument lambdas in complex expressions" $ 
+            pending
 
 
     describe "remove currying pass" $ do

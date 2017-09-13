@@ -23,12 +23,12 @@ import           Ohua.Monad
 import           Ohua.Types
 
 
-newtype TaggedFnName f = TaggedFnName { unTagFnName :: FnName }
+newtype TaggedFnName f = TaggedFnName { unTagFnName :: QualifiedBinding }
 
 instance IsString (TaggedFnName a) where
     fromString = tagFnName . fromString
 
-tagFnName :: FnName -> TaggedFnName f
+tagFnName :: QualifiedBinding -> TaggedFnName f
 tagFnName = TaggedFnName
 
 

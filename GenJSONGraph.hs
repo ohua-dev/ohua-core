@@ -1,9 +1,9 @@
+import           Data.Aeson
 import qualified Data.ByteString.Lazy as L
-import Data.Aeson
-import Ohua.DFGraph
-import Ohua.Serialize.JSON
-import Test.QuickCheck
-import Ohua.Types.Arbitrary
+import           Ohua.DFGraph
+import           Ohua.Serialize.JSON
+import           Ohua.Types.Arbitrary
+import           Test.QuickCheck
 
 
 main = do

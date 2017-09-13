@@ -45,7 +45,7 @@ import           Ohua.Types
 import           Ohua.Util
 
 
-type Pass m = FnName -> FnId -> Assignment -> [Expression] -> m (Seq LetExpr)
+type Pass m = QualifiedBinding -> FnId -> Assignment -> [Expression] -> m (Seq LetExpr)
 
 
 -- | Check that a sequence of let expressions does not redefine bindings.
@@ -155,7 +155,7 @@ renameWith m = fmap go
 
 -- | Ananlyze an apply expression, extracting the inner stateful function and the nested arguments as a list.
 -- Also generates a new function id for the inner function should it not have one yet.
-handleApplyExpr :: MonadOhua m => Expression -> m (FnName, FnId, [Expression])
+handleApplyExpr :: MonadOhua m => Expression -> m (QualifiedBinding, FnId, [Expression])
 handleApplyExpr (Apply fn arg) = go fn [arg]
   where
     go (Var (Sf fn id)) args = (fn, , args) <$> maybe generateId return id
@@ -172,7 +172,7 @@ expectVar :: MonadOhua m => Expression -> m DFVar
 expectVar (Var (Local bnd)) = pure $ DFVar bnd
 expectVar (Var (Env i))     = pure $ DFEnvVar i
 expectVar (Var _)           = failWith "Var must be local or env"
-expectVar _                 = failWith "Argument must be var"
+expectVar a                 = failWith $ "Argument must be var, was " <> showT a
 
 
 lowerHOF :: forall f m . (MonadOhua m, HigherOrderFunction f, MonadWriter (Seq LetExpr) m)
@@ -211,6 +211,6 @@ hofs =
     , WHOF (Proxy :: Proxy SeqFn)
     ]
 
-hofNames :: HM.HashMap FnName WHOF
+hofNames :: HM.HashMap QualifiedBinding WHOF
 hofNames = HM.fromList $ map (extractName &&& id) hofs
   where extractName (WHOF (_ :: Proxy p)) = unTagFnName $ (name :: TaggedFnName p)

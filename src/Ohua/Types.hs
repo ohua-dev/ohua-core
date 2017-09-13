@@ -19,12 +19,12 @@ import           Data.Maybe
 import           Data.Monoid
 import           Data.String
 import qualified Data.Text        as T
+import qualified Data.Vector      as V
 import           GHC.Exts
 import           GHC.Generics
 import           Lens.Micro
 import           Ohua.LensClasses
 import           Ohua.Util
-import qualified Data.Vector as V
 
 
 newtype FnId = FnId { unFnId :: Int } deriving (Eq, Ord, Generic)
@@ -41,7 +41,7 @@ instance NFData FnId where rnf (FnId i) = rnf i
 newtype Binding = Binding { unBinding :: T.Text }
     deriving (Eq, Hashable, Generic, Ord, Monoid)
 
-instance Show Binding where show = T.unpack . unBinding
+instance Show Binding where show = show . unBinding
 instance NFData Binding where rnf (Binding b) = rnf b
 
 instance IsString Binding where
@@ -53,26 +53,44 @@ unwrapFnName :: FnName -> Binding
 unwrapFnName = id
 {-# DEPRECATED unwrapFnName "Use Binding or QualifiedBinding instead" #-}
 
-newtype NSRef = NSRef { unwrapNSRef :: V.Vector Binding } 
-    deriving (Show, Eq, Generic)
+newtype NSRef = NSRef { unwrapNSRef :: V.Vector Binding }
+    deriving (Eq, Generic)
 
-listToNSRef :: [Binding] -> NSRef
-listToNSRef = NSRef . V.fromList
+instance Show NSRef where
+    show = T.unpack . T.intercalate "." . map unBinding . nsRefToList
 
-nsREfToList :: NSRef -> [Binding]
-nsREfToList = V.toList . unwrapNSRef
+nsRefFromList :: [Binding] -> NSRef
+nsRefFromList = NSRef . V.fromList
+
+
+nsRefToList :: NSRef -> [Binding]
+nsRefToList = V.toList . unwrapNSRef
 
 instance Hashable NSRef where
-    hashWithSalt salt = hashWithSalt salt . nsREfToList
+    hashWithSalt salt = hashWithSalt salt . nsRefToList
     {-# INLINE hashWithSalt #-}
+
+instance NFData NSRef where
+    rnf (NSRef a) = rnf a
 
 data QualifiedBinding = QualifiedBinding
     { qbNamespace :: NSRef
-    , qbName :: Binding
-    } deriving (Show, Eq, Generic)
+    , qbName      :: Binding
+    } deriving (Eq, Generic)
+
+instance Show QualifiedBinding where
+    show (QualifiedBinding ns n) = show $ show ns ++ "/" ++ T.unpack (unBinding n)
 
 instance Hashable QualifiedBinding where
     hashWithSalt s (QualifiedBinding a b) = hashWithSalt s (a, b)
+
+instance NFData QualifiedBinding where
+    rnf (QualifiedBinding ns n) = ns `deepseq` rnf n
+
+instance IsString QualifiedBinding where
+    fromString s = case fromString s of
+        Qual q -> q
+        _      -> error "unqualified binding"
 
 data SomeBinding
     = Unqual Binding
@@ -81,19 +99,22 @@ data SomeBinding
 
 instance Hashable SomeBinding where
     hashWithSalt s (Unqual b) = hashWithSalt s (0 :: Int, b)
-    hashWithSalt s (Qual b) = hashWithSalt s (1 :: Int, b)
+    hashWithSalt s (Qual b)   = hashWithSalt s (1 :: Int, b)
 
-symbolFromString :: T.Text -> Either String (Either FnName Binding)
+instance IsString SomeBinding where
+    fromString = either error id . symbolFromString . T.pack
+
+symbolFromString :: T.Text -> Either String SomeBinding
 symbolFromString s | T.null s = Left "Symbols cannot be empty"
                    | otherwise =
     case T.break (== '/') s of
         (name, ns) | T.null name -> Left "Unexpected '/' at start"
-                   | T.null ns -> Right $ Right $ Binding name
+                   | T.null ns -> Right $ Unqual $ Binding name
         (ns, rest) | Just ('/', name) <- T.uncons rest ->
             if '/' `textElem` name then
                 Left "Too many '/' delimiters found."
             else
-                Right $ Left $ Binding s
+                Right $ Qual $ QualifiedBinding (nsRefFromList $ map Binding $ T.split (== '.') ns) (Binding name)
         _ -> error "Leading slash expected after `break`"
 
   where

@@ -18,7 +18,7 @@ import           Ohua.Types
 
 myOpts = defaultOptions { unwrapUnaryRecords = True }
 sourceOpts = myOpts { constructorTagModifier = f, sumEncoding = TaggedObject "type" "val" }
-  where 
+  where
     f "LocalSource" = "local"
     f "EnvSource" = "env"
     f _ = error "This is only intended for use with something of type `Source`"

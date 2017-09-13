@@ -2,9 +2,11 @@ module TestALangUtils where
 
 
 import           Ohua.ALang.Lang
+import           Ohua.Types
 import           Test.Hspec
 
 
+substitute' :: Binding -> Expression -> Expression -> Expression
 substitute' var val = lrPostwalkExpr f
   where
     f (Var (Local v)) | var == v = val

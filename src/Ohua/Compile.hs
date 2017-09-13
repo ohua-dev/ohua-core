@@ -15,11 +15,13 @@ module Ohua.Compile where
 import           Control.Monad.Except
 import           Data.Functor.Identity
 import qualified Data.HashMap.Strict       as HM
+import           Debug.Trace
 import           Lens.Micro
 import           Ohua.ALang.Lang
 import           Ohua.ALang.Optimizations
 import           Ohua.ALang.Passes
 import           Ohua.ALang.Passes.SSA
+import           Ohua.ALang.Show
 import           Ohua.DFGraph
 import           Ohua.DFLang.Optimizations
 import           Ohua.DFLang.Passes
@@ -43,6 +45,9 @@ pipeline e = do
 #ifdef DEBUG
     Ohua.ALang.Passes.SSA.checkSSA optimizedE
 #endif
+
+    traceShow optimizedE (return ())
+    trace (showLambda optimizedE) (return ())
 
     dfE <- lowerALang optimizedE
 

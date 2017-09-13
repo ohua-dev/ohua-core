@@ -27,6 +27,7 @@ library
     , Ohua.Types
     , Ohua.LensClasses
     , Ohua.Monad
+    , Ohua.ParseTools.Refs
     , Ohua.IR.Functions
     , Ohua.ALang.Lang
     , Ohua.ALang.NS

@@ -40,8 +40,8 @@ data LetExpr = LetExpr
     deriving Eq
 
 data DFFnRef
-    = DFFunction !FnName -- a build-in function of DFLang
-    | EmbedSf !FnName -- an generic dataflow function that wraps a stateful function call
+    = DFFunction !QualifiedBinding -- a build-in function of DFLang
+    | EmbedSf !QualifiedBinding -- an generic dataflow function that wraps a stateful function call
     deriving Eq
 
 data DFVar

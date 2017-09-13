@@ -2,14 +2,14 @@ module TestAesonConvert where
 
 
 import           Data.Aeson
+import           Ohua.ALang.Lang
 import           Ohua.DFGraph
 import           Ohua.Serialize.JSON   ()
+import           Ohua.Types
 import           Ohua.Types.Arbitrary
 import           Test.Hspec
 import           Test.Hspec.QuickCheck
 import           Test.QuickCheck
-import Ohua.Types
-import Ohua.ALang.Lang
 
 
 testConvert :: (ToJSON a, FromJSON a, Arbitrary a, Show a, Eq a) => a -> Bool

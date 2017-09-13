@@ -24,7 +24,7 @@ data SeqFn = SeqFn {
 }
 
 instance HigherOrderFunction SeqFn where
-  name = "com.ohua.lang/seq"
+  name = "ohua.lang/seq"
 
   parseCallAndInitState [Variable (DFVar before), LamArg after] = return $ SeqFn before after
   parseCallAndInitState as = failWith "seq not defined for arguments: " -- TODO ++ show as

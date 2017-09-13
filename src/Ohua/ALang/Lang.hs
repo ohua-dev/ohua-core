@@ -27,7 +27,10 @@ import           Ohua.Types
 -- I revised the proposal.
 -- I got rid of `Fn`. Not because of cyclic dependencies but because I think that function application can be more general.
 
-newtype HostExpr = HostExpr { unwrapHostExpr :: Int } deriving (Show, Eq, Ord, Generic)
+newtype HostExpr = HostExpr { unwrapHostExpr :: Int } deriving (Eq, Ord, Generic)
+
+instance Show HostExpr where
+    show = show . unwrapHostExpr
 
 -- Only exists to allow literal integers to be interpreted as host expressions
 instance Num HostExpr where fromInteger = HostExpr . fromInteger
@@ -58,10 +61,12 @@ data Symbol a
     deriving (Show, Eq)
 
 
-type ResolvedSymbol = Symbol FnName
+type ResolvedSymbol = Symbol QualifiedBinding
 
 instance IsString ResolvedSymbol where
-    fromString = either error (either (`Sf` Nothing) Local) . symbolFromString . fromString
+    fromString str = case fromString str of
+        Unqual bnd -> Local bnd
+        Qual q     -> Sf q Nothing
 
 instance ExtractBindings ResolvedSymbol where
     extractBindings (Local l) = return l

@@ -19,7 +19,6 @@ import qualified Data.HashMap.Strict    as HM
 import qualified Data.HashSet           as HS
 import           Ohua.ALang.Lang
 import           Ohua.ALang.Util
-import           Ohua.IR.Functions
 import           Ohua.Monad
 import           Ohua.Types
 import           Ohua.Util
@@ -93,6 +92,9 @@ letLift (Apply function argument) = reduceApplication $ Apply (letLift function)
 letLift (Lambda bnd body) = Lambda bnd (letLift body)
 letLift v = v
 
+
+idName :: QualifiedBinding
+idName = QualifiedBinding (nsRefFromList ["ohua", "lang"]) "id"
 
 -- | Inline all direct reassignments.
 -- Aka `let x = E in let y = x in y` -> `let x = E in x`

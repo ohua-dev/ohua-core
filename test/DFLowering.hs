@@ -26,7 +26,7 @@ import           Ohua.Types
 import           Test.Hspec
 
 
-newtype OhuaGrGraph = OhuaGrGraph { unGr :: Gr FnName OhuaGrEdgeLabel } deriving Eq
+newtype OhuaGrGraph = OhuaGrGraph { unGr :: Gr QualifiedBinding OhuaGrEdgeLabel } deriving Eq
 
 
 data OhuaGrEdgeLabel = OhuaGrEdgeLabel
@@ -94,17 +94,17 @@ lowerAndValidate sourceExpr targetExpr statementType = do
 smapLowering :: Spec
 smapLowering = describe "lowering smap constructs" $ do
     let sourceExpr =
-            Let "coll" ("com.ohua.lang/id" `Apply` 0) $
-            Let "x" ("com.ohua.lang/smap" `Apply` Lambda "y" (Let "z" ("some.module/inc" `Apply` "y") "z") `Apply` "coll")
+            Let "coll" ("ohua.lang/id" `Apply` 0) $
+            Let "x" ("ohua.lang/smap" `Apply` Lambda "y" (Let "z" ("some.module/inc" `Apply` "y") "z") `Apply` "coll")
             "x"
     let targetExpr = DFExpr
-            [ LetExpr 0 "coll" "com.ohua.lang/id" [0] Nothing
-            , LetExpr 4 "a" "com.ohua.lang/size" ["coll"] Nothing
-            , LetExpr 5 "b" (DFFunction "com.ohua.lang/one-to-n") ["a", "coll"] Nothing
-            , LetExpr 1 "y" (DFFunction "com.ohua.lang/smap-fun") ["b"] Nothing
+            [ LetExpr 0 "coll" "ohua.lang/id" [0] Nothing
+            , LetExpr 4 "a" "ohua.lang/size" ["coll"] Nothing
+            , LetExpr 5 "b" (DFFunction "ohua.lang/one-to-n") ["a", "coll"] Nothing
+            , LetExpr 1 "y" (DFFunction "ohua.lang/smap-fun") ["b"] Nothing
             , LetExpr 2 "z" "some.module/inc" ["y"] Nothing
-            , LetExpr 6 "c" (DFFunction "com.ohua.lang/one-to-n") ["a", "a"] Nothing
-            , LetExpr 3 "x" (DFFunction "com.ohua.lang/collect") ["c", "z"] Nothing
+            , LetExpr 6 "c" (DFFunction "ohua.lang/one-to-n") ["a", "a"] Nothing
+            , LetExpr 3 "x" (DFFunction "ohua.lang/collect") ["c", "z"] Nothing
             ]
             "x"
     lowerAndValidate sourceExpr targetExpr "smap"
@@ -115,23 +115,23 @@ smapSpec = smapLowering
 ifLowering :: Spec
 ifLowering = describe "lowering conditionals" $ do
     let sourceExpr =
-          Let "a" ("com.ohua.lang/id" `Apply` 0) $
-          Let "b" ("com.ohua.lang/id" `Apply` 1) $
-          Let "c" ("com.ohua.lang/id" `Apply` 2) $
-          Let "z" (Apply (Apply (Apply "com.ohua.lang/if" "c")
+          Let "a" ("ohua.lang/id" `Apply` 0) $
+          Let "b" ("ohua.lang/id" `Apply` 1) $
+          Let "c" ("ohua.lang/id" `Apply` 2) $
+          Let "z" (Apply (Apply (Apply "ohua.lang/if" "c")
                                 (Lambda "then" (Let "p" (Apply "some-ns/+" "a")
                                                     (Let "f" (Apply "p" "b") "f"))))
                          (Lambda "else" (Let "m" (Apply "some-ns/-" "a")
                                              (Let "f" (Apply "m" "b") "f"))))
           "z"
     let targetExpr = DFExpr
-          [ LetExpr 0 "a" "com.ohua.lang/id" [0] Nothing
-          , LetExpr 1 "b" "com.ohua.lang/id" [1] Nothing
-          , LetExpr 2 "c" "com.ohua.lang/id" [2] Nothing
-          , LetExpr 3 "s" (DFFunction "com.ohua.lang/ifThenElse") ["c"] Nothing
+          [ LetExpr 0 "a" "ohua.lang/id" [0] Nothing
+          , LetExpr 1 "b" "ohua.lang/id" [1] Nothing
+          , LetExpr 2 "c" "ohua.lang/id" [2] Nothing
+          , LetExpr 3 "s" (DFFunction "ohua.lang/ifThenElse") ["c"] Nothing
           , LetExpr 4 "d" "some-ns/+" ["a", "b"] Nothing
           , LetExpr 5 "e" "some-ns/-" ["a", "b"] Nothing
-          , LetExpr 6 "z" (DFFunction "com.ohua.lang/switch") ["s", "d", "e"] Nothing
+          , LetExpr 6 "z" (DFFunction "ohua.lang/switch") ["s", "d", "e"] Nothing
           ]
           "z"
 
@@ -142,10 +142,10 @@ generalLowering :: Spec
 generalLowering = do
     describe "lowering a stateful function" $ do
         it "lowers a function with one argument" $
-            Let "a" ("com.ohua.lang/id" `Apply` 0) (Let "x" ("some/function" `Apply` "a") "x")
+            Let "a" ("ohua.lang/id" `Apply` 0) (Let "x" ("some/function" `Apply` "a") "x")
             `shouldLowerTo`
             DFExpr
-                [ LetExpr 1 "a" "com.ohua.lang/id" [0] Nothing
+                [ LetExpr 1 "a" "ohua.lang/id" [0] Nothing
                 , LetExpr 0 "x" "some/function" ["a"] Nothing
                 ] "x"
         it "lowers a function with one env argument" $
@@ -169,13 +169,13 @@ seqSpec :: Spec
 seqSpec = do
     describe "seq lowering" $ do
         it "lowers a simple seq" $
-            (   Let "y" ("com.ohua.lang/id" `Apply` 0) $
-                Let "x" ("com.ohua.lang/seq" `Apply` "y" `Apply` Lambda "_" (Let "p" "some/function" "p"))
+            (   Let "y" ("ohua.lang/id" `Apply` 0) $
+                Let "x" ("ohua.lang/seq" `Apply` "y" `Apply` Lambda "_" (Let "p" "some/function" "p"))
                     "x"
             )
             `shouldLowerTo`
             DFExpr
-                [ LetExpr 1 "y" (EmbedSf "com.ohua.lang/id") [0] Nothing
+                [ LetExpr 1 "y" (EmbedSf "ohua.lang/id") [0] Nothing
                 , LetExpr 0 "x" (EmbedSf "some/function") [] "y"
                 ]
                 "x"
