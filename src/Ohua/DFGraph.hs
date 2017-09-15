@@ -33,21 +33,36 @@ data Target = Target
     } deriving (Eq, Generic, Show)
 
 
-data Arc = Arc
+data Arc envExpr = Arc
     { target :: !Target
-    , source :: !Source
+    , source :: !(Source envExpr)
     } deriving (Eq, Generic, Show)
 
-data Source
+instance Functor Arc where
+    fmap f (Arc target source) = Arc target (fmap f source)
+
+
+data Source envExpr
     = LocalSource !Target
-    | EnvSource !HostExpr
+    | EnvSource !envExpr
     deriving (Eq, Generic, Show)
 
+instance Functor Source where
+    fmap f (EnvSource e) = EnvSource $ f e
+    fmap _ (LocalSource t) = LocalSource t
 
-data OutGraph = OutGraph
+
+data AbstractOutGraph envExpr = OutGraph
     { operators :: [Operator]
-    , arcs      :: [Arc]
+    , arcs      :: [Arc envExpr]
     } deriving (Eq, Generic, Show)
+
+
+instance Functor AbstractOutGraph where
+    fmap f (OutGraph ops arcs) = OutGraph ops (fmap (fmap f) arcs)
+
+
+type OutGraph = AbstractOutGraph HostExpr
 
 
 toGraph :: DFExpr -> OutGraph

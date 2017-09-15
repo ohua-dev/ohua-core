@@ -27,10 +27,10 @@ instance ToJSON Operator where toEncoding = genericToEncoding myOpts
 instance FromJSON Operator where parseJSON = genericParseJSON myOpts
 instance ToJSON Target where toEncoding = genericToEncoding myOpts
 instance FromJSON Target where parseJSON = genericParseJSON myOpts
-instance ToJSON Arc where toEncoding = genericToEncoding myOpts
-instance FromJSON Arc where parseJSON = genericParseJSON myOpts
-instance ToJSON Source where toEncoding = genericToEncoding sourceOpts
-instance FromJSON Source where parseJSON = genericParseJSON sourceOpts
+instance ToJSON a => ToJSON (Arc a) where toEncoding = genericToEncoding myOpts
+instance FromJSON a => FromJSON (Arc a) where parseJSON = genericParseJSON myOpts
+instance ToJSON a => ToJSON (Source a) where toEncoding = genericToEncoding sourceOpts
+instance FromJSON a => FromJSON (Source a) where parseJSON = genericParseJSON sourceOpts
 instance ToJSON OutGraph where toEncoding = genericToEncoding myOpts
 instance FromJSON OutGraph where parseJSON = genericParseJSON myOpts
 instance ToJSON HostExpr where toEncoding = genericToEncoding myOpts
