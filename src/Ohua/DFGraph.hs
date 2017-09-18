@@ -52,6 +52,7 @@ instance Functor Source where
     fmap _ (LocalSource t) = LocalSource t
 
 
+-- | Graph emitted by the compiler. Abstracted over the type of environment expression it contains.
 data AbstractOutGraph envExpr = OutGraph
     { operators :: [Operator]
     , arcs      :: [Arc envExpr]

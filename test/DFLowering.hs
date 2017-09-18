@@ -1,6 +1,7 @@
 {-# LANGUAGE BangPatterns       #-}
 {-# LANGUAGE FlexibleInstances  #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE UnboxedTuples #-}
 module DFLowering where
 
 import           Control.Arrow
@@ -62,9 +63,9 @@ toFGLGraph (OutGraph ops arcs) = OhuaGrGraph $ mkGraph nodes edges
 
     toEdge (Arc t s) = (sourceOp, unFnId $ operator t, OhuaGrEdgeLabel sourceIdx (index t))
       where
-        (sourceOp, sourceIdx) = case s of
-            LocalSource (Target op idx) -> (unFnId op, idx)
-            EnvSource e                 -> (envId, unwrapHostExpr e)
+        (# sourceOp, sourceIdx #) = case s of
+            LocalSource (Target op idx) -> (# unFnId op, idx #)
+            EnvSource e                 -> (# envId, unwrapHostExpr e #)
 
 
 shouldSatisfyRet :: Show a => IO a -> (a -> Bool) -> Expectation

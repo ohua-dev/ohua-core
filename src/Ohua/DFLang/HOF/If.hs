@@ -56,7 +56,7 @@ instance HigherOrderFunction IfFn where
         selected <- mapM generateBindingWith freeVars
         selectorId <- generateId
         let Direct sourceVar = beginAssignment lam
-        return   -- im just prepending the if return, this is probably not correct
+        return
             (   [ LetExpr selectorId (Destructure selected) Refs.scope (map DFVar freeVars) (Just sourceVar)
                 ]
             ,   zip freeVars selected

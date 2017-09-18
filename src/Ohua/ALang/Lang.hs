@@ -27,6 +27,7 @@ import           Ohua.Types
 -- I revised the proposal.
 -- I got rid of `Fn`. Not because of cyclic dependencies but because I think that function application can be more general.
 
+-- | Numerical reference to a spliced expression from the host environment.
 newtype HostExpr = HostExpr { unwrapHostExpr :: Int } deriving (Eq, Ord, Generic)
 
 instance Show HostExpr where
@@ -224,6 +225,9 @@ foldrExpr f e b = runIdentity $ foldrExprM (\x y -> return $ f x y) e b
     -- newtypes efficient now
 --   deriving Data
 --
+
+-- | An expression in the algorithm language.
+-- Abstracted over a concrete type of binding.
 data Expr bindingType
     = Var bindingType
     | Let Assignment (Expr bindingType) (Expr bindingType)
@@ -248,4 +252,3 @@ instance NFData a => NFData (Expr a) where
     rnf (Lambda a b) = rnf a `seq` rnf b
 
 type Expression = Expr ResolvedSymbol
-

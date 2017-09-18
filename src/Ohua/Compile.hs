@@ -28,8 +28,11 @@ import           Ohua.DFLang.Optimizations
 import           Ohua.DFLang.Passes
 import           Ohua.Monad
 import           Ohua.Types
+import Ohua.Util
+import Data.Monoid ((<>))
 
 
+-- | The canonical order of transformations and lowerings performed in a full compilation.
 pipeline :: MonadOhua m => Expression -> m OutGraph
 pipeline e = do
     ssaE <- performSSA e
@@ -64,13 +67,12 @@ pipeline e = do
     return $ toGraph optimizedDfE
 
 
+-- | Run the pipeline in an arbitrary monad that supports error reporting.
 compile :: MonadError Error m => Expression -> m OutGraph
 compile e = either throwError (return . fst) =<< flip runOhuaT e pipeline
 
 
-type SimplePass = Pass (OhuaT (Either String))
-
-
+-- | Verify that only higher order fucntions have lambdas as arguments
 checkHigherOrderFunctionSupport :: MonadOhua m => Expression -> m ()
 checkHigherOrderFunctionSupport (Let _ e rest) = do
     checkNestedExpr e
@@ -78,12 +80,12 @@ checkHigherOrderFunctionSupport (Let _ e rest) = do
   where
     checkNestedExpr (Apply f arg) = do
         supportsHOF <- checkNestedExpr f
-        when (isLambda arg && not supportsHOF) $ failWith "Lambdas may only be input to higher order functions!"
+        when (isLambda arg && not supportsHOF) $ failWith $ "Lambdas may only be input to higher order functions, not " <> showT f
         return True
     checkNestedExpr (Var (Sf n _)) = return $ HM.member n hofNames
     checkNestedExpr (Var _) = return False
-    checkNestedExpr _ = failWith "Expected var or apply expr"
+    checkNestedExpr a = failWith $ "Expected var or apply expr, got " <> showT a
     isLambda (Lambda _ _) = True
     isLambda _            = False
 checkHigherOrderFunctionSupport (Var _) = return ()
-checkHigherOrderFunctionSupport _ = failWith "Expected let or var"
+checkHigherOrderFunctionSupport a = failWith $ "Expected let or var, got " <> showT a

@@ -33,13 +33,13 @@ instance ToJSON a => ToJSON (Source a) where toEncoding = genericToEncoding sour
 instance FromJSON a => FromJSON (Source a) where parseJSON = genericParseJSON sourceOpts
 instance ToJSON OutGraph where toEncoding = genericToEncoding myOpts
 instance FromJSON OutGraph where parseJSON = genericParseJSON myOpts
-instance ToJSON HostExpr where toEncoding = genericToEncoding myOpts
-instance FromJSON HostExpr where parseJSON = genericParseJSON myOpts
+instance ToJSON HostExpr where toEncoding = toEncoding . unwrapHostExpr
+instance FromJSON HostExpr where parseJSON = fmap HostExpr . parseJSON
 instance ToJSON QualifiedBinding where toEncoding = genericToEncoding myOpts
 instance FromJSON QualifiedBinding where parseJSON = genericParseJSON myOpts
-instance ToJSON Binding where toEncoding = genericToEncoding myOpts
-instance FromJSON Binding where parseJSON = genericParseJSON myOpts
-instance ToJSON FnId where toEncoding = genericToEncoding myOpts
-instance FromJSON FnId where parseJSON = genericParseJSON myOpts
-instance ToJSON NSRef where toEncoding = genericToEncoding myOpts
-instance FromJSON NSRef where parseJSON = genericParseJSON myOpts
+instance ToJSON Binding where toEncoding = toEncoding . unBinding
+instance FromJSON Binding where parseJSON = fmap Binding . parseJSON
+instance ToJSON FnId where toEncoding = toEncoding . unFnId
+instance FromJSON FnId where parseJSON = fmap FnId . parseJSON
+instance ToJSON NSRef where toEncoding = toEncoding . nsRefToList
+instance FromJSON NSRef where parseJSON = fmap nsRefFromList . parseJSON

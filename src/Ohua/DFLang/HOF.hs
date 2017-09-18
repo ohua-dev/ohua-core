@@ -6,11 +6,23 @@
 -- Maintainer  : dev@justus.science, sebastian.ertel@gmail.com
 -- Stability   : experimental
 -- Portability : portable
+--
+-- This module describes the interface for a language extension via a so called "Higher order function".
+--
+-- Higher order functions are used like regular functions when writing algorithms but during
+-- the lowering from ALang to DFLang they are treated specially.
+-- This interface defines both the dispatch and the concrete lowering strategy for a
+-- higher order function.
 
 -- This source code is licensed under the terms described in the associated LICENSE.TXT file
 --
 {-# LANGUAGE ExistentialQuantification #-}
-module Ohua.DFLang.HOF where
+module Ohua.DFLang.HOF
+    ( HigherOrderFunction(..)
+    , TaggedFnName, tagFnName, unTagFnName
+    , Lambda(..), Argument(..), Renaming
+    , WHOF(..)
+    ) where
 
 
 import           Control.Monad.Except
@@ -23,6 +35,7 @@ import           Ohua.Monad
 import           Ohua.Types
 
 
+-- | A function name tagged with a higher order function instance it belongs to.
 newtype TaggedFnName f = TaggedFnName { unTagFnName :: QualifiedBinding }
 
 instance IsString (TaggedFnName a) where
@@ -32,15 +45,17 @@ tagFnName :: QualifiedBinding -> TaggedFnName f
 tagFnName = TaggedFnName
 
 
+-- | Description of a lambda hiding the actual contents of the function.
 data Lambda = Lam
-    { beginAssignment :: Assignment
-    , resultBinding   :: Binding
+    { beginAssignment :: !Assignment
+    , resultBinding   :: !Binding
     } deriving Eq
 
 
+-- | Poosible shapes of arguments to higher order functions
 data Argument
-    = Variable DFVar
-    | LamArg Lambda
+    = Variable !DFVar
+    | LamArg !Lambda
 
 
 type Renaming = [(Binding, Binding)]
@@ -82,5 +97,7 @@ class HigherOrderFunction f where
     contextifyUnboundFunctions :: (MonadOhua m, MonadState f m) => Lambda -> m (Maybe Binding)
 
 
+-- | _W_rapped _H_igher _O_rder _F_unction.
+-- A simple wrapper for instances of the 'HigherOrderFunction' typeclass.
+-- Utility type.
 data WHOF = forall f . HigherOrderFunction f => WHOF (Proxy f)
-

@@ -27,6 +27,7 @@ import           Ohua.LensClasses
 import           Ohua.Util
 
 
+-- | The numeric id of a function call site
 newtype FnId = FnId { unFnId :: Int } deriving (Eq, Ord, Generic)
 
 -- Only here so we can write literals and have them convert automatically
@@ -38,6 +39,7 @@ instance Show FnId where
 instance Hashable FnId where hashWithSalt s = hashWithSalt s . unFnId
 instance NFData FnId where rnf (FnId i) = rnf i
 
+-- | A binding name
 newtype Binding = Binding { unBinding :: T.Text }
     deriving (Eq, Hashable, Generic, Ord, Monoid)
 
@@ -53,16 +55,20 @@ unwrapFnName :: FnName -> Binding
 unwrapFnName = id
 {-# DEPRECATED unwrapFnName "Use Binding or QualifiedBinding instead" #-}
 
+-- | Hierarchical reference to a namespace
 newtype NSRef = NSRef { unwrapNSRef :: V.Vector Binding }
     deriving (Eq, Generic)
 
 instance Show NSRef where
     show = T.unpack . T.intercalate "." . map unBinding . nsRefToList
 
+
+-- | Creates a 'NSRef' from a hierarchical sorted list of namespaces
 nsRefFromList :: [Binding] -> NSRef
 nsRefFromList = NSRef . V.fromList
 
 
+-- | Extract an NSRef into a list of hierarchical namespaces
 nsRefToList :: NSRef -> [Binding]
 nsRefToList = V.toList . unwrapNSRef
 
@@ -73,6 +79,7 @@ instance Hashable NSRef where
 instance NFData NSRef where
     rnf (NSRef a) = rnf a
 
+-- | A qualified binding. References a particular bound value inside a namespace.
 data QualifiedBinding = QualifiedBinding
     { qbNamespace :: NSRef
     , qbName      :: Binding
@@ -92,6 +99,7 @@ instance IsString QualifiedBinding where
         Qual q -> q
         _      -> error "unqualified binding"
 
+-- | Utility type for parsing. Denotes a binding which may or may not be qualified.
 data SomeBinding
     = Unqual Binding
     | Qual QualifiedBinding
@@ -104,6 +112,8 @@ instance Hashable SomeBinding where
 instance IsString SomeBinding where
     fromString = either error id . symbolFromString . T.pack
 
+-- | Attempt to parse a string into either a simple binding or a qualified binding.
+-- Assumes a form "name.space/value" for qualified bindings.
 symbolFromString :: T.Text -> Either String SomeBinding
 symbolFromString s | T.null s = Left "Symbols cannot be empty"
                    | otherwise =
@@ -125,6 +135,7 @@ class ExtractBindings a where
 instance ExtractBindings a => ExtractBindings [a] where extractBindings = concatMap extractBindings
 
 
+-- | Allowed forms for the left hand side of a let binding or in a lambda input.
 data Assignment
     = Direct !Binding
     | Destructure ![Binding]
@@ -168,7 +179,10 @@ type Warning = T.Text
 type Warnings = [Warning]
 
 
+-- | State of the ohua compiler monad.
 data CompilerState = CompilerState !NameGenerator !Int
+
+-- | The read only compiler environment (currently empty)
 data CompilerEnv
 
 nameGenerator :: Lens' CompilerState NameGenerator
@@ -177,6 +191,7 @@ nameGenerator f (CompilerState gen counter) = flip CompilerState counter <$> f g
 idCounter :: Lens' CompilerState Int
 idCounter f (CompilerState gen counter) = CompilerState gen <$> f counter
 
+-- | Stateful name generator
 data NameGenerator = NameGenerator !(HS.HashSet Binding) [Binding]
 
 takenNames :: Lens' NameGenerator (HS.HashSet Binding)
