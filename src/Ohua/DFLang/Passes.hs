@@ -201,7 +201,7 @@ lowerHOF _ assign args = do
     handleArg (Lambda assign body) = do
         DFExpr lets bnd <- lowerALang body
         return $ Right (Lam assign bnd, lets)
-    handleArg _ = failWith "unexpected type of argument"
+    handleArg a = failWith $ "unexpected type of argument, expected var or lambda, got " <> showT a
 
 
 hofs :: [WHOF]

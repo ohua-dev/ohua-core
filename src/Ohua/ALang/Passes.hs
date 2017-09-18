@@ -243,9 +243,22 @@ checkProgramValidity e = do
     noUndefinedBindings e
 
 
+-- | Lifts something like @if (f x) a b@ to @let x0 = f x in if x0 a b@
+liftApplyToApply :: MonadOhua m => Expression -> m Expression
+liftApplyToApply = lrPrewalkExprM $ \case
+    Apply fn arg@(Apply _ _) -> do
+        bnd <- generateBinding
+        return $ Let (Direct bnd) arg $ Apply fn (Var (Local bnd))
+    a -> return a
+
+
 -- The canonical composition of the above transformations to create a program with the invariants we expect.
-normalize :: MonadOhua m=> Expression -> m Expression
-normalize e = reduceLambdas (letLift e) >>= removeCurrying >>= ensureFinalLet . inlineReassignments
+normalize :: MonadOhua m => Expression -> m Expression
+normalize e =
+        reduceLambdas (letLift e)
+    >>= removeCurrying
+    >>= liftApplyToApply
+    >>= ensureFinalLet . inlineReassignments . letLift
   where
     -- we repeat this step until a fix point is reached.
     -- this is necessary as lambdas may be input to lambdas,
