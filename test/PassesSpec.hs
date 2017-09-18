@@ -129,12 +129,17 @@ passesSpec = do
             normalize' e `shouldBe` Right (Let "c" ("some/fn" `Apply` "a" `Apply` "b" ) "c")
 
     describe "reassignment inlining" $ do
+        let normalize' = fmap fst . runIdentity . runOhuaT normalize
         it "inlines reassignments in argument lambdas" $
             inlineReassignments ("ohua.lang/smap" `Apply` Lambda "i_0" (Let "x_1" "i_0" ("ohua.math/add" `Apply` "x_1" `Apply` "x_1")) `Apply` "x")
             `shouldBe`
             ("ohua.lang/smap" `Apply` Lambda "i_0" ("ohua.math/add" `Apply` "i_0" `Apply` "i_0") `Apply` "x")
-        it "inlines reassignments in argument lambdas in complex expressions" $ 
-            pending
+        it "inlines reassignments in argument lambdas in complex expressions" $
+            normalize'
+                (Let "coll0" ("ohua.lang/smap" `Apply` Lambda "i" (Lambda "x" ("ohua.math/add" `Apply` "x" `Apply` "x") `Apply` "i") `Apply` "coll") "coll0")
+            `shouldBe`
+            Right (Let "coll0" ("ohua.lang/smap" `Apply` Lambda "i" ("ohua.math/add" `Apply` "i" `Apply` "i") `Apply` "coll") "coll0")
+
 
 
     describe "remove currying pass" $ do
