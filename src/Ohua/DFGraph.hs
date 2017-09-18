@@ -96,3 +96,12 @@ toGraph (DFExpr lets _) = OutGraph ops arcs
                             $ zip (callArguments l) [0..]
         , let target = Target (callSiteId l) index
         ]
+
+
+spliceEnv :: OutGraph -> (Int -> a) -> AbstractOutGraph a
+spliceEnv (OutGraph ops oldArcs) lookup = OutGraph ops arcs
+  where
+    arcs = map f oldArcs
+    f (Arc t source) = Arc t $ case source of
+        EnvSource (HostExpr i) -> EnvSource (lookup i)
+        LocalSource t -> LocalSource t
