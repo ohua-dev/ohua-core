@@ -111,12 +111,26 @@ inlineReassignments v@(Var _) = v
 
 -- | Transforms the final expression into a let expression with the result variable as body.
 -- Aka `let x = E in some/sf a` -> `let x = E in let y = some/sf a in y`
+--
+-- EDIT: Now also does the same for any residual lambdas
 ensureFinalLet :: MonadOhua m => Expression -> m Expression
-ensureFinalLet (Let a e b) = Let a e <$> ensureFinalLet b
-ensureFinalLet v@(Var _) = return v
-ensureFinalLet a = do
+ensureFinalLet = ensureFinalLetInLambdas >=> ensureFinalLet'
+
+
+-- | Transforms the final expression into a let expression with the result variable as body.
+ensureFinalLet' :: MonadOhua m => Expression -> m Expression
+ensureFinalLet' (Let a e b) = Let a e <$> ensureFinalLet' b
+ensureFinalLet' v@(Var _) = return v
+ensureFinalLet' a = do
     newBnd <- generateBinding
     return $ Let (Direct newBnd) a (Var (Local newBnd))
+
+
+ensureFinalLetInLambdas :: MonadOhua m => Expression -> m Expression
+ensureFinalLetInLambdas = lrPostwalkExprM $ \case
+    Lambda bnd body -> Lambda bnd <$> ensureFinalLet' body
+    a -> return a
+
 
 
 -- | Removes bindings that are never used.

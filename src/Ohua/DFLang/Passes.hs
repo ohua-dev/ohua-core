@@ -90,7 +90,7 @@ lowerALang expr = do
             Just (WHOF (_ :: Proxy p)) -> lowerHOF (name :: TaggedFnName p) assign args
             Nothing       -> tell =<< lowerDefault fn fnId assign args
         go rest
-    go  _ = failWith "Expected `let` or binding"
+    go  e = failWith $ "Expected `let` or binding, got " <> showT e
 
 
 -- | Lower any not specially treated function type.
