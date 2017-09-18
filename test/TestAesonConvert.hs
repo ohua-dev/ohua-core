@@ -21,10 +21,9 @@ spec :: Spec
 spec = describe "encode . decode == id" $ do
     prop "for operators" (testConvert :: Operator -> Bool)
     prop "for targets" (testConvert :: Target -> Bool)
-    prop "for arcs" (testConvert :: Arc -> Bool)
-    prop "for sources" (testConvert :: Source -> Bool)
+    prop "for arcs" (testConvert :: Arc HostExpr -> Bool)
+    prop "for sources" (testConvert :: Source HostExpr -> Bool)
     prop "for fn names" (testConvert :: FnName -> Bool)
     prop "for fn ids" (testConvert :: FnId -> Bool)
     prop "for host expressions" (testConvert :: HostExpr -> Bool)
     prop "for graphs" (testConvert :: OutGraph -> Bool)
-
