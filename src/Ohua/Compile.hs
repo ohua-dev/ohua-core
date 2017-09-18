@@ -23,6 +23,7 @@ import           Ohua.ALang.Passes
 import           Ohua.ALang.Passes.SSA
 import           Ohua.ALang.Show
 import           Ohua.DFGraph
+import           Ohua.DFLang.Lang
 import           Ohua.DFLang.Optimizations
 import           Ohua.DFLang.Passes
 import           Ohua.Monad
@@ -47,7 +48,6 @@ pipeline e = do
 #endif
 
     traceShow optimizedE (return ())
-    trace (showLambda optimizedE) (return ())
 
     dfE <- lowerALang optimizedE
 
@@ -60,7 +60,7 @@ pipeline e = do
 #ifdef DEBUG
     Ohua.DFLang.Passes.checkSSAExpr optimizedDfE
 #endif
-    -- Comment: I use `<&>` (aka `fmap`) here because `toGraph` does not run in a monad
+    trace (showDFExpr optimizedDfE) (return ())
     return $ toGraph optimizedDfE
 
 

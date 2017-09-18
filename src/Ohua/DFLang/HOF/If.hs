@@ -43,16 +43,13 @@ instance HigherOrderFunction IfFn where
         let Direct thenBnd = beginAssignment $ thenBranch f
             Direct elseBnd = beginAssignment $ elseBranch f
         modify $ \s -> s { ifRet = ifRet' }
-        return
-            -- not sure this has to be a dffunction
-            [ LetExpr ifId (Destructure [thenBnd, elseBnd]) Refs.ifThenElse [conditionVariable f] Nothing
-            ]
+        return [ LetExpr ifId (Destructure [thenBnd, elseBnd]) Refs.ifThenElse [conditionVariable f] Nothing ]
 
     createContextExit assignment = do
         switchId <- generateId
         IfFn {..} <- get
         return
-            [ LetExpr switchId assignment Refs.switch [DFVar ifRet, DFVar $ resultBinding thenBranch, DFVar $ resultBinding elseBranch] Nothing
+            [ LetExpr switchId assignment Refs.switch [conditionVariable, DFVar $ resultBinding thenBranch, DFVar $ resultBinding elseBranch] Nothing
             ]
 
     scopeFreeVariables lam freeVars = do
@@ -67,4 +64,3 @@ instance HigherOrderFunction IfFn where
 
     contextifyUnboundFunctions (Lam (Direct x) _) = return $ Just x
     contextifyUnboundFunctions _ = failWith "Unexpected destructuring in begin assignment"
-

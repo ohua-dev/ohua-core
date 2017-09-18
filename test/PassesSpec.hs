@@ -135,10 +135,10 @@ passesSpec = do
             `shouldBe`
             ("ohua.lang/smap" `Apply` Lambda "i_0" ("ohua.math/add" `Apply` "i_0" `Apply` "i_0") `Apply` "x")
         it "inlines reassignments in argument lambdas in complex expressions" $
-            normalize'
+            inlineReassignments
                 (Let "coll0" ("ohua.lang/smap" `Apply` Lambda "i" (Lambda "x" ("ohua.math/add" `Apply` "x" `Apply` "x") `Apply` "i") `Apply` "coll") "coll0")
             `shouldBe`
-            Right (Let "coll0" ("ohua.lang/smap" `Apply` Lambda "i" ("ohua.math/add" `Apply` "i" `Apply` "i") `Apply` "coll") "coll0")
+            Let "coll0" ("ohua.lang/smap" `Apply` Lambda "i" ("ohua.math/add" `Apply` "i" `Apply` "i") `Apply` "coll") "coll0"
 
 
 

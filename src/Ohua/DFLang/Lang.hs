@@ -17,7 +17,9 @@
 --
 module Ohua.DFLang.Lang where
 
+import           Data.Foldable   (toList)
 import           Data.Hashable
+import           Data.List       (intercalate)
 import           Data.Sequence
 import           Data.String
 import           Ohua.ALang.Lang
@@ -56,3 +58,19 @@ instance Hashable DFVar where
 
 instance IsString DFVar where fromString = DFVar . fromString
 instance Num DFVar where fromInteger = DFEnvVar . fromInteger
+
+
+
+showDFExpr :: DFExpr -> String
+showDFExpr (DFExpr lets retVar) =
+    unlines $ (toList $ fmap showLet lets) ++ [show retVar]
+  where
+    showAssign (Direct v)       = show v
+    showAssign (Destructure vs) = "[" ++ intercalate ", " (map show vs) ++ "]"
+    showRef (DFFunction a) = show a
+    showRef (EmbedSf a)    = show a
+    showVar (DFEnvVar h) = show h
+    showVar (DFVar v)    = show v
+    showLet (LetExpr id ass ref args ctxArc) =
+        "let " ++ showAssign ass ++ " = " ++ showRef ref ++ "<" ++ show id ++ "> ("
+        ++ intercalate ", " (map showVar args) ++ ")" ++ maybe "" (\a -> " [" ++ show a ++"]") ctxArc

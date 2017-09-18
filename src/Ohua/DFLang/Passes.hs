@@ -97,15 +97,6 @@ lowerALang expr = do
 lowerDefault :: MonadOhua m => Pass m
 lowerDefault fn fnId assign args = mapM expectVar args <&> \args' -> [LetExpr fnId assign (EmbedSf fn) args' Nothing]
 
-    -- finds all functions that use vars from the lexical context and adds the context source to them.
--- needs to do the following two things
---        1. contextify all functions that do not have a bound arg -> context arg
---        2. provide lexical scope access to these args
-tieContext :: (Functor f, Foldable f) => Binding -> f LetExpr -> f LetExpr
-tieContext ctxSource exprs = tieContext0 bounds ctxSource exprs
-  where
-    bounds = findBoundVars exprs
-
 
 tieContext0 :: Functor f => HS.HashSet Binding -> Binding -> f LetExpr -> f LetExpr
 tieContext0 bounds ctxSource = fmap go
@@ -126,25 +117,6 @@ findFreeVars0 boundVars = HS.fromList . concatMap (mapMaybe f . callArguments)
   where
     f (DFVar b) | not (HS.member b boundVars) = Just b
     f _         = Nothing
-
-
--- | Insert a `one-to-n` node for each free variable to scope them.
-replicateFreeVars :: MonadOhua m => Binding -> [Binding] -> Seq LetExpr -> m (Seq LetExpr)
-replicateFreeVars countSource_ initialBindings exprs = do
-    (replicators, replications) <- unzip <$> mapM mkReplicator freeVars
-    pure $ S.fromList replicators >< renameWith (HM.fromList $ zip freeVars replications) exprs
-  where
-    boundVars = findBoundVars exprs `mappend` HS.fromList initialBindings
-
-    freeVars = HS.toList $ HS.fromList $ concatMap (mapMaybe f . callArguments) exprs
-
-    f (DFVar b) | not (HS.member b boundVars) = Just b
-    f _         = Nothing
-
-    mkReplicator var = do
-        id <- generateId
-        newVar <- generateBindingWith var
-        pure (LetExpr id (Direct newVar) (DFFunction "com.ohua.lang/one-to-n") [DFVar countSource_, DFVar var] Nothing, newVar)
 
 
 renameWith :: Functor f => HM.HashMap Binding Binding -> f LetExpr -> f LetExpr
@@ -187,7 +159,11 @@ lowerHOF _ assign args = do
         for_ lambdas $ \(lam, body) -> do
             let boundVars = findBoundVars body `mappend` HS.fromList (flattenAssign $ beginAssignment lam)
             let freeVars = HS.toList $ findFreeVars0 boundVars body
-            (scopers, renaming) <- scopeFreeVariables lam freeVars
+            (scopers, renaming) <-
+                if null freeVars then
+                    return ([], [])
+                else
+                    scopeFreeVariables lam freeVars
             tell scopers
             scopeUnbound <- contextifyUnboundFunctions lam
             let tieContext1 = case scopeUnbound of

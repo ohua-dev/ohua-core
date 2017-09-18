@@ -116,10 +116,10 @@ smapSpec = smapLowering
 ifLowering :: Spec
 ifLowering = describe "lowering conditionals" $ do
     let sourceExpr =
-          Let "a" ("com.ohua.lang/id" `Apply` 0) $
-          Let "b" ("com.ohua.lang/id" `Apply` 1) $
-          Let "c" ("com.ohua.lang/id" `Apply` 2) $
-          Let "z" (Apply (Apply (Apply "com.ohua.lang/if" "c")
+          Let "a" ("ohua.lang/id" `Apply` 0) $
+          Let "b" ("ohua.lang/id" `Apply` 1) $
+          Let "c" ("ohua.lang/id" `Apply` 2) $
+          Let "z" (Apply (Apply (Apply "ohua.lang/if" "c")
                                 (Lambda "then" (Let "f" (Apply (Apply "some-ns/+" "a") "b") "f")))
                                 (Lambda "else" (Let "f0" (Apply (Apply "some-ns/-" "a") "b") "f0")))
           "z"
