@@ -1,7 +1,8 @@
 module TestAesonConvert where
 
 
-import           Data.Aeson
+import           Data.Aeson as A
+import           Data.Aeson.Types as A
 import           Ohua.ALang.Lang
 import           Ohua.DFGraph
 import           Ohua.Serialize.JSON   ()
@@ -13,8 +14,9 @@ import           Test.QuickCheck
 
 
 testConvert :: (ToJSON a, FromJSON a, Arbitrary a, Show a, Eq a) => a -> Bool
-testConvert thing = Just thing == decode (encode thing)
-
+testConvert thing =
+    Just thing == decode (encode thing) -- this uses and tests toEncoding
+    && parse parseJSON (toJSON thing) == A.Success thing -- this uses and tests toJSON
 
 
 spec :: Spec
