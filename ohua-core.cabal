@@ -21,7 +21,7 @@ flag debug
   default: False
 
 library
-  exposed-modules:     
+  exposed-modules:
       Ohua.Compile
     , Ohua.IR
     , Ohua.Types
@@ -49,7 +49,7 @@ library
     , Ohua.Util
   -- other-modules:
   -- other-extensions:
-  build-depends:       
+  build-depends:
       base >=4.8 && <5
     , transformers
     , microlens
@@ -65,7 +65,7 @@ library
     , vector
   hs-source-dirs:      src
   default-language:    Haskell2010
-  default-extensions:  
+  default-extensions:
       OverloadedStrings
     , MultiParamTypeClasses
     , FunctionalDependencies
@@ -83,16 +83,30 @@ library
 executable ohua-test-exec
   main-is: Main.hs
   hs-source-dirs: .
-  build-depends: 
+  build-depends:
       base >=4.8 && <5
     , ohua-core
     , mtl
   default-language: Haskell2010
 
 
+executable test-graph-gen
+  main-is: GenJSONGraph.hs
+  hs-source-dirs: test, .
+  other-modules:
+    Ohua.Types.Arbitrary
+  build-depends:
+      base >=4.8 && <5
+    , ohua-core
+    , bytestring
+    , aeson
+    , QuickCheck
+    , text
+  default-language: Haskell2010
+
 test-suite ohua-tests
   main-is: Spec.hs
-  other-modules:       
+  other-modules:
       PassesSpec
     , DFLowering
     , TestALangUtils
@@ -100,7 +114,7 @@ test-suite ohua-tests
     , TestAesonConvert
     , Ohua.Types.Arbitrary
   hs-source-dirs:      test
-  build-depends:       
+  build-depends:
       base >=4.8 && <5
     , ohua-core
     , hspec
@@ -131,4 +145,3 @@ test-suite ohua-tests
 --
 --  type:                exitcode-stdio-1.0
 --  default-extensions:  OverloadedStrings
-

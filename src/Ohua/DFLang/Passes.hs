@@ -131,7 +131,6 @@ handleApplyExpr :: MonadOhua m => Expression -> m (QualifiedBinding, FnId, [Expr
 handleApplyExpr (Apply fn arg) = go fn [arg]
   where
     go (Var (Sf fn id)) args = (fn, , args) <$> maybe generateId return id
-            -- reject algos for now
     go (Var v) _             = failWith $ "Expected Var Sf but got: Var " <> showT v -- FIXME there should be a special type of error here that takes the string and a value
     go (Apply fn arg) args   = go fn (arg:args)
     go x _                   = failWith $ "Expected Apply or Var but got: " <> showT x
@@ -143,7 +142,7 @@ handleApplyExpr g = failWith $ "Expected apply but got: " <> showT g
 expectVar :: MonadOhua m => Expression -> m DFVar
 expectVar (Var (Local bnd)) = pure $ DFVar bnd
 expectVar (Var (Env i))     = pure $ DFEnvVar i
-expectVar (Var _)           = failWith "Var must be local or env"
+expectVar (Var v)           = failWith $ "Var must be local or env, was " <> showT v
 expectVar a                 = failWith $ "Argument must be var, was " <> showT a
 
 
