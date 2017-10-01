@@ -1,8 +1,8 @@
 module TestAesonConvert where
 
 
-import           Data.Aeson as A
-import           Data.Aeson.Types as A
+import           Data.Aeson            as A
+import           Data.Aeson.Types      as A
 import           Ohua.ALang.Lang
 import           Ohua.DFGraph
 import           Ohua.Serialize.JSON   ()

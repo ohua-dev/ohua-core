@@ -15,6 +15,7 @@ module Ohua.Compile where
 import           Control.Monad.Except
 import           Data.Functor.Identity
 import qualified Data.HashMap.Strict       as HM
+import           Data.Monoid               ((<>))
 import           Debug.Trace
 import           Lens.Micro
 import           Ohua.ALang.Lang
@@ -28,8 +29,7 @@ import           Ohua.DFLang.Optimizations
 import           Ohua.DFLang.Passes
 import           Ohua.Monad
 import           Ohua.Types
-import Ohua.Util
-import Data.Monoid ((<>))
+import           Ohua.Util
 
 
 -- | The canonical order of transformations and lowerings performed in a full compilation.
@@ -37,7 +37,7 @@ pipeline :: MonadOhua m => Expression -> m OutGraph
 pipeline e = do
     ssaE <- performSSA e
     normalizedE <- normalize ssaE
-
+    forceTraceReport "Normalization done" normalizedE
 #ifdef DEBUG
     checkProgramValidity normalizedE
     checkHigherOrderFunctionSupport normalizedE
@@ -50,9 +50,8 @@ pipeline e = do
     Ohua.ALang.Passes.SSA.checkSSA optimizedE
 #endif
 
-    traceShow optimizedE (return ())
-
     dfE <- lowerALang optimizedE
+    forceTraceReport "Lowering done" dfE
 
 #ifdef DEBUG
     Ohua.DFLang.Passes.checkSSAExpr dfE
@@ -63,8 +62,10 @@ pipeline e = do
 #ifdef DEBUG
     Ohua.DFLang.Passes.checkSSAExpr optimizedDfE
 #endif
-    trace (showDFExpr optimizedDfE) (return ())
-    return $ toGraph optimizedDfE
+    let gr = toGraph optimizedDfE
+    forceTraceReport "Graph created" gr
+    pure gr
+
 
 
 -- | Run the pipeline in an arbitrary monad that supports error reporting.
@@ -81,11 +82,11 @@ checkHigherOrderFunctionSupport (Let _ e rest) = do
     checkNestedExpr (Apply f arg) = do
         supportsHOF <- checkNestedExpr f
         when (isLambda arg && not supportsHOF) $ failWith $ "Lambdas may only be input to higher order functions, not " <> showT f
-        return True
-    checkNestedExpr (Var (Sf n _)) = return $ HM.member n hofNames
-    checkNestedExpr (Var _) = return False
+        pure True
+    checkNestedExpr (Var (Sf n _)) = pure $ HM.member n hofNames
+    checkNestedExpr (Var _) = pure False
     checkNestedExpr a = failWith $ "Expected var or apply expr, got " <> showT a
     isLambda (Lambda _ _) = True
     isLambda _            = False
-checkHigherOrderFunctionSupport (Var _) = return ()
+checkHigherOrderFunctionSupport (Var _) = pure ()
 checkHigherOrderFunctionSupport a = failWith $ "Expected let or var, got " <> showT a

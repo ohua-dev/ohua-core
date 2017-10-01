@@ -12,11 +12,14 @@
 {-# LANGUAGE UndecidableInstances #-}
 module Ohua.Util where
 
+import           Control.DeepSeq
 import           Control.Exception
 import           Control.Monad.Except
-import qualified Data.Text            as T
+import           Control.Monad.IO.Class
+import qualified Data.Text              as T
 import           Lens.Micro
-
+import           System.IO
+import           System.IO.Unsafe
 
 type Prism s t a b = Traversal s t a b
 
@@ -36,8 +39,8 @@ prism' make get = prism make (\s -> maybe (Left s) Right $ get s)
 
 
 
-assertM :: Monad m => Bool -> m ()
-assertM = flip assert (return ())
+assertM :: Applicative m => Bool -> m ()
+assertM = flip assert (pure ())
 {-# INLINE assertM #-}
 
 
@@ -57,3 +60,13 @@ class ShowT a where
 
 instance {-# OVERLAPPABLE #-} Show a => ShowT a where
     showT = T.pack . show
+
+trace :: String -> a -> a
+trace msg a = unsafeDupablePerformIO (hPutStrLn stderr msg >> pure a)
+
+forceAndReport :: (MonadIO m, NFData a) => String -> a -> m ()
+forceAndReport msg val = val `deepseq` liftIO (putStrLn msg)
+
+
+forceTraceReport :: (Applicative f, NFData a) => String -> a -> f ()
+forceTraceReport msg val = val `deepseq` trace msg (pure ())

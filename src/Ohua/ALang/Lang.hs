@@ -19,6 +19,7 @@ import           Data.String
 import qualified Data.Text             as T
 import           GHC.Generics
 import           Ohua.Types
+import           Ohua.Util
 
 
 -- bindingType is the type of general bindings
@@ -36,6 +37,8 @@ instance Show HostExpr where
 -- Only exists to allow literal integers to be interpreted as host expressions
 instance Num HostExpr where fromInteger = HostExpr . fromInteger
 instance Hashable HostExpr where hashWithSalt s = hashWithSalt s . unwrapHostExpr
+
+instance NFData HostExpr
 
 -- (Sebastian) can we treat opaque JVM objects here somehow?
 -- (Justus) Several. Well have to discus what the best option is at some point,

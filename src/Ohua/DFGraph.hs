@@ -11,6 +11,7 @@
 module Ohua.DFGraph where
 
 
+import           Control.DeepSeq
 import           Data.Aeson
 import           Data.Foldable
 import qualified Data.HashMap.Strict as HM
@@ -32,25 +33,15 @@ data Target = Target
     , index    :: !Int
     } deriving (Eq, Generic, Show)
 
-
 data Arc envExpr = Arc
     { target :: !Target
     , source :: !(Source envExpr)
     } deriving (Eq, Generic, Show)
 
-instance Functor Arc where
-    fmap f (Arc target source) = Arc target (fmap f source)
-
-
 data Source envExpr
     = LocalSource !Target
     | EnvSource !envExpr
     deriving (Eq, Generic, Show)
-
-instance Functor Source where
-    fmap f (EnvSource e)   = EnvSource $ f e
-    fmap _ (LocalSource t) = LocalSource t
-
 
 -- | Graph emitted by the compiler. Abstracted over the type of environment expression it contains.
 data AbstractOutGraph envExpr = OutGraph
@@ -58,12 +49,23 @@ data AbstractOutGraph envExpr = OutGraph
     , arcs      :: [Arc envExpr]
     } deriving (Eq, Generic, Show)
 
+type OutGraph = AbstractOutGraph HostExpr
 
+
+instance Functor Source where
+    fmap f (EnvSource e)   = EnvSource $ f e
+    fmap _ (LocalSource t) = LocalSource t
+instance Functor Arc where
+    fmap f (Arc target source) = Arc target (fmap f source)
 instance Functor AbstractOutGraph where
     fmap f (OutGraph ops arcs) = OutGraph ops (fmap (fmap f) arcs)
 
 
-type OutGraph = AbstractOutGraph HostExpr
+instance NFData Operator
+instance NFData Target
+instance NFData a => NFData (Arc a)
+instance NFData a => NFData (Source a)
+instance NFData a => NFData (AbstractOutGraph a)
 
 
 toGraph :: DFExpr -> OutGraph
@@ -104,4 +106,4 @@ spliceEnv (OutGraph ops oldArcs) lookup = OutGraph ops arcs
     arcs = map f oldArcs
     f (Arc t source) = Arc t $ case source of
         EnvSource (HostExpr i) -> EnvSource (lookup i)
-        LocalSource t -> LocalSource t
+        LocalSource t          -> LocalSource t

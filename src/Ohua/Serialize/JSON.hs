@@ -5,6 +5,13 @@
 -- License     : EPL-1.0
 -- Maintainer  : sebastian.ertel@gmail.com, dev@justus.science
 -- Stability   : experimental
+--
+-- This module basically does not expose anything that is not available otherwise.
+-- It is a single place to collect the orphan instances for the types in ohua that are part of the
+-- external API.
+--
+-- The two exposed functions, 'encode' and 'eitherDecode', are just convenient reexports from
+-- @Data.Aeson@.
 
 -- This source code is licensed under the terms described in the associated LICENSE.TXT file
 module Ohua.Serialize.JSON (encode, eitherDecode) where
@@ -18,12 +25,17 @@ import           Ohua.ALang.Lang
 import           Ohua.DFGraph
 import           Ohua.Types
 
-baseOptions = defaultOptions { unwrapUnaryRecords = True, fieldLabelModifier = camelTo2 '_' }
-sourceOptions = baseOptions { constructorTagModifier = f, sumEncoding = TaggedObject "type" "val" }
-  where
-    f "LocalSource" = "local"
-    f "EnvSource" = "env"
-    f _ = error "This is only intended for use with something of type `Source`"
+baseOptions = defaultOptions
+    { unwrapUnaryRecords = True
+    , fieldLabelModifier = camelTo2 '_'
+    }
+sourceOptions = baseOptions
+    { constructorTagModifier = \case
+        "LocalSource" -> "local"
+        "EnvSource" -> "env"
+        _ -> error "This is only intended for use with something of type `Source`"
+    , sumEncoding = TaggedObject "type" "val"
+    }
 
 operatorOptions = baseOptions
     { fieldLabelModifier =

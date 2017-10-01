@@ -24,6 +24,7 @@ import           Data.Sequence
 import           Data.String
 import           Ohua.ALang.Lang
 import           Ohua.Types
+import           Control.DeepSeq
 
 -- | A sequence of let statements with a terminating binding to be used as return value
 data DFExpr = DFExpr
@@ -59,6 +60,20 @@ instance Hashable DFVar where
 instance IsString DFVar where fromString = DFVar . fromString
 instance Num DFVar where fromInteger = DFEnvVar . fromInteger
 
+
+instance NFData DFExpr where
+    rnf (DFExpr a b) = a `deepseq` rnf b
+
+instance NFData LetExpr where
+    rnf (LetExpr a b c d e) = a `deepseq` b `deepseq` c `deepseq` d `deepseq` rnf e
+
+instance NFData DFFnRef where
+    rnf (DFFunction bnd) = rnf bnd
+    rnf (EmbedSf bnd) = rnf bnd
+
+instance NFData DFVar where
+    rnf (DFEnvVar e) = rnf e
+    rnf (DFVar v) = rnf v
 
 
 showDFExpr :: DFExpr -> String

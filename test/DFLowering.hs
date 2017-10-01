@@ -1,7 +1,7 @@
 {-# LANGUAGE BangPatterns       #-}
 {-# LANGUAGE FlexibleInstances  #-}
 {-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE UnboxedTuples #-}
+{-# LANGUAGE UnboxedTuples      #-}
 module DFLowering where
 
 import           Control.Arrow
