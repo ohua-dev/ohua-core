@@ -136,12 +136,14 @@ instance ExtractBindings a => ExtractBindings [a] where extractBindings = concat
 
 
 -- | Allowed forms for the left hand side of a let binding or in a lambda input.
-data Assignment
-    = Direct !Binding
-    | Destructure ![Binding]
+data AbstractAssignment binding
+    = Direct !binding
+    | Destructure ![binding]
     deriving (Eq)
 
-instance Show Assignment where
+type Assignment = AbstractAssignment Binding
+
+instance Show binding => Show (AbstractAssignment binding) where
     show (Direct b)      = show b
     show (Destructure d) = show d
 
@@ -159,14 +161,14 @@ instance ExtractBindings Assignment where
     extractBindings (Direct bnd)       = [bnd]
     extractBindings (Destructure bnds) = bnds
 
-instance NFData Assignment where
+instance NFData binding => NFData (AbstractAssignment binding) where
     rnf (Destructure ds) = rnf ds
     rnf (Direct d)       = rnf d
 
-_Direct :: Prism' Assignment Binding
+_Direct :: Prism' (AbstractAssignment binding) binding
 _Direct = prism' Direct $ \case { Direct a -> Just a; _ -> Nothing }
 
-_Destructure :: Prism' Assignment [Binding]
+_Destructure :: Prism' (AbstractAssignment binding) [binding]
 _Destructure = prism' Destructure $ \case { Destructure a -> Just a; _ -> Nothing }
 
 
@@ -199,3 +201,35 @@ takenNames f (NameGenerator taken l) = flip NameGenerator l <$> f taken
 
 simpleNameList :: Lens' NameGenerator [Binding]
 simpleNameList f (NameGenerator taken l) = NameGenerator taken <$> f l
+
+
+data Annotated annotation value = Annotated !annotation !value
+    deriving (Eq, Show)
+
+instance (NFData annotation, NFData value) => NFData (Annotated annotation value) where
+    rnf (Annotated ann val) = ann `deepseq` rnf val
+
+instance HasValue (Annotated annotation value) value where
+    value f (Annotated ann val) = Annotated ann <$> f val
+
+instance HasAnnotation (Annotated annotation value) annotation where
+    annotation f (Annotated ann val) = flip Annotated val <$> f ann
+
+
+-- | A type expression
+data TyExpr binding
+    = TyRef binding -- ^ A primitive referece to a type
+    | TyApp (TyExpr binding) (TyExpr binding) -- ^ A type application
+    deriving (Show, Eq)
+
+-- | Default primitive type references (type variables and constructors)
+data TyVar tyConRef tyVarRef 
+    = TyCon tyConRef 
+    | TyVar tyVarRef
+    deriving (Show, Eq)
+
+type DefaultTyExpr = TyExpr (TyVar SomeBinding SomeBinding)
+
+instance NFData binding => NFData (TyExpr binding) where
+    rnf (TyRef bnd) = rnf bnd
+    rnf (TyApp a b) = a `deepseq` rnf b

@@ -14,4 +14,3 @@ data Namespace sym = Namespace
     , nsSfImports   :: [(NSRef, [Binding])]
     , nsDecls       :: HM.HashMap Binding (Expr sym)
     }
-

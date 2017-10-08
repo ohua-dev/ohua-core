@@ -64,7 +64,6 @@ data Symbol a
         -- reference to an environment object. this maybe a var or any other term of the host language.
     deriving (Show, Eq)
 
-
 type ResolvedSymbol = Symbol QualifiedBinding
 
 instance IsString ResolvedSymbol where
@@ -230,15 +229,27 @@ foldrExpr f e b = runIdentity $ foldrExprM (\x y -> return $ f x y) e b
 --
 
 -- | An expression in the algorithm language.
--- Abstracted over a concrete type of binding.
-data Expr bindingType
-    = Var bindingType
-    | Let Assignment (Expr bindingType) (Expr bindingType)
-    | Apply (Expr bindingType) (Expr bindingType)
-    | Lambda Assignment (Expr bindingType)
+-- Abstracted over a concrete type of local binding (target) and a type of reference (source).
+data AExpr bndType refType
+    = Var refType
+    | Let (AbstractAssignment bndType) (AExpr bndType refType) (AExpr bndType refType)
+    | Apply (AExpr bndType refType) (AExpr bndType refType)
+    | Lambda (AbstractAssignment bndType) (AExpr bndType refType)
     deriving (Show, Eq)
 
-instance IsString b => IsString (Expr b) where
+-- | Backward compatible alias
+type Expr = AExpr Binding
+
+-- | An Alang expression with optionally type annotated bindings (let bindings and lambda arguments)
+type OptTyAnnExpr = AExpr (Annotated (Maybe DefaultTyExpr) Binding)
+
+-- | An Alang expression with only type annotated bindings (let bindings and lambda arguments)
+type TyAnnExpr = AExpr (Annotated DefaultTyExpr Binding)
+
+-- | Backward compatibility alias
+type Expression = Expr ResolvedSymbol
+
+instance IsString b => IsString (AExpr a b) where
     fromString = Var . fromString
 
 instance ExtractBindings b => ExtractBindings (Expr b) where
@@ -248,10 +259,8 @@ instance ExtractBindings b => ExtractBindings (Expr b) where
     extractBindings (Lambda assign body) = extractBindings assign ++ extractBindings body
 
 
-instance NFData a => NFData (Expr a) where
+instance (NFData a, NFData b) => NFData (AExpr a b) where
     rnf (Let a b c)  = rnf a `seq` rnf b `seq` rnf c
     rnf (Var a)      = rnf a
     rnf (Apply a b)  = rnf a `seq` rnf b
     rnf (Lambda a b) = rnf a `seq` rnf b
-
-type Expression = Expr ResolvedSymbol

@@ -10,6 +10,7 @@ import           Ohua.Monad
 import           Ohua.Types
 
 
+expr, expr0, expr1, expr2, expr3, expr4, expr5 :: Expression
 expr =
     Apply
         (Let "x" (Lambda "y" "y") "x")

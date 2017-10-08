@@ -1,3 +1,4 @@
+{-# LANGUAGE TypeSynonymInstances, FlexibleInstances #-}
 module Ohua.Types.Arbitrary where
 
 
@@ -34,6 +35,7 @@ instance Arbitrary Assignment where
 instance Arbitrary a => Arbitrary (Expr a) where
     arbitrary = sized expr
       where
+        expr :: Arbitrary a => Int -> Gen (Expr a)
         expr 0 = Var <$> arbitrary
         expr n = oneof
             [ liftM3 Let arbitrary nestExpr nestExpr
