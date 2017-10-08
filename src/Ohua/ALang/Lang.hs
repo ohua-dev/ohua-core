@@ -13,15 +13,18 @@ module Ohua.ALang.Lang where
 
 
 import           Control.DeepSeq
+import           Data.Bifoldable
+import           Data.Bifunctor
+import           Data.Bitraversable
 import           Data.Functor.Identity
 import           Data.Hashable
 import           Data.String
 import qualified Data.Text             as T
 import           GHC.Generics
+import           Lens.Micro            ((^.))
+import           Ohua.LensClasses
 import           Ohua.Types
 import           Ohua.Util
-import           Lens.Micro ((^.))
-import Ohua.LensClasses
 
 
 -- bindingType is the type of general bindings
@@ -182,7 +185,7 @@ foldrExpr f e b = runIdentity $ foldrExprM (\x y -> return $ f x y) e b
 
 
 lrMapBndsRefsA :: Applicative f => (bndT -> f bndT') -> (refT -> f refT') -> AExpr bndT refT -> f (AExpr bndT' refT')
-lrMapBndsRefsA mapBnd mapRef expr = 
+lrMapBndsRefsA mapBnd mapRef expr =
     case expr of
         Var ref -> Var <$> mapRef ref
         Let assign val body -> Let <$> traverse mapBnd assign <*> recur val <*> recur body
@@ -190,7 +193,7 @@ lrMapBndsRefsA mapBnd mapRef expr =
         Lambda assign body -> Lambda <$> traverse mapBnd assign <*> recur body
   where recur = lrMapBndsRefsA mapBnd mapRef
 
-  
+
 lrMapBndsA :: Applicative f => (bndT -> f bndT') -> AExpr bndT refT -> f (AExpr bndT' refT)
 lrMapBndsA = flip lrMapBndsRefsA pure
 
@@ -270,6 +273,43 @@ data AExpr bndType refType
     | Lambda (AbstractAssignment bndType) (AExpr bndType refType)
     deriving (Show, Eq)
 
+instance Bifunctor AExpr where
+    bimap f g expr =
+        case expr of
+            Var v -> Var $ g v
+            Let assign val body -> Let (fmap f assign) (recur val) (recur body)
+            Apply e1 e2 -> Apply (recur e1) (recur e2)
+            Lambda assign body -> Lambda (fmap f assign) (recur body)
+      where recur = bimap f g
+
+instance Functor (AExpr a) where
+    fmap = bimap id
+
+instance Bifoldable AExpr where
+    bifoldr f g c expr =
+        case expr of
+            Var v               -> g v c
+            Let assign val body -> foldr f (recur val $ recur body c) assign
+            Apply e1 e2         -> recur e1 $ recur e2 c
+            Lambda assign body  -> foldr f (recur body c) assign
+      where recur = flip $ bifoldr f g
+
+instance Foldable (AExpr a) where
+    foldr = bifoldr (flip const)
+
+instance Bitraversable AExpr where
+    bitraverse f g expr =
+        case expr of
+            Var v -> Var <$> g v
+            Let assign val body -> Let <$> traverse f assign <*> recur val <*> recur body
+            Apply e1 e2 -> Apply <$> recur e1 <*> recur e2
+            Lambda assign body -> Lambda <$> traverse f assign <*> recur body
+
+      where recur = bitraverse f g
+
+instance Traversable (AExpr a) where
+    traverse = bitraverse pure
+
 -- | Backward compatible alias
 type Expr = AExpr Binding
 
@@ -301,4 +341,4 @@ instance (NFData a, NFData b) => NFData (AExpr a b) where
 
 removeTyAnns :: TyAnnExpr a -> Expr a
 removeTyAnns = lrMapBnds (^. value)
-    
+

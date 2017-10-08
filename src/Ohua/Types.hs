@@ -13,19 +13,22 @@
 module Ohua.Types where
 
 import           Control.DeepSeq
+import           Data.Bifoldable
+import           Data.Bifunctor
+import           Data.Bitraversable
+import qualified Data.Char          as C
 import           Data.Hashable
-import qualified Data.HashSet     as HS
+import qualified Data.HashSet       as HS
 import           Data.Maybe
 import           Data.Monoid
 import           Data.String
-import qualified Data.Text        as T
-import qualified Data.Vector      as V
+import qualified Data.Text          as T
+import qualified Data.Vector        as V
 import           GHC.Exts
 import           GHC.Generics
 import           Lens.Micro
 import           Ohua.LensClasses
 import           Ohua.Util
-import qualified Data.Char as C
 
 
 -- | The numeric id of a function call site
@@ -145,15 +148,15 @@ data AbstractAssignment binding
 type Assignment = AbstractAssignment Binding
 
 instance Functor AbstractAssignment where
-    fmap f (Direct d) = Direct $ f d
+    fmap f (Direct d)       = Direct $ f d
     fmap f (Destructure ds) = Destructure $ map f ds
 
 instance Foldable AbstractAssignment where
-    foldr f b (Direct bnd) = f bnd b
+    foldr f b (Direct bnd)       = f bnd b
     foldr f b (Destructure bnds) = foldr f b bnds
 
 instance Traversable AbstractAssignment where
-    sequenceA (Direct a) = Direct <$> a
+    sequenceA (Direct a)       = Direct <$> a
     sequenceA (Destructure as) = Destructure <$> sequenceA as
 
 instance Show binding => Show (AbstractAssignment binding) where
@@ -228,6 +231,23 @@ instance HasValue (Annotated annotation value) value where
 instance HasAnnotation (Annotated annotation value) annotation where
     annotation f (Annotated ann val) = flip Annotated val <$> f ann
 
+instance Bifunctor Annotated where
+    bimap f g (Annotated ann val) = Annotated (f ann) (g val)
+
+instance Bifoldable Annotated where
+    bifoldr f g c (Annotated ann val) = f ann $ g val c
+
+instance Bitraversable Annotated where
+    bitraverse f g (Annotated ann val) = Annotated <$> f ann <*> g val
+
+instance Functor (Annotated ann) where
+    fmap = bimap id
+
+instance Foldable (Annotated ann) where
+    foldr = bifoldr (flip const)
+
+instance Traversable (Annotated ann) where
+    traverse = bitraverse pure
 
 -- | A type expression
 data TyExpr binding
@@ -235,13 +255,27 @@ data TyExpr binding
     | TyApp (TyExpr binding) (TyExpr binding) -- ^ A type application
     deriving (Show, Eq)
 
+instance Functor TyExpr where
+    fmap f (TyRef r) = TyRef $ f r
+    fmap f (TyApp e1 e2) = recur e1 `TyApp` recur e2
+      where recur = fmap f
+
+instance Foldable TyExpr where
+    foldr f c (TyRef r) = f r c
+    foldr f c (TyApp e1 e2) = recur e2 $ recur e2 c
+      where recur = flip (foldr f)
+
+instance Traversable TyExpr where
+    traverse f (TyRef r)     = TyRef <$> f r
+    traverse f (TyApp e1 e2) = TyApp <$> traverse f e1 <*> traverse f e2
+
 -- | Default primitive type references (type variables and constructors)
-data TyVar tyConRef tyVarRef 
-    = TyCon tyConRef 
+data TyVar tyConRef tyVarRef
+    = TyCon tyConRef
     | TyVar tyVarRef
     deriving (Show, Eq)
 
--- | Typical instantiation of a @TyVar@ 
+-- | Typical instantiation of a @TyVar@
 type SomeTyVar = TyVar SomeBinding SomeBinding
 
 -- | Typical instantiation of a @TyExpr@

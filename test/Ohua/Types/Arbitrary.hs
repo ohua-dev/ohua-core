@@ -1,4 +1,5 @@
-{-# LANGUAGE TypeSynonymInstances, FlexibleInstances #-}
+{-# LANGUAGE FlexibleInstances    #-}
+{-# LANGUAGE TypeSynonymInstances #-}
 module Ohua.Types.Arbitrary where
 
 
