@@ -20,6 +20,8 @@ import qualified Data.Text             as T
 import           GHC.Generics
 import           Ohua.Types
 import           Ohua.Util
+import           Lens.Micro ((^.))
+import Ohua.LensClasses
 
 
 -- bindingType is the type of general bindings
@@ -82,7 +84,7 @@ instance NFData ResolvedSymbol where
 
 
 -- | Traverse an ALang expression from left to right and top down, building a new expression.
-lrPrewalkExprM :: Monad m => (Expr b -> m (Expr b)) -> Expr b -> m (Expr b)
+lrPrewalkExprM :: Monad m => (AExpr bndT refT -> m (AExpr bndT refT)) -> AExpr bndT refT -> m (AExpr bndT refT)
 lrPrewalkExprM f e = f e >>= \case
     Let bnd val body -> Let bnd <$> lrPrewalkExprM f val <*> lrPrewalkExprM f body
     Apply fn arg -> Apply <$> lrPrewalkExprM f fn <*> lrPrewalkExprM f arg
@@ -91,7 +93,7 @@ lrPrewalkExprM f e = f e >>= \case
 
 
 -- | Traverse an ALang expression from right to left and top down.
-rlPrewalkExprM :: Monad m => (Expr b -> m (Expr b)) -> Expr b -> m (Expr b)
+rlPrewalkExprM :: Monad m => (AExpr bndT refT -> m (AExpr bndT refT)) -> AExpr bndT refT -> m (AExpr bndT refT)
 rlPrewalkExprM f e = f e >>= \case
     Let bnd val body -> flip (Let bnd) <$> lrPrewalkExprM f body <*> lrPrewalkExprM f val
     Apply fn arg -> flip Apply <$> lrPrewalkExprM f arg <*> lrPrewalkExprM f fn
@@ -100,17 +102,17 @@ rlPrewalkExprM f e = f e >>= \case
 
 
 -- | Same as 'lrPrewalkExprM' but does not carry a monadic value.
-lrPrewalkExpr :: (Expr b -> (Expr b)) -> Expr b -> (Expr b)
+lrPrewalkExpr :: (AExpr bndT refT -> AExpr bndT refT) -> AExpr bndT refT -> (AExpr bndT refT)
 lrPrewalkExpr f = runIdentity . lrPrewalkExprM (return . f)
 
 
 -- | Same as 'rlPrewalkExprM' but does not carry a monadic value.
-rlPrewalkExpr :: (Expr b -> (Expr b)) -> Expr b -> (Expr b)
+rlPrewalkExpr :: (AExpr bndT refT -> AExpr bndT refT) -> AExpr bndT refT -> (AExpr bndT refT)
 rlPrewalkExpr f = runIdentity . rlPrewalkExprM (return . f)
 
 
 -- | Traverse an ALang expression from left to right and from the bottom up.
-lrPostwalkExprM :: Monad m => (Expr b -> m (Expr b)) -> Expr b -> m (Expr b)
+lrPostwalkExprM :: Monad m => (AExpr bndT refT -> m (AExpr bndT refT)) -> AExpr bndT refT -> m (AExpr bndT refT)
 lrPostwalkExprM f e = f =<< case e of
     Let assign val body -> Let assign <$> lrPostwalkExprM f val <*> lrPostwalkExprM f body
     Apply fn arg -> Apply <$> lrPostwalkExprM f fn <*> lrPostwalkExprM f arg
@@ -119,7 +121,7 @@ lrPostwalkExprM f e = f =<< case e of
 
 
 -- | Traverse an ALang expression from right to left and from the bottom up.
-rlPostwalkExprM :: Monad m => (Expr b -> m (Expr b)) -> Expr b -> m (Expr b)
+rlPostwalkExprM :: Monad m => (AExpr bndT refT -> m (AExpr bndT refT)) -> AExpr bndT refT -> m (AExpr bndT refT)
 rlPostwalkExprM f e = f =<< case e of
     Let assign val body -> flip (Let assign) <$> lrPostwalkExprM f body <*> lrPostwalkExprM f val
     Apply fn arg -> flip Apply <$> lrPostwalkExprM f arg <*>  lrPostwalkExprM f fn
@@ -128,18 +130,18 @@ rlPostwalkExprM f e = f =<< case e of
 
 
 -- | Same as 'lrPostwalkExprM' but does not carry a monad.
-lrPostwalkExpr :: (Expr b -> (Expr b)) -> Expr b -> (Expr b)
+lrPostwalkExpr :: (AExpr bndT refT -> AExpr bndT refT) -> AExpr bndT refT -> (AExpr bndT refT)
 lrPostwalkExpr f = runIdentity . lrPostwalkExprM (return . f)
 
 
 -- | Same as 'lrPostwalkExprM' bot does not carry a monad.
-rlPostwalkExpr :: (Expr b -> (Expr b)) -> Expr b -> (Expr b)
+rlPostwalkExpr :: (AExpr bndT refT -> AExpr bndT refT) -> AExpr bndT refT -> (AExpr bndT refT)
 rlPostwalkExpr f = runIdentity . rlPostwalkExprM (return . f)
 
 
 -- | Generic fold over an ALang expression.
 -- Folds from top down and from left to right.
-foldlExprM :: Monad m => (Expr a -> b -> m b) -> b -> Expr a -> m b
+foldlExprM :: Monad m => (AExpr bndT refT -> b -> m b) -> b -> AExpr bndT refT -> m b
 foldlExprM f b e = do
     b' <- f e b
     case e of
@@ -155,7 +157,7 @@ foldlExprM f b e = do
 
 -- | Generic fold over an ALang expression.
 -- Folds from bottom up and from right to left.
-foldrExprM :: Monad m => (a -> Expr b -> m a) -> Expr b -> a -> m a
+foldrExprM :: Monad m => (a -> AExpr bndT refT -> m a) -> AExpr bndT refT -> a -> m a
 foldrExprM f e a = do
     a' <- case e of
         Apply e1 e2 -> do
@@ -170,13 +172,44 @@ foldrExprM f e a = do
 
 
 -- | Same as 'foldlExprM' but does not carry a monad.
-foldlExpr :: (Expr a -> b -> b) -> b -> Expr a -> b
+foldlExpr :: (AExpr bndT refT -> b -> b) -> b -> AExpr bndT refT -> b
 foldlExpr f b e = runIdentity $ foldlExprM (\x y -> return $ f x y) b e
 
 
 -- | Same as 'foldrExprM' but does not carry a monad.
-foldrExpr :: (a -> Expr b -> a) -> Expr b -> a -> a
+foldrExpr :: (a -> AExpr bndT refT -> a) -> AExpr bndT refT -> a -> a
 foldrExpr f e b = runIdentity $ foldrExprM (\x y -> return $ f x y) e b
+
+
+lrMapBndsRefsA :: Applicative f => (bndT -> f bndT') -> (refT -> f refT') -> AExpr bndT refT -> f (AExpr bndT' refT')
+lrMapBndsRefsA mapBnd mapRef expr = 
+    case expr of
+        Var ref -> Var <$> mapRef ref
+        Let assign val body -> Let <$> traverse mapBnd assign <*> recur val <*> recur body
+        Apply e1 e2 -> Apply <$> recur e1 <*> recur e2
+        Lambda assign body -> Lambda <$> traverse mapBnd assign <*> recur body
+  where recur = lrMapBndsRefsA mapBnd mapRef
+
+  
+lrMapBndsA :: Applicative f => (bndT -> f bndT') -> AExpr bndT refT -> f (AExpr bndT' refT)
+lrMapBndsA = flip lrMapBndsRefsA pure
+
+
+lrMapRefsA :: Applicative f => (refT -> f refT') -> AExpr bndT refT -> f (AExpr bndT refT')
+lrMapRefsA = lrMapBndsRefsA pure
+
+
+lrMapBndsRefs :: (bndT -> bndT') -> (refT -> refT') -> AExpr bndT refT -> AExpr bndT' refT'
+lrMapBndsRefs mapBnd mapRef = runIdentity . lrMapBndsRefsA (pure . mapBnd) (pure . mapRef)
+
+
+lrMapBnds :: (bndT -> bndT') -> AExpr bndT refT -> AExpr bndT' refT
+lrMapBnds = flip lrMapBndsRefs id
+
+
+lrMapRefs :: (refT -> refT') -> AExpr bndT refT -> AExpr bndT refT'
+lrMapRefs = lrMapBndsRefs id
+
 
 -- IMPORTANT: we need this to be polymorphic over `bindingType` or at least I would very much
 -- recommend that, because then we can separate the generation of the algorithms language
@@ -264,3 +297,8 @@ instance (NFData a, NFData b) => NFData (AExpr a b) where
     rnf (Var a)      = rnf a
     rnf (Apply a b)  = rnf a `seq` rnf b
     rnf (Lambda a b) = rnf a `seq` rnf b
+
+
+removeTyAnns :: TyAnnExpr a -> Expr a
+removeTyAnns = lrMapBnds (^. value)
+    

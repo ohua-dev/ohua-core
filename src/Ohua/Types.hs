@@ -143,6 +143,18 @@ data AbstractAssignment binding
 
 type Assignment = AbstractAssignment Binding
 
+instance Functor AbstractAssignment where
+    fmap f (Direct d) = Direct $ f d
+    fmap f (Destructure ds) = Destructure $ map f ds
+
+instance Foldable AbstractAssignment where
+    foldr f b (Direct bnd) = f bnd b
+    foldr f b (Destructure bnds) = foldr f b bnds
+
+instance Traversable AbstractAssignment where
+    sequenceA (Direct a) = Direct <$> a
+    sequenceA (Destructure as) = Destructure <$> sequenceA as
+
 instance Show binding => Show (AbstractAssignment binding) where
     show (Direct b)      = show b
     show (Destructure d) = show d
