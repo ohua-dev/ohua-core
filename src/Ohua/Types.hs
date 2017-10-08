@@ -25,6 +25,7 @@ import           GHC.Generics
 import           Lens.Micro
 import           Ohua.LensClasses
 import           Ohua.Util
+import qualified Data.Char as C
 
 
 -- | The numeric id of a function call site
@@ -240,7 +241,11 @@ data TyVar tyConRef tyVarRef
     | TyVar tyVarRef
     deriving (Show, Eq)
 
-type DefaultTyExpr = TyExpr (TyVar SomeBinding SomeBinding)
+-- | Typical instantiation of a @TyVar@ 
+type SomeTyVar = TyVar SomeBinding SomeBinding
+
+-- | Typical instantiation of a @TyExpr@
+type DefaultTyExpr = TyExpr SomeTyVar
 
 instance NFData binding => NFData (TyExpr binding) where
     rnf (TyRef bnd) = rnf bnd
