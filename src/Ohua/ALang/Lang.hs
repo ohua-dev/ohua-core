@@ -185,33 +185,27 @@ foldrExpr f e b = runIdentity $ foldrExprM (\x y -> return $ f x y) e b
 
 
 lrMapBndsRefsA :: Applicative f => (bndT -> f bndT') -> (refT -> f refT') -> AExpr bndT refT -> f (AExpr bndT' refT')
-lrMapBndsRefsA mapBnd mapRef expr =
-    case expr of
-        Var ref -> Var <$> mapRef ref
-        Let assign val body -> Let <$> traverse mapBnd assign <*> recur val <*> recur body
-        Apply e1 e2 -> Apply <$> recur e1 <*> recur e2
-        Lambda assign body -> Lambda <$> traverse mapBnd assign <*> recur body
-  where recur = lrMapBndsRefsA mapBnd mapRef
+lrMapBndsRefsA = bitraverse
 
 
 lrMapBndsA :: Applicative f => (bndT -> f bndT') -> AExpr bndT refT -> f (AExpr bndT' refT)
-lrMapBndsA = flip lrMapBndsRefsA pure
+lrMapBndsA = flip bitraverse pure
 
 
 lrMapRefsA :: Applicative f => (refT -> f refT') -> AExpr bndT refT -> f (AExpr bndT refT')
-lrMapRefsA = lrMapBndsRefsA pure
+lrMapRefsA = bitraverse pure
 
 
 lrMapBndsRefs :: (bndT -> bndT') -> (refT -> refT') -> AExpr bndT refT -> AExpr bndT' refT'
-lrMapBndsRefs mapBnd mapRef = runIdentity . lrMapBndsRefsA (pure . mapBnd) (pure . mapRef)
+lrMapBndsRefs = bimap
 
 
 lrMapBnds :: (bndT -> bndT') -> AExpr bndT refT -> AExpr bndT' refT
-lrMapBnds = flip lrMapBndsRefs id
+lrMapBnds = flip bimap id
 
 
 lrMapRefs :: (refT -> refT') -> AExpr bndT refT -> AExpr bndT refT'
-lrMapRefs = lrMapBndsRefs id
+lrMapRefs = bimap id
 
 
 -- IMPORTANT: we need this to be polymorphic over `bindingType` or at least I would very much

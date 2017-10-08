@@ -25,3 +25,19 @@ ifBuiltin = mkOhuaLangRef "if"
 
 smapBuiltin :: Expr SomeBinding
 smapBuiltin = mkOhuaLangRef "smap"
+
+
+funcTyConRef :: QualifiedBinding
+funcTyConRef = QualifiedBinding ohuaLangNS "->"
+
+
+funcTyConSBind :: SomeBinding
+funcTyConSBind = Qual funcTyConRef
+
+
+funcTyCon :: SomeTyVar
+funcTyCon = TyCon funcTyConSBind
+
+
+mkFunc :: DefaultTyExpr -> DefaultTyExpr -> DefaultTyExpr
+mkFunc a b = TyRef funcTyCon `TyApp` a `TyApp` b
