@@ -27,7 +27,7 @@ import           Ohua.Util
 
 -- | Inline all references to lambdas.
 -- Aka `let f = (\a -> E) in f N` -> `(\a -> E) N`
-inlineLambdaRefs :: MonadOhua m => Expression -> m Expression
+inlineLambdaRefs :: MonadOhua envExpr m => Expression -> m Expression
 inlineLambdaRefs (Let assignment l@(Lambda _ _) body) =
     case assignment of
         Direct bnd -> inlineLambdaRefs $ substitute bnd l body
@@ -113,12 +113,12 @@ inlineReassignments v@(Var _) = v
 -- Aka `let x = E in some/sf a` -> `let x = E in let y = some/sf a in y`
 --
 -- EDIT: Now also does the same for any residual lambdas
-ensureFinalLet :: MonadOhua m => Expression -> m Expression
+ensureFinalLet :: MonadOhua envExpr m => Expression -> m Expression
 ensureFinalLet = ensureFinalLetInLambdas >=> ensureFinalLet'
 
 
 -- | Transforms the final expression into a let expression with the result variable as body.
-ensureFinalLet' :: MonadOhua m => Expression -> m Expression
+ensureFinalLet' :: MonadOhua envExpr m => Expression -> m Expression
 ensureFinalLet' (Let a e b) = Let a e <$> ensureFinalLet' b
 ensureFinalLet' v@(Var _) = return v
 ensureFinalLet' a = do
@@ -126,7 +126,7 @@ ensureFinalLet' a = do
     return $ Let (Direct newBnd) a (Var (Local newBnd))
 
 
-ensureFinalLetInLambdas :: MonadOhua m => Expression -> m Expression
+ensureFinalLetInLambdas :: MonadOhua envExpr m => Expression -> m Expression
 ensureFinalLetInLambdas = lrPostwalkExprM $ \case
     Lambda bnd body -> Lambda bnd <$> ensureFinalLet' body
     a -> return a
@@ -162,7 +162,7 @@ removeUnusedBindings = fst . runWriter . go
 -- It is recommended therefore to check this with 'noUndefinedBindings'.
 -- If an undefined binging is left behind this indicates the source expression
 -- was not fulfilling all its invariants.
-removeCurrying :: MonadOhua m => Expression -> m Expression
+removeCurrying :: MonadOhua envExpr m => Expression -> m Expression
 removeCurrying e = fst <$> evalRWST (inlinePartials e) mempty ()
   where
     inlinePartials (Let assign@(Direct bnd) val body) = do
@@ -186,7 +186,7 @@ removeCurrying e = fst <$> evalRWST (inlinePartials e) mempty ()
 
 
 -- | Ensures the expression is a sequence of let statements terminated with a local variable.
-hasFinalLet :: MonadOhua m => Expression -> m ()
+hasFinalLet :: MonadOhua envExpr m => Expression -> m ()
 hasFinalLet (Let _ _ body)  = hasFinalLet body
 hasFinalLet (Var (Local _)) = return ()
 hasFinalLet (Var _)         = failWith "Non-local final var"
@@ -194,7 +194,7 @@ hasFinalLet _               = failWith "Final value is not a var"
 
 
 -- | Ensures all of the optionally provided stateful function ids are unique.
-noDuplicateIds :: MonadOhua m => Expression -> m ()
+noDuplicateIds :: MonadOhua envExpr m => Expression -> m ()
 noDuplicateIds = void . flip runStateT mempty . lrPrewalkExprM go
   where
     go e@(Var (Sf _ (Just id))) = do
@@ -208,14 +208,14 @@ noDuplicateIds = void . flip runStateT mempty . lrPrewalkExprM go
 -- | Checks that no apply to a local variable is performed.
 -- This is a simple check and it will pass on complex expressions even if they would reduce
 -- to an apply to a local variable.
-applyToSf :: MonadOhua m => Expression -> m ()
+applyToSf :: MonadOhua envExpr m => Expression -> m ()
 applyToSf = foldlExprM (const . go) ()
   where
     go (Apply (Var (Local bnd)) _) = failWith $ "Illegal Apply to local var " <> showT bnd
     go _ = return ()
 
 -- FIXME this function is never called. was it supposed to be part of the below validity check?
-lamdasAreInputToHigherOrderFunctions :: MonadOhua m => Expression -> m ()
+lamdasAreInputToHigherOrderFunctions :: MonadOhua envExpr m => Expression -> m ()
 lamdasAreInputToHigherOrderFunctions _                         = return ()
 lamdasAreInputToHigherOrderFunctions (Apply v (Lambda _ body)) = undefined
 
@@ -223,7 +223,7 @@ lamdasAreInputToHigherOrderFunctions (Apply v (Lambda _ body)) = undefined
 -- | Checks that all local bindings are defined before use.
 -- Scoped. Aka bindings are only visible in their respective scopes.
 -- Hence the expression does not need to be in SSA form.
-noUndefinedBindings :: MonadOhua m => Expression -> m ()
+noUndefinedBindings :: MonadOhua envExpr m => Expression -> m ()
 noUndefinedBindings = flip runReaderT mempty . go
   where
     go (Let assign val body) = go val >> local (HS.union $ HS.fromList $ flattenAssign assign) (go body)
@@ -235,7 +235,7 @@ noUndefinedBindings = flip runReaderT mempty . go
     go (Var _) = return ()
 
 
-checkProgramValidity :: MonadOhua m => Expression -> m ()
+checkProgramValidity :: MonadOhua envExpr m => Expression -> m ()
 checkProgramValidity e = do
     hasFinalLet e
     noDuplicateIds e
@@ -244,7 +244,7 @@ checkProgramValidity e = do
 
 
 -- | Lifts something like @if (f x) a b@ to @let x0 = f x in if x0 a b@
-liftApplyToApply :: MonadOhua m => Expression -> m Expression
+liftApplyToApply :: MonadOhua envExpr m => Expression -> m Expression
 liftApplyToApply = lrPrewalkExprM $ \case
     Apply fn arg@(Apply _ _) -> do
         bnd <- generateBinding
@@ -253,7 +253,7 @@ liftApplyToApply = lrPrewalkExprM $ \case
 
 
 -- The canonical composition of the above transformations to create a program with the invariants we expect.
-normalize :: MonadOhua m => Expression -> m Expression
+normalize :: MonadOhua envExpr m => Expression -> m Expression
 normalize e =
         reduceLambdas (letLift e)
     >>= removeCurrying

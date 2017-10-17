@@ -16,5 +16,5 @@ import           Ohua.DFLang.Lang
 import           Ohua.Monad
 
 
-runOptimizations :: MonadOhua m => DFExpr -> m DFExpr
+runOptimizations :: MonadOhua envExpr m => DFExpr -> m DFExpr
 runOptimizations = return

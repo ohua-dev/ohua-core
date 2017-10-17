@@ -21,6 +21,7 @@ import           Data.Hashable
 import qualified Data.HashSet       as HS
 import           Data.Maybe
 import           Data.Monoid
+import           Data.Sequence      as S
 import           Data.String
 import qualified Data.Text          as T
 import qualified Data.Vector        as V
@@ -198,16 +199,19 @@ type Warnings = [Warning]
 
 
 -- | State of the ohua compiler monad.
-data CompilerState = CompilerState !NameGenerator !Int
+data CompilerState envExpr = CompilerState !NameGenerator !Int !(V.Vector envExpr)
 
 -- | The read only compiler environment (currently empty)
 data CompilerEnv
 
-nameGenerator :: Lens' CompilerState NameGenerator
-nameGenerator f (CompilerState gen counter) = flip CompilerState counter <$> f gen
+nameGenerator :: Lens' (CompilerState envExpr) NameGenerator
+nameGenerator f (CompilerState gen counter envExprs) = f gen <&> \ng -> CompilerState ng counter envExprs
 
-idCounter :: Lens' CompilerState Int
-idCounter f (CompilerState gen counter) = CompilerState gen <$> f counter
+idCounter :: Lens' (CompilerState envExpr) Int
+idCounter f (CompilerState gen counter envExprs) = f counter <&> \c -> CompilerState gen c envExprs
+
+envExpressions :: Lens (CompilerState envExpr) (CompilerState envExpr') (V.Vector envExpr)  (V.Vector envExpr')
+envExpressions f (CompilerState gen counter envExprs) = CompilerState gen counter <$> f envExprs
 
 -- | Stateful name generator
 data NameGenerator = NameGenerator !(HS.HashSet Binding) [Binding]

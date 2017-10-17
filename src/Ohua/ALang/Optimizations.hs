@@ -16,5 +16,5 @@ import           Ohua.ALang.Lang
 import           Ohua.Monad
 
 
-runOptimizations :: MonadOhua m => Expression -> m Expression
+runOptimizations :: MonadOhua envExpr m => Expression -> m Expression
 runOptimizations = return

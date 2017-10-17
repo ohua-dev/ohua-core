@@ -49,7 +49,7 @@ type Pass m = QualifiedBinding -> FnId -> Assignment -> [Expression] -> m (Seq L
 
 
 -- | Check that a sequence of let expressions does not redefine bindings.
-checkSSA :: (Foldable f, MonadOhua m) => f LetExpr -> m ()
+checkSSA :: (Foldable f, MonadOhua envExpr m) => f LetExpr -> m ()
 checkSSA = flip evalStateT mempty . mapM_ go
   where
     go le = do
@@ -66,7 +66,7 @@ checkSSA = flip evalStateT mempty . mapM_ go
 
 
 -- | Check that a DFExpression is in SSA form.
-checkSSAExpr :: MonadOhua m => DFExpr -> m ()
+checkSSAExpr :: MonadOhua envExpr m => DFExpr -> m ()
 checkSSAExpr (DFExpr l _) = checkSSA l
 
 
@@ -74,7 +74,7 @@ checkSSAExpr (DFExpr l _) = checkSSA l
 -- This assumes a certain structure in the expression.
 -- This can be achieved with the 'normalize' and 'performSSA' functions and tested with
 -- 'checkProgramValidity'.
-lowerALang :: MonadOhua m => Expression -> m DFExpr
+lowerALang :: MonadOhua envExpr m => Expression -> m DFExpr
 lowerALang expr = do
     (var, exprs) <- runWriterT (go expr)
 #ifdef DEBUG
@@ -94,7 +94,7 @@ lowerALang expr = do
 
 
 -- | Lower any not specially treated function type.
-lowerDefault :: MonadOhua m => Pass m
+lowerDefault :: MonadOhua envExpr m => Pass m
 lowerDefault fn fnId assign args = mapM expectVar args <&> \args' -> [LetExpr fnId assign (EmbedSf fn) args' Nothing]
 
 
@@ -127,7 +127,7 @@ renameWith m = fmap go
 
 -- | Ananlyze an apply expression, extracting the inner stateful function and the nested arguments as a list.
 -- Also generates a new function id for the inner function should it not have one yet.
-handleApplyExpr :: MonadOhua m => Expression -> m (QualifiedBinding, FnId, [Expression])
+handleApplyExpr :: MonadOhua envExpr m => Expression -> m (QualifiedBinding, FnId, [Expression])
 handleApplyExpr (Apply fn arg) = go fn [arg]
   where
     go (Var (Sf fn id)) args = (fn, , args) <$> maybe generateId return id
@@ -139,14 +139,14 @@ handleApplyExpr g = failWith $ "Expected apply but got: " <> showT g
 
 
 -- | Inspect an expression expecting something which can be captured in a DFVar otherwies throws appropriate errors.
-expectVar :: MonadOhua m => Expression -> m DFVar
+expectVar :: MonadOhua envExpr m => Expression -> m DFVar
 expectVar (Var (Local bnd)) = pure $ DFVar bnd
 expectVar (Var (Env i))     = pure $ DFEnvVar i
 expectVar (Var v)           = failWith $ "Var must be local or env, was " <> showT v
 expectVar a                 = failWith $ "Argument must be var, was " <> showT a
 
 
-lowerHOF :: forall f m . (MonadOhua m, HigherOrderFunction f, MonadWriter (Seq LetExpr) m)
+lowerHOF :: forall f m envExpr . (MonadOhua envExpr m, HigherOrderFunction f, MonadWriter (Seq LetExpr) m)
          => TaggedFnName f -> Assignment -> [Expression] -> m ()
 lowerHOF _ assign args = do
     simpleArgs <- mapM handleArg args

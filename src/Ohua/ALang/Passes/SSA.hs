@@ -40,18 +40,18 @@ ssaResolve bnd = reader $ fromMaybe bnd <$> HM.lookup bnd
 -- becuase it does a lot of passing functions as arguments, however it very nicely
 -- encapsulates the scope changes which means they will never leak from where they are
 -- supposed to be applied
-ssaRename :: (MonadOhua m, MonadReader LocalScope m) => Binding -> m a -> m (Binding, a)
+ssaRename :: (MonadOhua envExpr m, MonadReader LocalScope m) => Binding -> m a -> m (Binding, a)
 ssaRename oldBnd cont = do
     newBnd <- generateBindingWith oldBnd
     (newBnd,) <$> local (HM.insert oldBnd newBnd) cont
 
-performSSA :: MonadOhua m => Expression -> m Expression
+performSSA :: MonadOhua envExpr m => Expression -> m Expression
 performSSA = flip runReaderT mempty . ssa
 
 flattenTuple :: (a, ([a], b)) -> ([a], b)
 flattenTuple (a, (as, r)) = (a:as, r)
 
-ssa :: (MonadOhua m, MonadReader LocalScope m) => Expression -> m Expression
+ssa :: (MonadOhua envExpr m, MonadReader LocalScope m) => Expression -> m Expression
 ssa (Var abstrBinding) = Var <$>
     case abstrBinding of
         Local bnd -> Local <$> ssaResolve bnd
@@ -65,7 +65,7 @@ ssa (Let assignment value body) = do
 -- As you can see the destructuring makes writing some stuff quite difficult.
 -- I wonder if it might not be easier to represent destructuring with a builtin function
 -- instead and collapse it down at the very end ...
-handleAssignment :: (MonadOhua m, MonadReader LocalScope m) => Assignment -> m t -> m (Assignment, t)
+handleAssignment :: (MonadOhua envExpr m, MonadReader LocalScope m) => Assignment -> m t -> m (Assignment, t)
 handleAssignment (Direct d) = fmap (first Direct) . ssaRename d
 handleAssignment (Destructure ds) = fmap (first Destructure) . foldl (\f bnd -> f . fmap flattenTuple . ssaRename bnd) id ds . fmap ([],)
 
@@ -91,7 +91,7 @@ isSSA = either Just (const Nothing) . flip evalState mempty . runExceptT . go
     go (Var _) = return ()
 
 
-checkSSA :: MonadOhua m => Expression -> m ()
+checkSSA :: MonadOhua envExpr m => Expression -> m ()
 checkSSA = maybe (return ()) (failWith . mkMsg) . isSSA
   where
     mkMsg bnd = "Redefinition of binding " <> showT bnd

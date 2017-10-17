@@ -8,26 +8,32 @@
 -- Portability : POSIX
 
 -- This source code is licensed under the terms described in the associated LICENSE.TXT file
+{-# LANGUAGE FunctionalDependencies          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE Rank2Types                 #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE UndecidableInstances       #-}
 module Ohua.Monad
     ( OhuaT, runOhuaT, runOhuaT0, runOhuaT0IO
-    , MonadOhua(modifyState, getState, recordWarning, failWith)
+    , MonadOhua(onState, recordWarning, failWith)
     , generateBinding, generateBindingWith, generateId
     , MonadIO(..)
     ) where
 
 
 import           Control.Monad.Except
+import           Control.Monad.Except
+import           Control.Monad.Reader
 import           Control.Monad.RWS.Strict hiding (fail)
+import           Control.Monad.State
+import           Control.Monad.Writer
 import qualified Data.HashSet             as HS
 import           Data.List                (intercalate)
 import           Data.Monoid
 import qualified Data.Text                as T
 import qualified Data.Text.IO             as T
-import           Lens.Micro
+import qualified Data.Vector              as V
+import           Lens.Micro.Platform
 import           Ohua.ALang.Lang
 import           Ohua.LensClasses
 import           Ohua.Types
@@ -40,10 +46,10 @@ import           Ohua.Util
 -- In development this collects errors via a MonadWriter, in production this collection will
 -- be turned off and be replaced by an exception, as such error should technically not occur
 -- there
-newtype OhuaT m a = OhuaT { runOhuaT' :: RWST CompilerEnv Warnings CompilerState (ExceptT Error m) a }
+newtype OhuaT env m a = OhuaT { runOhuaT' :: RWST CompilerEnv Warnings (CompilerState env) (ExceptT Error m) a }
     deriving (Functor, Applicative, Monad, MonadIO)
 
-instance MonadTrans OhuaT where
+instance MonadTrans (OhuaT env) where
     lift = OhuaT . lift . lift
 
 -- Convenience typeclass.
@@ -56,45 +62,45 @@ instance MonadTrans OhuaT where
 -- By implementing 'MonadOhua' (usually the implementation will be @lift@ or @lift .
 -- unwrapMyCustomMonad@) you can use compiler functionality such as 'generateBinding'
 -- from your custom monad without using @lift@.
-class Monad m => MonadOhua m where
+class Monad m => MonadOhua envExpr m | m -> envExpr where
     -- | Record an error or warning but continue computation
     recordWarning :: Warning -> m ()
     -- | Failt the compiler with an error
+    onState :: (CompilerState envExpr -> (a, CompilerState envExpr)) -> m a
     failWith :: Error -> m a
-    modifyState :: (CompilerState -> CompilerState) -> m ()
-    getState :: m CompilerState
 
-instance Monad m => MonadOhua (OhuaT m) where
+instance Monad m => MonadOhua env (OhuaT env m) where
     recordWarning err = OhuaT $ tell [err]
+    onState = OhuaT . state
     failWith = OhuaT . throwError
-    modifyState = OhuaT . modify
-    getState = OhuaT get
 
 -- A bit of magic to make every `MonadTrans` instance also a `MonadOhua` instance
-instance {-# OVERLAPPABLE #-} (MonadOhua m, MonadTrans m0, Monad (m0 m)) => MonadOhua (m0 m) where
+instance {-# OVERLAPPABLE #-} (MonadOhua envExpr m, MonadTrans m0, Monad (m0 m)) => MonadOhua envExpr (m0 m) where
     recordWarning = lift . recordWarning
-    modifyState = lift . modifyState
-    getState = lift getState
+    onState = lift . onState
     failWith = lift . failWith
 
 
-fromState :: MonadOhua m => Lens' CompilerState a -> m a
+getState :: MonadOhua envExprs m => m (CompilerState envExprs)
+getState = onState (\s -> (s, s))
+
+fromState :: MonadOhua envExprs m => Lens' (CompilerState envExprs) a -> m a
 fromState l = (^. l) <$> getState
 
 -- | Run a compiler
 -- Creates the state from the tree being passed in
 -- If there are any errors during the compilation they are reported together at the end
-runOhuaT :: Monad ctxt => (Expression -> OhuaT ctxt result) -> Expression -> ctxt (Either Error (result, Warnings))
+runOhuaT :: Monad ctxt => (Expression -> OhuaT env ctxt result) -> Expression -> ctxt (Either Error (result, Warnings))
 runOhuaT f tree = runOhuaT0 (f tree) $ HS.fromList $ extractBindings tree
 
-runOhuaT0 :: Monad ctxt => OhuaT ctxt result -> HS.HashSet Binding -> ctxt (Either Error (result, [Warning]))
+runOhuaT0 :: Monad ctxt => OhuaT env ctxt result -> HS.HashSet Binding -> ctxt (Either Error (result, Warnings))
 runOhuaT0 f taken =
-    runExceptT (evalRWST (runOhuaT' f) (error "Ohua has no environment!") (CompilerState nameGen 0))
+    runExceptT (evalRWST (runOhuaT' f) (error "Ohua has no environment!") (CompilerState nameGen 0 mempty))
   where
     nameGen = initNameGen taken
 
 
-runOhuaT0IO :: MonadIO ctxt => OhuaT ctxt result -> HS.HashSet Binding -> ctxt (Either Error result)
+runOhuaT0IO :: MonadIO ctxt => OhuaT env ctxt result -> HS.HashSet Binding -> ctxt (Either Error result)
 runOhuaT0IO f taken =  runOhuaT0 f taken >>= \case
     Left err -> return $ Left err
     Right (val, errors) -> do
@@ -108,23 +114,34 @@ initNameGen taken = NameGenerator taken
     , char <- ['a'..'z']
     ]
 
-generateBinding :: MonadOhua m => m Binding
-generateBinding = do
-    taken <- fromState $ nameGenerator . takenNames
-    (h:t) <- dropWhile (`HS.member` taken) <$> fromState (nameGenerator . simpleNameList)
-    modifyState $ nameGenerator . simpleNameList .~ t
-    modifyState $ nameGenerator . takenNames %~ HS.insert h
-    return h
+generateBinding :: MonadOhua envExpr m => m Binding
+generateBinding = onState $ \s ->
+    let taken = s ^. nameGenerator . takenNames
+        (h:t) = dropWhile (`HS.member` taken) $ s ^. nameGenerator . simpleNameList
+    in  ( h
+        , s & nameGenerator . simpleNameList .~ t
+            & nameGenerator . takenNames %~ HS.insert h
+        )
 
-generateBindingWith :: MonadOhua m => Binding -> m Binding
-generateBindingWith (Binding prefix) = do
-    taken <- fromState $ nameGenerator . takenNames
-    let (h:_) = dropWhile (`HS.member` taken) $ map (Binding . (prefix' <>) . T.pack . show) ([0..] :: [Int])
-    modifyState $ nameGenerator . takenNames %~ HS.insert h
-    return h
+generateBindingWith :: MonadOhua envExpr m => Binding -> m Binding
+generateBindingWith (Binding prefix) = onState $ \s ->
+    let taken = s ^. nameGenerator . takenNames
+        (h:_) = dropWhile (`HS.member` taken) $ map (Binding . (prefix' <>) . T.pack . show) ([0..] :: [Int])
+    in (h, s & nameGenerator . takenNames %~ HS.insert h)
   where prefix' = prefix <> "_"
 
-generateId :: MonadOhua m => m FnId
-generateId = do
-    modifyState $ idCounter %~ succ
-    FnId <$> fromState idCounter
+generateId :: MonadOhua envExpr m => m FnId
+generateId = onState $ \s ->
+    (FnId $ s ^. idCounter + 1, s & idCounter %~ succ)
+
+
+lookupEnvExpr :: MonadOhua envExpr m => HostExpr -> m (Maybe envExpr)
+lookupEnvExpr (HostExpr i) = (^? envExpressions . ix i) <$> getState
+
+
+addEnvExpression :: MonadOhua envExpr m => envExpr -> m HostExpr
+addEnvExpression expr = onState $ \s ->
+    ( HostExpr $ V.length $ s ^. envExpressions
+    , s & envExpressions %~ (`V.snoc` expr)
+    )
+

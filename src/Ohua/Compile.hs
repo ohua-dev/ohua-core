@@ -33,7 +33,7 @@ import           Ohua.Util
 
 
 -- | The canonical order of transformations and lowerings performed in a full compilation.
-pipeline :: MonadOhua m => Expression -> m OutGraph
+pipeline :: MonadOhua envExpr m => Expression -> m OutGraph
 pipeline e = do
     ssaE <- performSSA e
     normalizedE <- normalize ssaE
@@ -70,11 +70,11 @@ pipeline e = do
 
 -- | Run the pipeline in an arbitrary monad that supports error reporting.
 compile :: MonadError Error m => Expression -> m OutGraph
-compile e = either throwError (return . fst) =<< flip runOhuaT e pipeline
+compile = either throwError (return . fst) <=< runOhuaT pipeline
 
 
 -- | Verify that only higher order fucntions have lambdas as arguments
-checkHigherOrderFunctionSupport :: MonadOhua m => Expression -> m ()
+checkHigherOrderFunctionSupport :: MonadOhua envExpr m => Expression -> m ()
 checkHigherOrderFunctionSupport (Let _ e rest) = do
     checkNestedExpr e
     checkHigherOrderFunctionSupport rest
