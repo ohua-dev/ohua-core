@@ -18,6 +18,7 @@ module Ohua.Monad
     , MonadOhua(onState, recordWarning, failWith)
     , generateBinding, generateBindingWith, generateId
     , MonadIO(..)
+    , addEnvExpression
     ) where
 
 
