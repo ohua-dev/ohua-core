@@ -8,14 +8,18 @@
 -- Portability : portable
 
 -- This source code is licensed under the terms described in the associated LICENSE.TXT file
-{-# LANGUAGE ExplicitForAll, ScopedTypeVariables #-}
+{-# LANGUAGE ExplicitForAll      #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Ohua.ALang.Passes where
 
 
+import           Control.Applicative
 import           Control.Monad.Reader
 import           Control.Monad.RWS.Lazy
 import           Control.Monad.State
 import           Control.Monad.Writer
+import           Data.Bifunctor
+import           Data.Bitraversable
 import qualified Data.HashMap.Strict    as HM
 import qualified Data.HashSet           as HS
 import           Ohua.ALang.Lang
@@ -23,8 +27,6 @@ import           Ohua.ALang.Util
 import           Ohua.Monad
 import           Ohua.Types
 import           Ohua.Util
-import Data.Bitraversable
-import Data.Bifunctor
 
 
 
@@ -293,27 +295,36 @@ normalize e =
 type EnvOnlyExpr = Expr (Either Binding HostExpr)
 
 
-compressEnvExpressions :: forall env m. MonadOhua env m => (EnvOnlyExpr -> m env) -> Expression -> m Expression
+{-|
+Find complete subtrees in ALang which are only dependent on environemt values.
+Uses a user supplied function which is supposed to turn this inte some constant
+environment expression.
+
+The idea is that you can use this to create a custom pass by supplying a
+domain specific compression function.
+-}
+compressEnvExpressions :: forall env m. MonadOhua env m
+                       => (EnvOnlyExpr -> m env) -> Expression -> m Expression
 compressEnvExpressions compress = either pure compress' <=< go
   where
     go :: Expression -> m (Either Expression EnvOnlyExpr)
     go (Var v) = pure $
-        case v of 
-            Env e -> Right $ Var $ Right e
+        case v of
+            Env e   -> Right $ Var $ Right e
             Local l -> Right $ Var $ Left l
-            other -> Left $ Var other
+            other   -> Left $ Var other
     go (Apply e1 e2) = do
         e1' <- go e1
         e2' <- go e2
-        case Apply <$> e1' <*> e2' of
+        case liftA2 Apply e1' e2' of
             Right a -> pure $ Right a
-            Left _ -> Left <$> liftM2 Apply (mcompress e1') (mcompress e2')
+            Left _  -> Left <$> liftA2 Apply (mcompress e1') (mcompress e2')
     go (Let assign val body) = do
         val' <- go val
         body' <- go body
-        case Let assign <$> val' <*> body' of
+        case liftA2 (Let assign) val' body' of
             Right a -> pure $ Right a
-            Left _ -> Left <$> liftM2 (Let assign) (mcompress val') (mcompress body')
+            Left _ -> Left <$> liftA2 (Let assign) (mcompress val') (mcompress body')
     go (Lambda assign body) = bimap (Lambda assign) (Lambda assign) <$> go body
 
     mcompress :: Either Expression EnvOnlyExpr -> m Expression

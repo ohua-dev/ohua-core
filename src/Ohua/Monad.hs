@@ -8,7 +8,7 @@
 -- Portability : POSIX
 
 -- This source code is licensed under the terms described in the associated LICENSE.TXT file
-{-# LANGUAGE FunctionalDependencies          #-}
+{-# LANGUAGE FunctionalDependencies     #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE Rank2Types                 #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
@@ -95,10 +95,11 @@ runOhuaT :: Monad ctxt => (Expression -> OhuaT env ctxt result) -> Expression ->
 runOhuaT f tree = runOhuaT0 (f tree) $ HS.fromList $ extractBindings tree
 
 runOhuaT0 :: Monad ctxt => OhuaT env ctxt result -> HS.HashSet Binding -> ctxt (Either Error (result, Warnings))
-runOhuaT0 f taken =
-    runExceptT (evalRWST (runOhuaT' f) (error "Ohua has no environment!") (CompilerState nameGen 0 mempty))
+runOhuaT0 f taken = runExceptT $ evalRWST (runOhuaT' f) env state
   where
     nameGen = initNameGen taken
+    state = CompilerState nameGen 0 mempty
+    env = error "Ohua has no environment!"
 
 
 runOhuaT0IO :: MonadIO ctxt => OhuaT env ctxt result -> HS.HashSet Binding -> ctxt (Either Error result)
@@ -133,11 +134,16 @@ generateBindingWith (Binding prefix) = onState $ \s ->
 
 generateId :: MonadOhua envExpr m => m FnId
 generateId = onState $ \s ->
-    (FnId $ s ^. idCounter + 1, s & idCounter %~ succ)
+    ( FnId $ s ^. idCounter + 1
+    , s & idCounter %~ succ
+    )
 
 
-lookupEnvExpr :: MonadOhua envExpr m => HostExpr -> m (Maybe envExpr)
-lookupEnvExpr (HostExpr i) = (^? envExpressions . ix i) <$> getState
+lookupEnvExpr :: MonadOhua envExpr m => HostExpr -> m envExpr
+lookupEnvExpr (HostExpr i) =
+    maybe (failWith msg) pure . (^? envExpressions . ix i) =<< getState
+  where
+    msg = "Invariant violated, host expression was not defined."
 
 
 addEnvExpression :: MonadOhua envExpr m => envExpr -> m HostExpr
@@ -145,4 +151,3 @@ addEnvExpression expr = onState $ \s ->
     ( HostExpr $ V.length $ s ^. envExpressions
     , s & envExpressions %~ (`V.snoc` expr)
     )
-

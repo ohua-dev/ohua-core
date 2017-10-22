@@ -37,7 +37,6 @@ pipeline :: MonadOhua envExpr m => Expression -> m OutGraph
 pipeline e = do
     ssaE <- performSSA e
     normalizedE <- normalize ssaE
-    forceTraceReport "Normalization done" normalizedE
 #ifdef DEBUG
     checkProgramValidity normalizedE
     checkHigherOrderFunctionSupport normalizedE
@@ -51,7 +50,8 @@ pipeline e = do
 #endif
 
     dfE <- lowerALang optimizedE
-    forceTraceReport "Lowering done" dfE
+
+    forceTraceReport (showDFExpr dfE) ()
 
 #ifdef DEBUG
     Ohua.DFLang.Passes.checkSSAExpr dfE
@@ -62,9 +62,8 @@ pipeline e = do
 #ifdef DEBUG
     Ohua.DFLang.Passes.checkSSAExpr optimizedDfE
 #endif
-    let gr = toGraph optimizedDfE
-    forceTraceReport "Graph created" gr
-    pure gr
+    pure $ toGraph optimizedDfE
+
 
 
 

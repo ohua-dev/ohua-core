@@ -205,7 +205,8 @@ data CompilerState envExpr = CompilerState !NameGenerator !Int !(V.Vector envExp
 data CompilerEnv
 
 nameGenerator :: Lens' (CompilerState envExpr) NameGenerator
-nameGenerator f (CompilerState gen counter envExprs) = f gen <&> \ng -> CompilerState ng counter envExprs
+nameGenerator f (CompilerState gen counter envExprs) =
+    f gen <&> \ng -> CompilerState ng counter envExprs
 
 idCounter :: Lens' (CompilerState envExpr) Int
 idCounter f (CompilerState gen counter envExprs) = f counter <&> \c -> CompilerState gen c envExprs

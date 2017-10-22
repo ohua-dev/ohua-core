@@ -45,6 +45,7 @@ library
     , Ohua.DFLang.Passes
     , Ohua.DFLang.Optimizations
     , Ohua.DFGraph
+    , Ohua.DFGraph.Show
     , Ohua.Serialize.JSON
     , Ohua.Util
   -- other-modules:
@@ -65,6 +66,7 @@ library
     , aeson
     , vector
     , bifunctors
+    , boxes
   hs-source-dirs:      src
   default-language:    Haskell2010
   default-extensions:
