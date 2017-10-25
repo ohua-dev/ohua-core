@@ -52,22 +52,13 @@ instance NFData HostExpr
 -- some types for `bindingType`
 
 type RawSymbol = HostExpr
+
+-- | Type of references which can inhabit a `Var` once the source is copletely parsed.
 data Symbol a
-
-       -- the basic symbols occuring in the algorithm language
-
-    = Local !Binding
-
-        -- a variable/binding in the algorithm language
-
-    | Sf !a !(Maybe FnId)
-
-        -- reference to a stateful function
-
-    | Env !HostExpr
-
-        -- reference to an environment object. this maybe a var or any other term of the host language.
-    deriving (Show, Eq)
+    = Local !Binding -- ^ the basic symbols occuring in the algorithm language
+    | Sf !a !(Maybe FnId) -- ^ reference to a stateful function
+    | Env !HostExpr -- ^ reference to an environment object. this maybe a var or any other term of the host language.
+    deriving (Show, Eq, Generic)
 
 type ResolvedSymbol = Symbol QualifiedBinding
 
@@ -76,15 +67,142 @@ instance IsString ResolvedSymbol where
         Unqual bnd -> Local bnd
         Qual q     -> Sf q Nothing
 
-instance ExtractBindings ResolvedSymbol where
+instance ExtractBindings (Symbol a) where
     extractBindings (Local l) = return l
     extractBindings _         = mempty
 
-instance NFData ResolvedSymbol where
+instance NFData a => NFData (Symbol a) where
     rnf (Local b) = rnf b
-    rnf (Env _)   = ()
+    rnf (Env e)   = rnf e
     rnf (Sf s i)  = rnf s `seq` rnf i
 
+
+-- IMPORTANT: we need this to be polymorphic over `bindingType` or at least I would very much
+-- recommend that, because then we can separate the generation of the algorithms language
+-- and the symbol resolution.
+-- If we dont separate those we'll have to reimplement the complete symbol resolution pass for
+-- each frontend
+
+-- I changed this again so that application and let both do not use lists.
+-- this makes generic transformations much simpler to write, such as SSA
+--
+--
+-- For comparison, here is the GHC intermediate language `Core`
+--
+-- data Expr b
+    -- much like us they are polymorphic over the
+    -- binding type, however in their case its the for
+    -- assigments, not variables
+    --
+    --   = Var   Id
+    --
+    --   | Lit   Literal
+        -- we dont need this as this is encoded in `Var`
+    --
+    --   | App   (Expr b) (Arg b)
+        -- Expr == Arg => App ~= Apply
+    --
+    --   | Lam   b (Expr b)
+    --   | Let   (Bind b) (Expr b)
+        -- Bind == (b, Expr b) (plus recursive)
+        -- I want to note that they too use single assigment
+        -- let, not multiple assigment with lists
+        -- same goes for lambdas and apply
+    --
+    --   | Case  (Expr b) b Type [Alt b]
+        -- We have no case, hence we don't need this constructor
+    --
+    --   | Cast  (Expr b) Coercion
+        -- This we might need if we get a type system
+
+    --   | Tick  (Tickish Id) (Expr b)
+        -- No clue what this is used for yet
+    --
+    --   | Type  Type
+        -- Types ... we might need this too at some point
+    --
+    --   | Coercion Coercion
+        -- I've heard about this, this is what makes
+        -- newtypes efficient now
+    --   deriving Data
+    --
+
+-- | An expression in the algorithm language.
+-- Abstracted over a concrete type of local binding (target) and a type of reference (source).
+data AExpr bndType refType
+    = Var refType -- ^ A reference to a value
+    | Let (AbstractAssignment bndType) (AExpr bndType refType) (AExpr bndType refType) -- ^ Binding of a value to one ore more identifiers
+    | Apply (AExpr bndType refType) (AExpr bndType refType) -- ^ Function application
+    | Lambda (AbstractAssignment bndType) (AExpr bndType refType) -- ^ Anonymous function definition
+    deriving (Show, Eq)
+
+
+
+instance Bifunctor AExpr where
+    bimap f g expr =
+        case expr of
+            Var v -> Var $ g v
+            Let assign val body -> Let (fmap f assign) (recur val) (recur body)
+            Apply e1 e2 -> Apply (recur e1) (recur e2)
+            Lambda assign body -> Lambda (fmap f assign) (recur body)
+      where recur = bimap f g
+
+instance Functor (AExpr a) where
+    fmap = bimap id
+
+instance Bifoldable AExpr where
+    bifoldr f g c expr =
+        case expr of
+            Var v               -> g v c
+            Let assign val body -> foldr f (recur val $ recur body c) assign
+            Apply e1 e2         -> recur e1 $ recur e2 c
+            Lambda assign body  -> foldr f (recur body c) assign
+      where recur = flip $ bifoldr f g
+
+instance Foldable (AExpr a) where
+    foldr = bifoldr (flip const)
+
+instance Bitraversable AExpr where
+    bitraverse f g expr =
+        case expr of
+            Var v -> Var <$> g v
+            Let assign val body -> Let <$> traverse f assign <*> recur val <*> recur body
+            Apply e1 e2 -> Apply <$> recur e1 <*> recur e2
+            Lambda assign body -> Lambda <$> traverse f assign <*> recur body
+
+      where recur = bitraverse f g
+
+instance Traversable (AExpr a) where
+    traverse = bitraverse pure
+
+instance IsString b => IsString (AExpr a b) where
+    fromString = Var . fromString
+
+instance ExtractBindings b => ExtractBindings (Expr b) where
+    extractBindings (Var v) = extractBindings v
+    extractBindings (Let assign val body) = extractBindings assign ++ extractBindings val ++ extractBindings body
+    extractBindings (Apply function argument) = extractBindings function ++ extractBindings argument
+    extractBindings (Lambda assign body) = extractBindings assign ++ extractBindings body
+
+
+instance (NFData a, NFData b) => NFData (AExpr a b) where
+    rnf (Let a b c)  = rnf a `seq` rnf b `seq` rnf c
+    rnf (Var a)      = rnf a
+    rnf (Apply a b)  = rnf a `seq` rnf b
+    rnf (Lambda a b) = rnf a `seq` rnf b
+
+-- | Backward compatible alias
+type Expr = AExpr Binding
+
+-- | An Alang expression with optionally type annotated bindings (let bindings and lambda arguments)
+type OptTyAnnExpr = AExpr (Annotated (Maybe DefaultTyExpr) Binding)
+
+-- | An Alang expression with only type annotated bindings (let bindings and lambda arguments)
+type TyAnnExpr = AExpr (Annotated DefaultTyExpr Binding)
+
+-- | Backward compatibility alias
+type Expression = Expr ResolvedSymbol
+    
 
 -- | Traverse an ALang expression from left to right and top down, building a new expression.
 lrPrewalkExprM :: Monad m => (AExpr bndT refT -> m (AExpr bndT refT)) -> AExpr bndT refT -> m (AExpr bndT refT)
@@ -206,131 +324,6 @@ lrMapBnds = flip bimap id
 
 lrMapRefs :: (refT -> refT') -> AExpr bndT refT -> AExpr bndT refT'
 lrMapRefs = bimap id
-
-
--- IMPORTANT: we need this to be polymorphic over `bindingType` or at least I would very much
--- recommend that, because then we can separate the generation of the algorithms language
--- and the symbol resolution.
--- If we dont separate those we'll have to reimplement the complete symbol resolution pass for
--- each frontend
-
--- I changed this again so that application and let both do not use lists.
--- this makes generic transformations much simpler to write, such as SSA
---
---
--- For comparison, here is the GHC intermediate language `Core`
---
--- data Expr b
-    -- much like us they are polymorphic over the
-    -- binding type, however in their case its the for
-    -- assigments, not variables
---
---   = Var   Id
---
---   | Lit   Literal
-    -- we dont need this as this is encoded in `Var`
---
---   | App   (Expr b) (Arg b)
-    -- Expr == Arg => App ~= Apply
---
---   | Lam   b (Expr b)
---   | Let   (Bind b) (Expr b)
-    -- Bind == (b, Expr b) (plus recursive)
-    -- I want to note that they too use single assigment
-    -- let, not multiple assigment with lists
-    -- same goes for lambdas and apply
---
---   | Case  (Expr b) b Type [Alt b]
-    -- We have no case, hence we don't need this constructor
---
---   | Cast  (Expr b) Coercion
-    -- This we might need if we get a type system
-
---   | Tick  (Tickish Id) (Expr b)
-    -- No clue what this is used for yet
---
---   | Type  Type
-    -- Types ... we might need this too at some point
---
---   | Coercion Coercion
-    -- I've heard about this, this is what makes
-    -- newtypes efficient now
---   deriving Data
---
-
--- | An expression in the algorithm language.
--- Abstracted over a concrete type of local binding (target) and a type of reference (source).
-data AExpr bndType refType
-    = Var refType
-    | Let (AbstractAssignment bndType) (AExpr bndType refType) (AExpr bndType refType)
-    | Apply (AExpr bndType refType) (AExpr bndType refType)
-    | Lambda (AbstractAssignment bndType) (AExpr bndType refType)
-    deriving (Show, Eq)
-
-instance Bifunctor AExpr where
-    bimap f g expr =
-        case expr of
-            Var v -> Var $ g v
-            Let assign val body -> Let (fmap f assign) (recur val) (recur body)
-            Apply e1 e2 -> Apply (recur e1) (recur e2)
-            Lambda assign body -> Lambda (fmap f assign) (recur body)
-      where recur = bimap f g
-
-instance Functor (AExpr a) where
-    fmap = bimap id
-
-instance Bifoldable AExpr where
-    bifoldr f g c expr =
-        case expr of
-            Var v               -> g v c
-            Let assign val body -> foldr f (recur val $ recur body c) assign
-            Apply e1 e2         -> recur e1 $ recur e2 c
-            Lambda assign body  -> foldr f (recur body c) assign
-      where recur = flip $ bifoldr f g
-
-instance Foldable (AExpr a) where
-    foldr = bifoldr (flip const)
-
-instance Bitraversable AExpr where
-    bitraverse f g expr =
-        case expr of
-            Var v -> Var <$> g v
-            Let assign val body -> Let <$> traverse f assign <*> recur val <*> recur body
-            Apply e1 e2 -> Apply <$> recur e1 <*> recur e2
-            Lambda assign body -> Lambda <$> traverse f assign <*> recur body
-
-      where recur = bitraverse f g
-
-instance Traversable (AExpr a) where
-    traverse = bitraverse pure
-
--- | Backward compatible alias
-type Expr = AExpr Binding
-
--- | An Alang expression with optionally type annotated bindings (let bindings and lambda arguments)
-type OptTyAnnExpr = AExpr (Annotated (Maybe DefaultTyExpr) Binding)
-
--- | An Alang expression with only type annotated bindings (let bindings and lambda arguments)
-type TyAnnExpr = AExpr (Annotated DefaultTyExpr Binding)
-
--- | Backward compatibility alias
-type Expression = Expr ResolvedSymbol
-
-instance IsString b => IsString (AExpr a b) where
-    fromString = Var . fromString
-
-instance ExtractBindings b => ExtractBindings (Expr b) where
-    extractBindings (Var v) = extractBindings v
-    extractBindings (Let assign val body) = extractBindings assign ++ extractBindings val ++ extractBindings body
-    extractBindings (Apply function argument) = extractBindings function ++ extractBindings argument
-    extractBindings (Lambda assign body) = extractBindings assign ++ extractBindings body
-
-
-instance (NFData a, NFData b) => NFData (AExpr a b) where
-    rnf (Let a b c)  = rnf a `seq` rnf b `seq` rnf c
-    rnf (Var a)      = rnf a
-    rnf (Apply a b)  = rnf a `seq` rnf b
-    rnf (Lambda a b) = rnf a `seq` rnf b
 
 
 removeTyAnns :: TyAnnExpr a -> Expr a
