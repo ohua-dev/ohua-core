@@ -8,11 +8,13 @@
 -- Portability : portable
 
 -- This source code is licensed under the terms described in the associated LICENSE.TXT file
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP             #-}
+{-# LANGUAGE RecordWildCards #-}
 module Ohua.Compile where
 
 
 import           Control.Monad.Except
+import           Data.Default
 import           Data.Functor.Identity
 import qualified Data.HashMap.Strict       as HM
 import           Data.Monoid               ((<>))
@@ -32,9 +34,23 @@ import           Ohua.Types
 import           Ohua.Util
 
 
+data CustomPasses m = CustomPasses
+    { passAfterDFLowering :: DFExpr -> m DFExpr
+    }
+
+noCustomPasses :: Applicative m => CustomPasses m
+noCustomPasses = CustomPasses pure
+
+instance Applicative m => Default (CustomPasses m) where
+    def = noCustomPasses
+
+
+
+
+
 -- | The canonical order of transformations and lowerings performed in a full compilation.
-pipeline :: MonadOhua envExpr m => Expression -> m OutGraph
-pipeline e = do
+pipeline :: MonadOhua envExpr m => CustomPasses m -> Expression -> m OutGraph
+pipeline CustomPasses{..} e = do
     ssaE <- performSSA e
     normalizedE <- normalize ssaE
 #ifdef DEBUG
@@ -57,7 +73,9 @@ pipeline e = do
     Ohua.DFLang.Passes.checkSSAExpr dfE
 #endif
 
-    optimizedDfE <- Ohua.DFLang.Optimizations.runOptimizations dfE
+    dfAfterCustom <- passAfterDFLowering dfE
+
+    optimizedDfE <- Ohua.DFLang.Optimizations.runOptimizations dfAfterCustom
 
 #ifdef DEBUG
     Ohua.DFLang.Passes.checkSSAExpr optimizedDfE
@@ -68,8 +86,8 @@ pipeline e = do
 
 
 -- | Run the pipeline in an arbitrary monad that supports error reporting.
-compile :: MonadError Error m => Expression -> m OutGraph
-compile = either throwError (return . fst) <=< runOhuaT pipeline
+compile :: MonadError Error m => CustomPasses (OhuaT env m) -> Expression -> m OutGraph
+compile passes = either throwError (return . fst) <=< runOhuaT (pipeline passes)
 
 
 -- | Verify that only higher order fucntions have lambdas as arguments

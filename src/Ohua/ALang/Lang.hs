@@ -202,7 +202,7 @@ type TyAnnExpr = AExpr (Annotated DefaultTyExpr Binding)
 
 -- | Backward compatibility alias
 type Expression = Expr ResolvedSymbol
-    
+
 
 -- | Traverse an ALang expression from left to right and top down, building a new expression.
 lrPrewalkExprM :: Monad m => (AExpr bndT refT -> m (AExpr bndT refT)) -> AExpr bndT refT -> m (AExpr bndT refT)
