@@ -15,11 +15,13 @@ module Ohua.DFLang.HOF.If where
 
 import           Control.Monad.Except
 import           Control.Monad.State
+import           Data.Monoid
 import           Ohua.DFLang.HOF
 import           Ohua.DFLang.Lang
 import qualified Ohua.DFLang.Refs     as Refs
 import           Ohua.Monad
 import           Ohua.Types
+import           Ohua.Util
 
 
 data IfFn = IfFn
@@ -33,8 +35,8 @@ data IfFn = IfFn
 instance HigherOrderFunction IfFn where
     name = "ohua.lang/if"
 
-    parseCallAndInitState [Variable v, LamArg thenBr, LamArg elseBr] = return $ IfFn v thenBr elseBr (error "return uninitialized")
-    parseCallAndInitState _ = failWith "Unexpected number or type of argument for if"
+    parseCallAndInitState [Variable v, LamArg thenBr, LamArg elseBr] = pure $ IfFn v thenBr elseBr (error "return uninitialized")
+    parseCallAndInitState args = failWith $ "Unexpected number or type of argument for if " <> showT args
 
     createContextEntry = do
         f <- get
@@ -43,12 +45,12 @@ instance HigherOrderFunction IfFn where
         let Direct thenBnd = beginAssignment $ thenBranch f
             Direct elseBnd = beginAssignment $ elseBranch f
         modify $ \s -> s { ifRet = ifRet' }
-        return [ LetExpr ifId (Destructure [thenBnd, elseBnd]) Refs.ifThenElse [conditionVariable f] Nothing ]
+        pure [ LetExpr ifId (Destructure [thenBnd, elseBnd]) Refs.ifThenElse [conditionVariable f] Nothing ]
 
     createContextExit assignment = do
         switchId <- generateId
         IfFn {..} <- get
-        return
+        pure
             [ LetExpr switchId assignment Refs.switch [conditionVariable, DFVar $ resultBinding thenBranch, DFVar $ resultBinding elseBranch] Nothing
             ]
 
@@ -56,7 +58,7 @@ instance HigherOrderFunction IfFn where
         selected <- mapM generateBindingWith freeVars
         selectorId <- generateId
         let Direct sourceVar = beginAssignment lam
-        return
+        pure
             (   [ LetExpr selectorId (Destructure selected) Refs.scope (map DFVar freeVars) (Just sourceVar)
                 ]
             ,   zip freeVars selected

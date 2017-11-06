@@ -31,7 +31,7 @@ ifThenElse = EmbedSf "ohua.lang/ifThenElse"
 
 
 switch ::DFFnRef
-switch = DFFunction "ohua.lang/switch"
+switch = DFFunction "ohua.lang/select"
 
 
 scope :: DFFnRef

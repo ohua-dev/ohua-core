@@ -50,7 +50,7 @@ data DFFnRef
 data DFVar
     = DFEnvVar !HostExpr
     | DFVar !Binding
-    deriving Eq
+    deriving (Eq, Show)
 
 
 instance Hashable DFVar where

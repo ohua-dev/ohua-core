@@ -49,13 +49,14 @@ tagFnName = TaggedFnName
 data Lambda = Lam
     { beginAssignment :: !Assignment
     , resultBinding   :: !Binding
-    } deriving Eq
+    } deriving (Eq, Show)
 
 
--- | Poosible shapes of arguments to higher order functions
+-- | Possible shapes of arguments to higher order functions
 data Argument
     = Variable !DFVar
     | LamArg !Lambda
+    deriving (Show, Eq)
 
 
 type Renaming = [(Binding, Binding)]
