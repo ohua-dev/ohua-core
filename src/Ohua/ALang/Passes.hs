@@ -137,6 +137,17 @@ ensureFinalLetInLambdas = lrPostwalkExprM $ \case
     a -> return a
 
 
+ensureAtLeastOneCall :: MonadOhua envExpr m => Expression -> m Expression
+ensureAtLeastOneCall e@(Var _) = do
+    newBnd <- generateBinding
+    pure $ Let (Direct newBnd) (Var (Sf idName Nothing) `Apply` e) $ Var (Local newBnd)
+ensureAtLeastOneCall e = lrPostwalkExprM f e
+  where
+    f (Lambda bnd e@(Var _)) = do
+        newBnd <- generateBinding
+        pure $ Lambda bnd $ Let (Direct newBnd) (Var (Sf idName Nothing) `Apply` e) $ Var (Local newBnd)
+    f e = pure e
+
 
 -- | Removes bindings that are never used.
 -- This is actually not safe becuase sfn invocations may have side effects
@@ -264,6 +275,7 @@ normalize e =
     >>= removeCurrying
     >>= liftApplyToApply
     >>= ensureFinalLet . inlineReassignments . letLift
+    >>= ensureAtLeastOneCall
   where
     -- we repeat this step until a fix point is reached.
     -- this is necessary as lambdas may be input to lambdas,
