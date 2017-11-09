@@ -138,7 +138,7 @@ handleApplyExpr (Apply fn arg) = go fn [arg]
                     Nothing -> failWith "Calling local functions is not supported in this adapter"
                     Just fn -> (fn, , ve : args) <$> generateId
             Env _ ->
-                fromEnv (options . callLocalFunction) >>= \case
+                fromEnv (options . callEnvExpr) >>= \case
                     Nothing -> failWith "Calling environment functions is not supported in this adapter"
                     Just fn -> (fn, , ve : args) <$> generateId
     go (Apply fn arg) args   = go fn (arg:args)
@@ -147,7 +147,7 @@ handleApplyExpr (Var (Sf fn id)) = (fn, , []) <$> maybe generateId return id
 handleApplyExpr g = failWith $ "Expected apply but got: " <> showT g
 
 
--- | Inspect an expression expecting something which can be captured in a DFVar otherwies throws appropriate errors.
+-- | Inspect an expression expecting something which can be captured in a DFVar otherwise throws appropriate errors.
 expectVar :: MonadOhua envExpr m => Expression -> m DFVar
 expectVar (Var (Local bnd)) = pure $ DFVar bnd
 expectVar (Var (Env i))     = pure $ DFEnvVar i
