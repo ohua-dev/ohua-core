@@ -28,30 +28,33 @@ data IfFn = IfFn
     { conditionVariable :: !DFVar
     , thenBranch        :: !Lambda
     , elseBranch        :: !Lambda
-    , ifRet             :: Binding
+    , ifRet             :: !Binding
     }
 
 
 instance HigherOrderFunction IfFn where
     name = "ohua.lang/if"
 
-    parseCallAndInitState [Variable v, LamArg thenBr, LamArg elseBr] = pure $ IfFn v thenBr elseBr (error "return uninitialized")
+    parseCallAndInitState
+        [ Variable v
+        , LamArg thenBr@(Lam{beginAssignment=Direct ret})
+        , LamArg elseBr
+        ] = pure $ IfFn v thenBr elseBr ret
     parseCallAndInitState args = failWith $ "Unexpected number or type of argument for if " <> showT args
 
     createContextEntry = do
         f <- get
         ifId <- generateId
-        ifRet' <- generateBinding
         let Direct thenBnd = beginAssignment $ thenBranch f
             Direct elseBnd = beginAssignment $ elseBranch f
-        modify $ \s -> s { ifRet = ifRet' }
+        modify $ \s -> s { ifRet = thenBnd }
         pure [ LetExpr ifId (Destructure [thenBnd, elseBnd]) Refs.ifThenElse [conditionVariable f] Nothing ]
 
     createContextExit assignment = do
         switchId <- generateId
         IfFn {..} <- get
         pure
-            [ LetExpr switchId assignment Refs.switch [conditionVariable, DFVar $ resultBinding thenBranch, DFVar $ resultBinding elseBranch] Nothing
+            [ LetExpr switchId assignment Refs.switch [DFVar ifRet, DFVar $ resultBinding thenBranch, DFVar $ resultBinding elseBranch] Nothing
             ]
 
     scopeFreeVariables lam freeVars = do
