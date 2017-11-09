@@ -48,7 +48,8 @@ library
     , Ohua.DFGraph.Show
     , Ohua.Serialize.JSON
     , Ohua.Util
-  -- other-modules:
+  other-modules:
+      Ohua.Internal.Monad
   -- other-extensions:
   build-depends:
       base >=4.8 && <5

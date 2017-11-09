@@ -34,14 +34,14 @@ import           Ohua.Types
 import           Ohua.Util
 
 
-data CustomPasses m = CustomPasses
-    { passAfterDFLowering :: DFExpr -> m DFExpr
+data CustomPasses env = CustomPasses
+    { passAfterDFLowering :: DFExpr -> OhuaM env DFExpr
     }
 
-noCustomPasses :: Applicative m => CustomPasses m
+noCustomPasses :: CustomPasses env
 noCustomPasses = CustomPasses pure
 
-instance Applicative m => Default (CustomPasses m) where
+instance Default (CustomPasses env) where
     def = noCustomPasses
 
 
@@ -49,7 +49,7 @@ instance Applicative m => Default (CustomPasses m) where
 
 
 -- | The canonical order of transformations and lowerings performed in a full compilation.
-pipeline :: MonadOhua envExpr m => CustomPasses m -> Expression -> m OutGraph
+pipeline :: CustomPasses env -> Expression -> OhuaM env OutGraph
 pipeline CustomPasses{..} e = do
     ssaE <- performSSA e
     normalizedE <- normalize ssaE
@@ -86,8 +86,8 @@ pipeline CustomPasses{..} e = do
 
 
 -- | Run the pipeline in an arbitrary monad that supports error reporting.
-compile :: MonadError Error m => Options -> CustomPasses (OhuaT env m) -> Expression -> m OutGraph
-compile opts passes = either throwError (return . fst) <=< runOhuaT opts (pipeline passes)
+compile :: (MonadError Error m, MonadIO m) => Options -> CustomPasses env -> Expression -> m OutGraph
+compile opts passes = either throwError (return . fst) <=< liftIO . runFromExpr opts (pipeline passes)
 
 
 -- | Verify that only higher order fucntions have lambdas as arguments

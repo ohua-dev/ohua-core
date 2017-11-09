@@ -34,7 +34,7 @@ instance HigherOrderFunction SmapFn where
     name = "ohua.lang/smap"
 
     parseCallAndInitState [LamArg lam, Variable v] = return $ SmapFn v lam (error "size uninitialized")
-    parseCallAndInitState _ = failWith "Unexpected number/type of arguments to smap"
+    parseCallAndInitState _ = throwError "Unexpected number/type of arguments to smap"
 
     createContextEntry = do
         f <- get

@@ -40,7 +40,7 @@ ssaResolve bnd = reader $ fromMaybe bnd <$> HM.lookup bnd
 -- becuase it does a lot of passing functions as arguments, however it very nicely
 -- encapsulates the scope changes which means they will never leak from where they are
 -- supposed to be applied
-ssaRename :: (MonadOhua envExpr m, MonadReader LocalScope m) => Binding -> m a -> m (Binding, a)
+ssaRename :: (MonadGenBnd m, MonadReader LocalScope m) => Binding -> m a -> m (Binding, a)
 ssaRename oldBnd cont = do
     newBnd <- generateBindingWith oldBnd
     (newBnd,) <$> local (HM.insert oldBnd newBnd) cont
@@ -92,6 +92,6 @@ isSSA = either Just (const Nothing) . flip evalState mempty . runExceptT . go
 
 
 checkSSA :: MonadOhua envExpr m => Expression -> m ()
-checkSSA = maybe (return ()) (failWith . mkMsg) . isSSA
+checkSSA = maybe (return ()) (throwError . mkMsg) . isSSA
   where
     mkMsg bnd = "Redefinition of binding " <> showT bnd
