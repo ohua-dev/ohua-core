@@ -23,7 +23,7 @@ import qualified Data.Text             as T
 import           GHC.Generics
 import           Lens.Micro            ((^.))
 import           Ohua.LensClasses
-import           Ohua.Types
+import           Ohua.Types            hiding (Env)
 import           Ohua.Util
 
 
@@ -328,4 +328,3 @@ lrMapRefs = bimap id
 
 removeTyAnns :: TyAnnExpr a -> Expr a
 removeTyAnns = lrMapBnds (^. value)
-

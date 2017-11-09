@@ -11,7 +11,7 @@
 module Ohua.ALang.Show where
 
 import           Ohua.ALang.Lang
-import           Ohua.Types
+import           Ohua.Types      hiding (Env)
 
 
 showAssigment :: Assignment -> String

@@ -130,8 +130,17 @@ renameWith m = fmap go
 handleApplyExpr :: MonadOhua envExpr m => Expression -> m (QualifiedBinding, FnId, [Expression])
 handleApplyExpr (Apply fn arg) = go fn [arg]
   where
-    go (Var (Sf fn id)) args = (fn, , args) <$> maybe generateId return id
-    go (Var v) _             = failWith $ "Expected Var Sf but got: Var " <> showT v -- FIXME there should be a special type of error here that takes the string and a value
+    go ve@(Var v) args =
+        case v of
+            Sf fn id -> (fn, , args) <$> maybe generateId return id
+            Local _ ->
+                fromEnv (options . callLocalFunction) >>= \case
+                    Nothing -> failWith "Calling local functions is not supported in this adapter"
+                    Just fn -> (fn, , ve : args) <$> generateId
+            Env _ ->
+                fromEnv (options . callLocalFunction) >>= \case
+                    Nothing -> failWith "Calling environment functions is not supported in this adapter"
+                    Just fn -> (fn, , ve : args) <$> generateId
     go (Apply fn arg) args   = go fn (arg:args)
     go x _                   = failWith $ "Expected Apply or Var but got: " <> showT x
 handleApplyExpr (Var (Sf fn id)) = (fn, , []) <$> maybe generateId return id

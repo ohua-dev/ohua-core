@@ -17,6 +17,7 @@ import           Data.Bifoldable
 import           Data.Bifunctor
 import           Data.Bitraversable
 import qualified Data.Char          as C
+import           Data.Default
 import           Data.Hashable
 import qualified Data.HashSet       as HS
 import           Data.Maybe
@@ -197,22 +198,25 @@ type Error = T.Text
 type Warning = T.Text
 type Warnings = [Warning]
 
+data Options = Options !(Maybe QualifiedBinding) !(Maybe QualifiedBinding)
+
+instance Default Options where def = Options Nothing Nothing
 
 -- | State of the ohua compiler monad.
-data CompilerState envExpr = CompilerState !NameGenerator !Int !(V.Vector envExpr)
+data State envExpr = State !NameGenerator !Int !(V.Vector envExpr)
 
--- | The read only compiler environment (currently empty)
-data CompilerEnv
+-- | The read only compiler environment
+newtype Environment = Environment Options
 
-nameGenerator :: Lens' (CompilerState envExpr) NameGenerator
-nameGenerator f (CompilerState gen counter envExprs) =
-    f gen <&> \ng -> CompilerState ng counter envExprs
+nameGenerator :: Lens' (State envExpr) NameGenerator
+nameGenerator f (State gen counter envExprs) =
+    f gen <&> \ng -> State ng counter envExprs
 
-idCounter :: Lens' (CompilerState envExpr) Int
-idCounter f (CompilerState gen counter envExprs) = f counter <&> \c -> CompilerState gen c envExprs
+idCounter :: Lens' (State envExpr) Int
+idCounter f (State gen counter envExprs) = f counter <&> \c -> State gen c envExprs
 
-envExpressions :: Lens (CompilerState envExpr) (CompilerState envExpr') (V.Vector envExpr)  (V.Vector envExpr')
-envExpressions f (CompilerState gen counter envExprs) = CompilerState gen counter <$> f envExprs
+envExpressions :: Lens (State envExpr) (State envExpr') (V.Vector envExpr)  (V.Vector envExpr')
+envExpressions f (State gen counter envExprs) = State gen counter <$> f envExprs
 
 -- | Stateful name generator
 data NameGenerator = NameGenerator !(HS.HashSet Binding) [Binding]
@@ -223,6 +227,14 @@ takenNames f (NameGenerator taken l) = flip NameGenerator l <$> f taken
 simpleNameList :: Lens' NameGenerator [Binding]
 simpleNameList f (NameGenerator taken l) = NameGenerator taken <$> f l
 
+callEnvExpr :: Lens' Options (Maybe QualifiedBinding)
+callEnvExpr f (Options c l) = f c <&> \c' -> Options c' l
+
+callLocalFunction :: Lens' Options (Maybe QualifiedBinding)
+callLocalFunction f (Options c l) = f l <&> Options c
+
+options :: Lens' Environment Options
+options f (Environment opts) = Environment <$> f opts
 
 data Annotated annotation value = Annotated !annotation !value
     deriving (Eq, Show)

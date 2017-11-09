@@ -15,7 +15,8 @@
 {-# LANGUAGE UndecidableInstances       #-}
 module Ohua.Monad
     ( OhuaT, runOhuaT, runOhuaT0, runOhuaT0IO
-    , MonadOhua(onState, recordWarning, failWith)
+    , MonadOhua(onState, recordWarning, failWith, getEnv)
+    , fromState, fromEnv
     , generateBinding, generateBindingWith, generateId
     , MonadIO(..)
     , addEnvExpression
@@ -26,7 +27,6 @@ import           Control.Monad.Except
 import           Control.Monad.Except
 import           Control.Monad.Reader
 import           Control.Monad.RWS.Strict hiding (fail)
-import           Control.Monad.State
 import           Control.Monad.Writer
 import qualified Data.HashSet             as HS
 import           Data.List                (intercalate)
@@ -47,7 +47,7 @@ import           Ohua.Util
 -- In development this collects errors via a MonadWriter, in production this collection will
 -- be turned off and be replaced by an exception, as such error should technically not occur
 -- there
-newtype OhuaT env m a = OhuaT { runOhuaT' :: RWST CompilerEnv Warnings (CompilerState env) (ExceptT Error m) a }
+newtype OhuaT env m a = OhuaT { runOhuaT' :: RWST Environment Warnings (State env) (ExceptT Error m) a }
     deriving (Functor, Applicative, Monad, MonadIO)
 
 instance MonadTrans (OhuaT env) where
@@ -67,43 +67,49 @@ class Monad m => MonadOhua envExpr m | m -> envExpr where
     -- | Record an error or warning but continue computation
     recordWarning :: Warning -> m ()
     -- | Failt the compiler with an error
-    onState :: (CompilerState envExpr -> (a, CompilerState envExpr)) -> m a
+    onState :: (State envExpr -> (a, State envExpr)) -> m a
     failWith :: Error -> m a
+    getEnv :: m Environment
 
 instance Monad m => MonadOhua env (OhuaT env m) where
     recordWarning err = OhuaT $ tell [err]
     onState = OhuaT . state
     failWith = OhuaT . throwError
+    getEnv = OhuaT ask
 
 -- A bit of magic to make every `MonadTrans` instance also a `MonadOhua` instance
 instance {-# OVERLAPPABLE #-} (MonadOhua envExpr m, MonadTrans m0, Monad (m0 m)) => MonadOhua envExpr (m0 m) where
     recordWarning = lift . recordWarning
     onState = lift . onState
     failWith = lift . failWith
+    getEnv = lift getEnv
 
 
-getState :: MonadOhua envExprs m => m (CompilerState envExprs)
+getState :: MonadOhua envExprs m => m (State envExprs)
 getState = onState (\s -> (s, s))
 
-fromState :: MonadOhua envExprs m => Lens' (CompilerState envExprs) a -> m a
+fromState :: MonadOhua envExprs m => Lens' (State envExprs) a -> m a
 fromState l = (^. l) <$> getState
+
+fromEnv :: MonadOhua envExprs m => Lens' Environment a -> m a
+fromEnv l = (^. l) <$> getEnv
 
 -- | Run a compiler
 -- Creates the state from the tree being passed in
 -- If there are any errors during the compilation they are reported together at the end
-runOhuaT :: Monad ctxt => (Expression -> OhuaT env ctxt result) -> Expression -> ctxt (Either Error (result, Warnings))
-runOhuaT f tree = runOhuaT0 (f tree) $ HS.fromList $ extractBindings tree
+runOhuaT :: Monad ctxt => Options -> (Expression -> OhuaT env ctxt result) -> Expression -> ctxt (Either Error (result, Warnings))
+runOhuaT opts f tree = runOhuaT0 opts (f tree) $ HS.fromList $ extractBindings tree
 
-runOhuaT0 :: Monad ctxt => OhuaT env ctxt result -> HS.HashSet Binding -> ctxt (Either Error (result, Warnings))
-runOhuaT0 f taken = runExceptT $ evalRWST (runOhuaT' f) env state
+runOhuaT0 :: Monad ctxt => Options -> OhuaT env ctxt result -> HS.HashSet Binding -> ctxt (Either Error (result, Warnings))
+runOhuaT0 opts f taken = runExceptT $ evalRWST (runOhuaT' f) env state
   where
     nameGen = initNameGen taken
-    state = CompilerState nameGen 0 mempty
-    env = error "Ohua has no environment!"
+    state = State nameGen 0 mempty
+    env = Environment opts
 
 
-runOhuaT0IO :: MonadIO ctxt => OhuaT env ctxt result -> HS.HashSet Binding -> ctxt (Either Error result)
-runOhuaT0IO f taken =  runOhuaT0 f taken >>= \case
+runOhuaT0IO :: MonadIO ctxt => Options -> OhuaT env ctxt result -> HS.HashSet Binding -> ctxt (Either Error result)
+runOhuaT0IO opts f taken =  runOhuaT0 opts f taken >>= \case
     Left err -> return $ Left err
     Right (val, errors) -> do
         unless (null errors) $ liftIO $ T.putStrLn $ T.intercalate "\n" errors

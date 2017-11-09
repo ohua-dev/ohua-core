@@ -86,8 +86,8 @@ pipeline CustomPasses{..} e = do
 
 
 -- | Run the pipeline in an arbitrary monad that supports error reporting.
-compile :: MonadError Error m => CustomPasses (OhuaT env m) -> Expression -> m OutGraph
-compile passes = either throwError (return . fst) <=< runOhuaT (pipeline passes)
+compile :: MonadError Error m => Options -> CustomPasses (OhuaT env m) -> Expression -> m OutGraph
+compile opts passes = either throwError (return . fst) <=< runOhuaT opts (pipeline passes)
 
 
 -- | Verify that only higher order fucntions have lambdas as arguments
