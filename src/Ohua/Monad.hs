@@ -12,11 +12,11 @@ module Ohua.Monad
     , MonadOhua
     ) where
 
-import Ohua.Internal.Monad
-import Control.Monad.IO.Class
-import Control.Monad.Except
-import Ohua.Types
-import Lens.Micro
+import           Control.Monad.Except
+import           Control.Monad.IO.Class
+import           Lens.Micro
+import           Ohua.Internal.Monad
+import           Ohua.Types
 
 
 failWith :: MonadError Error m => Error -> m a

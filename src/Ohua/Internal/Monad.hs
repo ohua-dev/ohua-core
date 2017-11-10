@@ -8,16 +8,17 @@
 -- Portability : POSIX
 
 -- This source code is licensed under the terms described in the associated LICENSE.TXT file
+{-# LANGUAGE ConstraintKinds            #-}
+{-# LANGUAGE DefaultSignatures          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE ConstraintKinds       #-}
 module Ohua.Internal.Monad where
 
 
 import           Control.Monad.Except
 import           Control.Monad.Reader
-import           Control.Monad.Writer
-import           Control.Monad.State
 import           Control.Monad.RWS.Strict hiding (fail)
+import           Control.Monad.State
+import           Control.Monad.Writer
 import           Control.Monad.Writer
 import qualified Data.HashSet             as HS
 import           Data.List                (intercalate)
@@ -28,7 +29,7 @@ import qualified Data.Vector              as V
 import           Lens.Micro.Platform
 import           Ohua.ALang.Lang
 import           Ohua.LensClasses
-import           Ohua.Types as Ty
+import           Ohua.Types               as Ty
 import           Ohua.Util
 
 
@@ -43,7 +44,11 @@ newtype OhuaM env a = OhuaM { runOhuaM :: RWST Environment Warnings (Ty.State en
 
 class MonadGenBnd m where
     generateBinding :: m Binding
+    default generateBinding :: (MonadGenBnd n, MonadTrans t, Monad n, t n ~ m) => t n Binding
+    generateBinding = lift generateBinding
     generateBindingWith :: Binding -> m Binding
+    default generateBindingWith :: (MonadGenBnd n, MonadTrans t, Monad n, t n ~ m) => Binding -> t n Binding
+    generateBindingWith = lift . generateBindingWith
 
 instance MonadGenBnd (OhuaM env) where
     generateBinding = OhuaM $ do
@@ -59,42 +64,31 @@ instance MonadGenBnd (OhuaM env) where
         pure h
       where prefix' = prefix <> "_"
 
-instance (MonadGenBnd m, Monad m) => MonadGenBnd (ReaderT e m) where
-    generateBinding = lift generateBinding
-    generateBindingWith = lift . generateBindingWith
-
-instance (MonadGenBnd m, Monad m, Monoid w) => MonadGenBnd (WriterT w m) where
-    generateBinding = lift generateBinding
-    generateBindingWith = lift . generateBindingWith
-
-instance (MonadGenBnd m, Monad m) => MonadGenBnd (StateT s m) where
-    generateBinding = lift generateBinding
-    generateBindingWith = lift . generateBindingWith
-
-instance (MonadGenBnd m, Monad m, Monoid w) => MonadGenBnd (RWST e w s m) where
-    generateBinding = lift generateBinding
-    generateBindingWith = lift . generateBindingWith
+instance (MonadGenBnd m, Monad m) => MonadGenBnd (ReaderT e m)
+instance (MonadGenBnd m, Monad m, Monoid w) => MonadGenBnd (WriterT w m)
+instance (MonadGenBnd m, Monad m) => MonadGenBnd (StateT s m)
+instance (MonadGenBnd m, Monad m, Monoid w) => MonadGenBnd (RWST e w s m)
 
 class MonadGenId m where
     generateId :: m FnId
+    default generateId :: (MonadGenId n, Monad n, MonadTrans t, t n ~ m) => m FnId
+    generateId = lift generateId
 
 instance MonadGenId (OhuaM env) where
     generateId = OhuaM $ do
         idCounter %= succ
         FnId <$> use idCounter
 
-instance (MonadGenId m, Monad m) => MonadGenId (ReaderT e m) where
-    generateId = lift generateId
-instance (MonadGenId m, Monad m, Monoid w) => MonadGenId (WriterT w m) where
-    generateId = lift generateId
-instance (MonadGenId m, Monad m) => MonadGenId (StateT s m) where
-    generateId = lift generateId
-instance (MonadGenId m, Monad m, Monoid w) => MonadGenId (RWST e w s m) where
-    generateId = lift generateId
+instance (MonadGenId m, Monad m) => MonadGenId (ReaderT e m)
+instance (MonadGenId m, Monad m, Monoid w) => MonadGenId (WriterT w m)
+instance (MonadGenId m, Monad m) => MonadGenId (StateT s m)
+instance (MonadGenId m, Monad m, Monoid w) => MonadGenId (RWST e w s m)
 
 class MonadReadEnvExpr m where
     type EnvExpr m
     lookupEnvExpr :: HostExpr -> m (Maybe (EnvExpr m))
+    default lookupEnvExpr :: (MonadReadEnvExpr n, MonadTrans t, Monad n, m ~ t n, EnvExpr n ~ EnvExpr m) => HostExpr -> m (Maybe (EnvExpr n))
+    lookupEnvExpr = lift . lookupEnvExpr
 
 instance MonadReadEnvExpr (OhuaM env) where
     type EnvExpr (OhuaM env) = env
@@ -102,37 +96,25 @@ instance MonadReadEnvExpr (OhuaM env) where
 
 instance (MonadReadEnvExpr m, Monad m) => MonadReadEnvExpr (ReaderT e m) where
     type EnvExpr (ReaderT e m) = EnvExpr m
-    lookupEnvExpr = lift . lookupEnvExpr
-
 instance (MonadReadEnvExpr m, Monad m, Monoid w) => MonadReadEnvExpr (WriterT w m) where
     type EnvExpr (WriterT e m) = EnvExpr m
-    lookupEnvExpr = lift . lookupEnvExpr
-
 instance (MonadReadEnvExpr m, Monad m) => MonadReadEnvExpr (StateT s m) where
     type EnvExpr (StateT s m) = EnvExpr m
-    lookupEnvExpr = lift . lookupEnvExpr
-
 instance (MonadReadEnvExpr m, Monad m, Monoid w) => MonadReadEnvExpr (RWST e w s m) where
     type EnvExpr (RWST e w s m) = EnvExpr m
-    lookupEnvExpr = lift . lookupEnvExpr
 
 class MonadRecordWarning m where
     recordWarning :: Warning -> m ()
+    default recordWarning :: (MonadTrans t, Monad n, MonadRecordWarning n, t n ~ m) => Warning -> m ()
+    recordWarning = lift . recordWarning
 
 instance MonadRecordWarning (OhuaM env) where
     recordWarning warn = OhuaM $ tell [warn]
 
-instance (MonadRecordWarning m, Monad m) => MonadRecordWarning (ReaderT e m) where
-    recordWarning = lift . recordWarning
-
-instance (MonadRecordWarning m, Monad m, Monoid w) => MonadRecordWarning (WriterT w m) where
-    recordWarning = lift . recordWarning
-
-instance (MonadRecordWarning m, Monad m) => MonadRecordWarning (StateT s m) where
-    recordWarning = lift . recordWarning
-
-instance (MonadRecordWarning m, Monad m, Monoid w) => MonadRecordWarning (RWST e w s m) where
-    recordWarning = lift . recordWarning
+instance (MonadRecordWarning m, Monad m) => MonadRecordWarning (ReaderT e m)
+instance (MonadRecordWarning m, Monad m, Monoid w) => MonadRecordWarning (WriterT w m)
+instance (MonadRecordWarning m, Monad m) => MonadRecordWarning (StateT s m)
+instance (MonadRecordWarning m, Monad m, Monoid w) => MonadRecordWarning (RWST e w s m)
 
 getEnvExpr :: (MonadError Error m, MonadReadEnvExpr m) => HostExpr -> m (EnvExpr m)
 getEnvExpr =  maybe (throwError msg) pure <=< lookupEnvExpr
@@ -141,6 +123,8 @@ getEnvExpr =  maybe (throwError msg) pure <=< lookupEnvExpr
 class MonadRecordEnvExpr m where
     type RecEnvExpr m
     addEnvExpression :: RecEnvExpr m -> m HostExpr
+    default addEnvExpression :: (MonadTrans t, Monad n, MonadRecordEnvExpr n, t n ~ m, RecEnvExpr n ~ RecEnvExpr m) => RecEnvExpr m -> m HostExpr
+    addEnvExpression = lift . addEnvExpression
 
 instance MonadRecordEnvExpr (OhuaM env) where
     type RecEnvExpr (OhuaM env) = env
@@ -151,37 +135,25 @@ instance MonadRecordEnvExpr (OhuaM env) where
 
 instance (MonadRecordEnvExpr m, Monad m) => MonadRecordEnvExpr (ReaderT e m) where
     type RecEnvExpr (ReaderT e m) = RecEnvExpr m
-    addEnvExpression = lift . addEnvExpression
-
 instance (MonadRecordEnvExpr m, Monad m, Monoid w) => MonadRecordEnvExpr (WriterT w m) where
     type RecEnvExpr (WriterT w m) = RecEnvExpr m
-    addEnvExpression = lift . addEnvExpression
-
 instance (MonadRecordEnvExpr m, Monad m) => MonadRecordEnvExpr (StateT s m) where
     type RecEnvExpr (StateT s m) = RecEnvExpr m
-    addEnvExpression = lift . addEnvExpression
-
 instance (MonadRecordEnvExpr m, Monad m, Monoid w) => MonadRecordEnvExpr (RWST e w s m) where
     type RecEnvExpr (RWST e w s m) = RecEnvExpr m
-    addEnvExpression = lift . addEnvExpression
 
 class MonadReadEnvironment m where
     getEnvironment :: m Environment
+    default getEnvironment :: (MonadTrans t, Monad n, MonadReadEnvironment n, t n ~ m) => m Environment
+    getEnvironment = lift getEnvironment
 
 instance MonadReadEnvironment (OhuaM env) where
     getEnvironment = OhuaM ask
 
-instance (MonadReadEnvironment m, Monad m) => MonadReadEnvironment (ReaderT e m) where
-    getEnvironment = lift getEnvironment
-
-instance (MonadReadEnvironment m, Monad m) => MonadReadEnvironment (StateT s m) where
-    getEnvironment = lift getEnvironment
-
-instance (MonadReadEnvironment m, Monad m, Monoid w) => MonadReadEnvironment (WriterT w m) where
-    getEnvironment = lift getEnvironment
-
-instance (MonadReadEnvironment m, Monad m, Monoid w) => MonadReadEnvironment (RWST e w s m) where
-    getEnvironment = lift getEnvironment
+instance (MonadReadEnvironment m, Monad m) => MonadReadEnvironment (ReaderT e m)
+instance (MonadReadEnvironment m, Monad m) => MonadReadEnvironment (StateT s m)
+instance (MonadReadEnvironment m, Monad m, Monoid w) => MonadReadEnvironment (WriterT w m)
+instance (MonadReadEnvironment m, Monad m, Monoid w) => MonadReadEnvironment (RWST e w s m)
 
 type MonadOhua env m = (MonadGenId m, MonadGenBnd m, MonadReadEnvExpr m, EnvExpr m ~ env, MonadRecordEnvExpr m, RecEnvExpr m ~ env, MonadError Error m, MonadIO m, MonadReadEnvironment m)
 
