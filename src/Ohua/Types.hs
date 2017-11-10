@@ -34,11 +34,7 @@ import           Ohua.Util
 
 
 -- | The numeric id of a function call site
-newtype FnId = FnId { unFnId :: Int } deriving (Eq, Ord, Generic)
-
--- Only here so we can write literals and have them convert automatically
-instance Num FnId where
-    fromInteger = FnId . fromInteger
+newtype FnId = FnId { unFnId :: Int } deriving (Eq, Ord, Generic, Enum, Num)
 
 instance Show FnId where
     show = show . unFnId
@@ -195,15 +191,13 @@ flattenAssign = extractBindings
 
 
 type Error = T.Text
-type Warning = T.Text
-type Warnings = [Warning]
 
 data Options = Options !(Maybe QualifiedBinding) !(Maybe QualifiedBinding)
 
 instance Default Options where def = Options Nothing Nothing
 
 -- | State of the ohua compiler monad.
-data State envExpr = State !NameGenerator !Int !(V.Vector envExpr)
+data State envExpr = State !NameGenerator !FnId !(V.Vector envExpr)
 
 -- | The read only compiler environment
 newtype Environment = Environment Options
@@ -212,7 +206,7 @@ nameGenerator :: Lens' (State envExpr) NameGenerator
 nameGenerator f (State gen counter envExprs) =
     f gen <&> \ng -> State ng counter envExprs
 
-idCounter :: Lens' (State envExpr) Int
+idCounter :: Lens' (State envExpr) FnId
 idCounter f (State gen counter envExprs) = f counter <&> \c -> State gen c envExprs
 
 envExpressions :: Lens (State envExpr) (State envExpr') (V.Vector envExpr)  (V.Vector envExpr')

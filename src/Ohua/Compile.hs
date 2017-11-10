@@ -13,11 +13,13 @@
 module Ohua.Compile where
 
 
+import           Control.DeepSeq
 import           Control.Monad.Except
 import           Data.Default
 import           Data.Functor.Identity
 import qualified Data.HashMap.Strict       as HM
 import           Data.Monoid               ((<>))
+import           Data.Text                 (Text, pack)
 import           Debug.Trace
 import           Lens.Micro
 import           Ohua.ALang.Lang
@@ -45,7 +47,8 @@ instance Default (CustomPasses env) where
     def = noCustomPasses
 
 
-
+forceLog :: (MonadLogger m, NFData a) => Text -> a -> m ()
+forceLog msg a = a `deepseq` logDebugN msg
 
 
 -- | The canonical order of transformations and lowerings performed in a full compilation.
@@ -67,7 +70,7 @@ pipeline CustomPasses{..} e = do
 
     dfE <- lowerALang optimizedE
 
-    forceTraceReport (showDFExpr dfE) ()
+    forceLog (showDFExpr dfE) ()
 
 #ifdef DEBUG
     Ohua.DFLang.Passes.checkSSAExpr dfE
@@ -87,7 +90,7 @@ pipeline CustomPasses{..} e = do
 
 -- | Run the pipeline in an arbitrary monad that supports error reporting.
 compile :: (MonadError Error m, MonadIO m) => Options -> CustomPasses env -> Expression -> m OutGraph
-compile opts passes = either throwError (return . fst) <=< liftIO . runFromExpr opts (pipeline passes)
+compile opts passes = either throwError pure <=< liftIO . runFromExpr opts (pipeline passes)
 
 
 -- | Verify that only higher order fucntions have lambdas as arguments

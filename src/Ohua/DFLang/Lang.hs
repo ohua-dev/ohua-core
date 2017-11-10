@@ -21,8 +21,10 @@ import           Control.DeepSeq
 import           Data.Foldable   (toList)
 import           Data.Hashable
 import           Data.List       (intercalate)
+import           Data.Monoid
 import           Data.Sequence
 import           Data.String
+import qualified Data.Text       as T
 import           Ohua.ALang.Lang
 import           Ohua.Types
 
@@ -76,16 +78,19 @@ instance NFData DFVar where
     rnf (DFVar v)    = rnf v
 
 
-showDFExpr :: DFExpr -> String
+showDFExpr :: DFExpr -> T.Text
 showDFExpr (DFExpr lets retVar) =
-    unlines $ (toList $ fmap showLet lets) ++ [show retVar]
+    T.unlines $ (toList $ fmap showLet lets) <> [showBnd retVar]
   where
-    showAssign (Direct v)       = show v
-    showAssign (Destructure vs) = "[" ++ intercalate ", " (map show vs) ++ "]"
-    showRef (DFFunction a) = show a
-    showRef (EmbedSf a)    = show a
-    showVar (DFEnvVar h) = show h
-    showVar (DFVar v)    = show v
+    showT :: Show a => a -> T.Text
+    showT = T.pack . show
+    showBnd (Binding b) = b
+    showAssign (Direct v)       = showBnd v
+    showAssign (Destructure vs) = "[" <> T.intercalate ", " (map showBnd vs) <> "]"
+    showRef (DFFunction a) = showT a
+    showRef (EmbedSf a)    = showT a
+    showVar (DFEnvVar h) = showT h
+    showVar (DFVar v)    = showBnd v
     showLet (LetExpr id ass ref args ctxArc) =
-        "let " ++ showAssign ass ++ " = " ++ showRef ref ++ "<" ++ show id ++ "> ("
-        ++ intercalate ", " (map showVar args) ++ ")" ++ maybe "" (\a -> " [" ++ show a ++"]") ctxArc
+        "let " <> showAssign ass <> " = " <> showRef ref <> "<" <> showT id <> "> ("
+        <> T.intercalate ", " (map showVar args) <> ")" <> maybe "" (\a -> " [" <> showBnd a <>"]") ctxArc
