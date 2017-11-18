@@ -7,7 +7,7 @@ import           Prelude          hiding (id)
 
 
 oneToN :: DFFnRef
-oneToN = DFFunction "ohua.lang/one-to-n"
+oneToN = DFFunction "ohua.lang/oneToN"
 
 
 size :: DFFnRef
@@ -19,7 +19,7 @@ collect = DFFunction "ohua.lang/collect"
 
 
 smapFun :: DFFnRef
-smapFun = DFFunction "ohua.lang/smap-fun"
+smapFun = DFFunction "ohua.lang/smapFun"
 
 
 id :: DFFnRef
