@@ -27,7 +27,7 @@ id = EmbedSf "ohua.lang/id"
 
 
 ifThenElse :: DFFnRef
-ifThenElse = EmbedSf "ohua.lang/ifThenElse"
+ifThenElse = EmbedSf "ohua.lang/bool"
 
 
 switch ::DFFnRef
