@@ -68,7 +68,7 @@ instance MonadGenBnd (OhuaM env) where
     generateBindingWith (Binding prefix) = OhuaM $ do
         taken <- use $ nameGenerator . takenNames
         let a = map (T.pack . show) ([0..] :: [Int])
-        deepseqM (take 10 a)
+        -- deepseqM (take 10 a)
         let (h:_) = dropWhile (`HS.member` taken) $ map (Binding . (prefix' <>)) a
         nameGenerator . takenNames %= HS.insert h
         pure h
