@@ -35,6 +35,8 @@ import           Ohua.Types               as Ty
 import           Ohua.Util
 
 
+import Control.DeepSeq
+
 -- The compiler monad.
 -- Encapsulates the state necessary to generate bindings
 -- Allows IO actions.
@@ -53,6 +55,9 @@ class MonadGenBnd m where
     default generateBindingWith :: (MonadGenBnd n, MonadTrans t, Monad n, t n ~ m) => Binding -> t n Binding
     generateBindingWith = lift . generateBindingWith
 
+deepseqM :: (Monad m, NFData a) => a -> m ()
+deepseqM a = a `deepseq` pure ()
+
 instance MonadGenBnd (OhuaM env) where
     generateBinding = OhuaM $ do
         taken <- use $ nameGenerator . takenNames
@@ -62,7 +67,9 @@ instance MonadGenBnd (OhuaM env) where
         pure h
     generateBindingWith (Binding prefix) = OhuaM $ do
         taken <- use $ nameGenerator . takenNames
-        let (h:_) = dropWhile (`HS.member` taken) $ map (Binding . (prefix' <>) . T.pack . show) ([0..] :: [Int])
+        let a = map (T.pack . show) ([0..] :: [Int])
+        deepseqM (take 10 a)
+        let (h:_) = dropWhile (`HS.member` taken) $ map (Binding . (prefix' <>)) a
         nameGenerator . takenNames %= HS.insert h
         pure h
       where prefix' = prefix <> "_"
