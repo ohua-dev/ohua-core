@@ -77,6 +77,15 @@ instance MonadError e m => MonadError e (LoggingT m) where
 mapLoggingT :: (m a -> n b) -> LoggingT m a -> LoggingT n b
 mapLoggingT f = LoggingT . (f .) . runLoggingT
 
+filterLogger :: (LogSource -> LogLevel -> Bool)
+             -> LoggingT m a
+             -> LoggingT m a
+filterLogger p (LoggingT f) = LoggingT $ \logger ->
+    f $ \loc src level msg -> 
+        if (p src level) then 
+            logger loc src level msg
+        else pure ()
+
 instance MonadRWS r w s m => MonadRWS r w s (LoggingT m)
 
 instance MonadReader r m => MonadReader r (LoggingT m) where
@@ -186,8 +195,13 @@ defaultLogStr loc src level msg =
     msg `mappend`
     "\n"
 
+
+runHandleLoggingT :: MonadIO m => Handle -> LoggingT m a -> m a
+runHandleLoggingT h = (`runLoggingT` defaultOutput h)
+
+
 runStderrLoggingT :: MonadIO m => LoggingT m a -> m a
-runStderrLoggingT = (`runLoggingT` defaultOutput stderr)
+runStderrLoggingT = runHandleLoggingT stderr
 
 
 data LogStr = LogStr !Int Builder

@@ -9,7 +9,9 @@ module Ohua.Monad
     , MonadReadEnvironment(getEnvironment), fromEnv
     , MonadIO(liftIO)
     , MonadError(throwError, catchError), failWith
-    , MonadLogger, LogLevel, LogSource, logDebugN, logInfoN
+    , MonadLogger, LoggingT, runStderrLoggingT, runHandleLoggingT, runLoggingT, filterLogger
+    , MonadLoggerIO(askLoggerIO)
+    , LogLevel, LogSource, logDebugN, logInfoN
     , logWarnN, logErrorN, logOtherN
     , MonadOhua
     ) where

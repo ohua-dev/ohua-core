@@ -44,7 +44,7 @@ import Control.DeepSeq
 -- be turned off and be replaced by an exception, as such errors should technically not occur
 -- there
 newtype OhuaM env a = OhuaM {
-    runOhuaM :: LoggingT (RWST Environment () (Ty.State env) (ExceptT Error IO)) a }
+    runOhuaM :: RWST Environment () (Ty.State env) (ExceptT Error (LoggingT IO)) a }
     deriving (Functor, Applicative, Monad, MonadIO, MonadError Error, MonadLogger, MonadLoggerIO)
 
 class MonadGenBnd m where
@@ -180,11 +180,11 @@ type MonadOhua env m = (MonadGenId m, MonadGenBnd m, MonadReadEnvExpr m, MonadRe
 -- | Run a compiler
 -- Creates the state from the tree being passed in
 -- If there are any errors during the compilation they are reported together at the end
-runFromExpr :: Options -> (Expression -> OhuaM env result) -> Expression -> IO (Either Error result)
+runFromExpr :: Options -> (Expression -> OhuaM env result) -> Expression -> LoggingT IO (Either Error result)
 runFromExpr opts f tree = runFromBindings opts (f tree) $ HS.fromList $ extractBindings tree
 
-runFromBindings :: Options -> OhuaM env result -> HS.HashSet Binding -> IO (Either Error result)
-runFromBindings opts f taken = runExceptT $ fst <$> evalRWST (runStderrLoggingT $ runOhuaM f) env state
+runFromBindings :: Options -> OhuaM env result -> HS.HashSet Binding -> LoggingT IO (Either Error result)
+runFromBindings opts f taken = runExceptT $ fst <$> evalRWST (runOhuaM f) env state
   where
     nameGen = initNameGen taken
     state = State nameGen 0 mempty

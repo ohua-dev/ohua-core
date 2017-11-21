@@ -89,8 +89,10 @@ pipeline CustomPasses{..} e = do
 
 
 -- | Run the pipeline in an arbitrary monad that supports error reporting.
-compile :: (MonadError Error m, MonadIO m) => Options -> CustomPasses env -> Expression -> m OutGraph
-compile opts passes = either throwError pure <=< liftIO . runFromExpr opts (pipeline passes)
+compile :: (MonadError Error m, MonadIO m, MonadLoggerIO m) => Options -> CustomPasses env -> Expression -> m OutGraph
+compile opts passes exprs = do
+    logFn <- askLoggerIO
+    either throwError pure =<< liftIO (runLoggingT (runFromExpr opts (pipeline passes) exprs) logFn)
 
 
 -- | Verify that only higher order fucntions have lambdas as arguments
