@@ -4,10 +4,11 @@ import           Ohua.ALang.Lang        (unwrapHostExpr)
 import           Ohua.DFGraph
 import           Ohua.Types             (unFnId)
 import           Text.PrettyPrint.Boxes
+import qualified Data.Text as T
 
 
-printAsTable :: OutGraph -> IO ()
-printAsTable (OutGraph ops arcs) = printBox $ vsep 1 left
+asTable :: OutGraph -> T.Text
+asTable (OutGraph ops arcs) = T.pack $ render $ vsep 1 left
     [ text "Operators"
     , hsep 4 top [idList, typeList ]
     , text "Arcs"

@@ -11,7 +11,7 @@ module Ohua.Monad
     , MonadError(throwError, catchError), failWith
     , MonadLogger, LoggingT, runStderrLoggingT, runHandleLoggingT, runLoggingT, filterLogger
     , MonadLoggerIO(askLoggerIO)
-    , LogLevel, LogSource, logDebugN, logInfoN
+    , LogLevel(..), LogSource, logDebugN, logInfoN
     , logWarnN, logErrorN, logOtherN
     , MonadOhua
     ) where
