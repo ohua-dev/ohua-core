@@ -67,5 +67,5 @@ instance HigherOrderFunction IfFn where
             ,   zip freeVars selected
             )
 
-    contextifyUnboundFunctions (Lam (Direct x) _) = return $ Just x
+    contextifyUnboundFunctions (Lam (Direct x) _) = return $ Just ([], x)
     contextifyUnboundFunctions _ = failWith "Unexpected destructuring in begin assignment"

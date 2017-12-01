@@ -69,6 +69,15 @@ instance HigherOrderFunction SmapFn where
                 newVar <- generateBindingWith var
                 pure (LetExpr id (Direct newVar) Refs.oneToN [DFVar sizeSource, DFVar var] Nothing, newVar)
         (replicators, replications) <- unzip <$> mapM mkReplicator freeVars
-        return (S.fromList replicators, zip freeVars replications)
+        return
+            ( S.fromList replicators
+            , zip freeVars replications
+            )
 
-    contextifyUnboundFunctions lam = return $ Just $ head $ flattenAssign $ beginAssignment lam
+    contextifyUnboundFunctions lam = do
+        ctxSource <- generateBindingWith "_smap_context"
+        ctxOp <- do 
+            ctxId <- generateId
+            pure $ LetExpr ctxId (Direct ctxSource) Refs.seq [DFVar elemSource] Nothing
+        pure $ Just ([ctxOp], ctxSource)
+      where elemSource = head $ flattenAssign $ beginAssignment lam

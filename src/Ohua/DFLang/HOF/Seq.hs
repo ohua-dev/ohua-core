@@ -35,4 +35,4 @@ instance HigherOrderFunction SeqFn where
 
   scopeFreeVariables lam freeVars = return (S.empty, [])
 
-  contextifyUnboundFunctions _ = Just <$> gets before
+  contextifyUnboundFunctions _ = Just . (S.empty,) <$> gets before

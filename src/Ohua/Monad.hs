@@ -24,6 +24,7 @@ import           Ohua.Internal.Monad
 import           Ohua.Types
 
 
+-- | Alias for backwards compatibility with old `MonadOhua` interface
 failWith :: MonadError Error m => Error -> m a
 failWith = throwError
 

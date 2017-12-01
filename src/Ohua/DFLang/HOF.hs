@@ -94,8 +94,8 @@ class HigherOrderFunction f where
     -- | Whether the compiler should add context args for all functions in this lambda
     -- which have no local variables as input.
     -- As an invariant, since 'scopeFreeVariables' makes all free varaibles local ones
-    -- this should only apply to funcitons with no inputs at all.
-    contextifyUnboundFunctions :: (MonadOhua envExpr m, MonadState f m) => Lambda -> m (Maybe Binding)
+    -- this should only apply to functions with no inputs at all.
+    contextifyUnboundFunctions :: (MonadOhua envExpr m, MonadState f m) => Lambda -> m (Maybe (Seq LetExpr, Binding))
 
 
 -- | _W_rapped _H_igher _O_rder _F_unction.

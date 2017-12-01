@@ -102,6 +102,8 @@ tieContext0 :: Functor f => HS.HashSet Binding -> Binding -> f LetExpr -> f LetE
 tieContext0 bounds ctxSource = fmap go
   where
     go e | any isBoundArg (callArguments e) = e
+         | Just ctxArg <- contextArg e
+         , isBoundArg (DFVar ctxArg) = e
     go e = e { contextArg = Just ctxSource }
 
     isBoundArg (DFVar v) = v `HS.member` bounds
@@ -175,7 +177,7 @@ lowerHOF _ assign args = do
             tell scopers
             scopeUnbound <- contextifyUnboundFunctions lam
             let tieContext1 = case scopeUnbound of
-                    Just bnd -> tieContext0 boundVars bnd
+                    Just (initExpr, bnd) -> (initExpr <>) . tieContext0 boundVars bnd
                     Nothing  -> id
             tell $ tieContext1 (renameWith (HM.fromList renaming) body)
         createContextExit assign >>= tell

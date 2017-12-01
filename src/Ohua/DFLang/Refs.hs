@@ -36,3 +36,7 @@ switch = DFFunction "ohua.lang/select"
 
 scope :: DFFnRef
 scope = DFFunction "ohua.lang/scope"
+
+
+seq :: DFFnRef
+seq = EmbedSf "ohua.lang/seq"
