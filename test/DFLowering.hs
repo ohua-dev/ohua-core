@@ -22,6 +22,8 @@ import           Ohua.ALang.Lang
 import           Ohua.DFGraph
 import           Ohua.DFLang.Lang
 import           Ohua.DFLang.Passes
+import qualified Ohua.ALang.Refs                  as ALangRefs
+import qualified Ohua.DFLang.Refs                  as Refs
 import           Ohua.Monad
 import           Ohua.Types
 import           Test.Hspec
@@ -34,12 +36,6 @@ data OhuaGrEdgeLabel = OhuaGrEdgeLabel
     { sourceIndex :: !Int
     , targetIndex :: !Int
     } deriving (Eq, Show, Ord)
-
-instance Show DFExpr where
-    show (DFExpr e v) = intercalate "\n" (map show (toList e)) ++ "\n" ++ show v
-deriving instance Show LetExpr
-deriving instance Show DFVar
-deriving instance Show DFFnRef
 
 instance Show OhuaGrGraph where
     show = prettify . unGr
@@ -180,6 +176,46 @@ seqSpec = do
                 ]
                 "x"
 
+-- (let [a (fn [i] (let [p (math/- i 10)]
+--                       (ohua.lang/if (math/< p 0)
+--                                     p
+--                                     (a p))))]
+--       (a 95))
+recurSpec :: Spec
+recurSpec = do
+    describe "recur lowering" $ do
+         it "lowers a simple recursion" $
+            (   Let (Recursive (Binding "a"))
+                        (Lambda "i"
+                                (Let "p" (("math/-" `Apply` "i") `Apply` 10)
+                                     (Let "x" (("math/<" `Apply` "p") `Apply` 0)
+                                          (Let "c" (Apply (Apply (Apply (Var $ Sf ALangRefs.ifThenElse Nothing) "x")
+                                                                        (Lambda "then" (Let "t" (Apply (Var $ Sf ALangRefs.id Nothing) "p")
+                                                                                            "t")))
+                                                                        (Lambda "else" (Let "r" ((Var $ Sf ALangRefs.recur Nothing) `Apply` "p")
+                                                                                            "r")))
+                                                "c"))))
+                     (Let "y" ("a" `Apply` 95)
+                          "y")
+            )
+            `shouldLowerTo`
+            DFExpr
+                [ LetExpr 0 "i_0" Refs.id [DFEnvVar 95] Nothing -- this adapts the actual to the formal that goes into algo-in and then becomes "i"
+                -- inside the lambda everything is left untouched.
+                , LetExpr 1 "p" (EmbedSf "math/-") [DFVar "i", DFEnvVar 10] Nothing
+                , LetExpr 2 "x" (EmbedSf "math/<") [DFVar "p", DFEnvVar 0] Nothing
+                , LetExpr 3 ["then", "else"] Refs.ifThenElse [DFVar "x"] Nothing
+                , LetExpr 4 ["p_0"] Refs.scope [DFVar "p"] $ Just "then"
+                , LetExpr 5 "t" Refs.id [DFVar "p_0"] Nothing
+                , LetExpr 6 ["p_1"] Refs.scope [DFVar "p"] $ Just "else"
+                -- the two functions to gather the parameters for the call to recur
+                , LetExpr 7 "recur-in_0" Refs.array [DFVar "p_1"] Nothing
+                , LetExpr 8 "algo-in_0" Refs.array [DFVar "i_0"] Nothing
+                -- note: recur produces finally the formal input vars of the lambda
+                , LetExpr 9 ["i"] Refs.recur [DFVar "x", DFVar "algo-in_0", DFVar "recur-in_0"] Nothing
+                , LetExpr 10 "y" Refs.id [DFVar "t"] Nothing -- this adapts the output formal to the output actual
+                ]
+                "y"
 
 
 isIsomorphic :: (Eq a, Ord b) => Gr a b -> Gr a b -> Bool
@@ -245,14 +281,18 @@ matchGraph _ _ = emptyEither
 
 matchAndReport :: (Eq a, Ord b, Show a, Show b) => Gr a b -> Gr a b -> Expectation
 matchAndReport gr1 gr2 =
-    case matchGraph gr1 gr2 of
+      -- TODO add a check here to verify that all nodes have unique function IDs
+--matchAndReport g1 g2 =
+--    let gr1 = trace ("Graph #1: " ++ show g1) g1
+--        gr2 = trace ("Graph #2: " ++ show g2) g2 in
+      case matchGraph gr1 gr2 of
         Right match -> return ()
         Left (largest, keys) ->
             let selectedGr1Nodes = IntMap.elems largest
                 selectedGr2Nodes = IntMap.keys largest
                 unselectedGr1Nodes = filter (not . flip IntSet.member (IntSet.fromList selectedGr1Nodes) . fst) (labNodes gr1)
                 unselectedGr2Nodes = filter (not . flip IntSet.member (IntMap.keysSet largest) . fst) (labNodes gr2)
-            in do
+            in
                 expectationFailure $ unlines
                     [ "Graphs weren't isomorphic."
                     , "The largest match was between"
@@ -276,6 +316,9 @@ matchAndReport gr1 gr2 =
                             [ ""
                             , "I failed when matching"
                             , show $ filter ((== x) . fst) unselectedGr1Nodes
-                            , show $ filter ((== k) . fst) unselectedGr1Nodes
+--                            , show $ filter ((== k) . fst) unselectedGr2Nodes
+                            , show unselectedGr2Nodes
+                            , show k
                             ]
+                    , show largest
                     ]

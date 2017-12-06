@@ -23,6 +23,8 @@ import           Ohua.Monad
 import           Ohua.Types
 import           Ohua.Util
 
+import           Debug.Trace
+
 
 data IfFn = IfFn
     { conditionVariable :: !DFVar

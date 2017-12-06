@@ -37,7 +37,7 @@ ssaResolve bnd = reader $ fromMaybe bnd <$> HM.lookup bnd
 --
 -- Passing in the computation which is to be executed in the modified environment
 -- makes this function a bit harder to use (or rather the code using it less readable)
--- becuase it does a lot of passing functions as arguments, however it very nicely
+-- because it does a lot of passing functions as arguments, however it very nicely
 -- encapsulates the scope changes which means they will never leak from where they are
 -- supposed to be applied
 ssaRename :: (MonadGenBnd m, MonadReader LocalScope m) => Binding -> m a -> m (Binding, a)

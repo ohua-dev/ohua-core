@@ -2,6 +2,7 @@ module Ohua.DFLang.Refs where
 
 
 import           Ohua.DFLang.Lang
+import qualified Ohua.ALang.Refs  as Refs
 import           Ohua.Types
 import           Prelude          hiding (id)
 
@@ -11,21 +12,22 @@ oneToN = DFFunction "ohua.lang/oneToN"
 
 
 size :: DFFnRef
-size = EmbedSf "ohua.lang/size"
+size = EmbedSf Refs.size
 
 
 collect :: DFFnRef
 collect = DFFunction "ohua.lang/collect"
 
 
+-- FIXME should be ohua.lang/smap
 smapFun :: DFFnRef
 smapFun = DFFunction "ohua.lang/smapFun"
 
 
 id :: DFFnRef
-id = EmbedSf "ohua.lang/id"
+id = EmbedSf Refs.id
 
-
+-- FIXME should be ohua.lang/if
 ifThenElse :: DFFnRef
 ifThenElse = EmbedSf "ohua.lang/bool"
 
@@ -35,8 +37,16 @@ switch = DFFunction "ohua.lang/select"
 
 
 scope :: DFFnRef
-scope = DFFunction "ohua.lang/scope"
+scope = DFFunction Refs.scope
 
 
 seq :: DFFnRef
 seq = EmbedSf "ohua.lang/seq"
+
+
+recur :: DFFnRef
+recur = DFFunction Refs.recur
+
+
+array :: DFFnRef
+array = EmbedSf Refs.array

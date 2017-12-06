@@ -8,7 +8,8 @@
 -- Portability : portable
 
 -- This source code is licensed under the terms described in the associated LICENSE.TXT file
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleContexts  #-}
+{-# LANGUAGE FlexibleInstances #-}
 module PassesSpec (passesSpec) where
 
 import           Control.DeepSeq
@@ -17,15 +18,17 @@ import           Data.Either
 import           Data.Functor.Identity
 import           Debug.Trace
 import           Ohua.ALang.Lang
+import qualified Ohua.ALang.Refs            as ALangRefs
 import           Ohua.ALang.Passes
 import           Ohua.ALang.Passes.SSA
+import           Ohua.ALang.Passes.TailRec
 import           Ohua.ALang.Show
 import           Ohua.Monad
 import           Ohua.Types
 import           Test.Hspec
 import           Test.Hspec.QuickCheck
 import           Test.QuickCheck
-import           Test.QuickCheck.Property as P
+import           Test.QuickCheck.Property   as P
 
 import           Ohua.Types.Arbitrary
 
@@ -40,6 +43,8 @@ smapName = "ohua.lang/smap"
 --       where
 --         tree (_, values) 0 = Var $ Local
 
+instance Num ResolvedSymbol where fromInteger = Env . fromInteger
+instance Num Expression where fromInteger = Var . fromInteger
 
 runPasses expr = flip runOhuaT expr $ performSSA >=> (normalize >=> \e -> checkProgramValidity e >> return e)
 
@@ -164,3 +169,35 @@ passesSpec = do
                 "x" )
             `shouldBe`
             Right (Let "x" ("some-ns/fn-with-3-args" `Apply` "a" `Apply` "b" `Apply` "c") "x")
+
+    -- TODO
+--    describe "lambda lifting" $ do
+--        it "lifts simple lambda" $
+
+
+    describe "letrec detection" $ do
+        it "detects simple recusion" $
+           findTailRecs (Let "a" (Lambda "i" (Let "p" (("math/-" `Apply` "i") `Apply` 10)
+                                     (Let "x" (("math/<" `Apply` "p") `Apply` 0)
+                                          (Let "c" (Apply (Apply (Apply (Var $ Sf ALangRefs.ifThenElse Nothing) "x")
+                                                                                (Lambda "then" (Let "t" (Apply (Var $ Sf ALangRefs.id Nothing) "p")
+                                                                                                    "t")))
+                                                                                (Lambda "else" (Let "r" ("a" `Apply` "p")
+                                                                                                    "r")))
+                                                        "c"))))
+                             (Let "y" ("a" `Apply` 95)
+                                  "y")
+                          )
+           `shouldBe`
+           (Let (Recursive (Binding "a")) (Lambda "i"
+                                           (Let "p" (("math/-" `Apply` "i") `Apply` 10)
+                                                (Let "x" (("math/<" `Apply` "p") `Apply` 0)
+                                                     (Let "c" (Apply (Apply (Apply (Var $ Sf ALangRefs.ifThenElse Nothing) "x")
+                                                                                   (Lambda "then" (Let "t" (Apply (Var $ Sf ALangRefs.id Nothing) "p")
+                                                                                                       "t")))
+                                                                                   (Lambda "else" (Let "r" ((Var $ Sf ALangRefs.recur Nothing) `Apply` "p")
+                                                                                                       "r")))
+                                                           "c"))))
+                                (Let "y" ("a" `Apply` 95)
+                                     "y")
+                       )

@@ -21,7 +21,7 @@ import           Ohua.ALang.Lang
 import           Ohua.DFLang.Lang
 import           Ohua.Types
 
-
+import           Debug.Trace
 
 data Operator = Operator
     { operatorId   :: !FnId
@@ -69,7 +69,7 @@ instance NFData a => NFData (AbstractOutGraph a)
 
 
 toGraph :: DFExpr -> OutGraph
-toGraph (DFExpr lets _) = OutGraph ops arcs
+toGraph a@(DFExpr lets _) = trace ("DFExpr to convert to graph:\n" ++ show a) $ OutGraph ops arcs
   where
     ops = map toOp $ toList lets
     toOp e = Operator (callSiteId e) (deRef e)
@@ -84,6 +84,7 @@ toGraph (DFExpr lets _) = OutGraph ops arcs
                     | (var, index) <- case returnAssignment l of
                                         Direct v         -> [(v, -1)]
                                         Destructure vars -> zip vars [0..]
+                                        g -> error $ "Found unsupported assignment: " ++ show g
                     ]
 
     arcs = concatMap toArc (toList lets)
@@ -91,7 +92,7 @@ toGraph (DFExpr lets _) = OutGraph ops arcs
     toArc l =
         [ Arc target $
             case arg of
-                DFVar v -> LocalSource $ fromMaybe (error $ "Undefined Binding " ++ show v) (HM.lookup v sources)
+                DFVar v -> LocalSource $ fromMaybe (error $ "Undefined Binding: DFVar " ++ show v ++ " defined vars: " ++ show sources) $ HM.lookup v sources
                 DFEnvVar envExpr -> EnvSource envExpr
         | (arg, index) <- maybe id ((:) . (,-1) . DFVar) (contextArg l)
                           -- prepend (ctxBinding, -1) if there is a context arc

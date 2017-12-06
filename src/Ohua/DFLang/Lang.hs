@@ -15,6 +15,7 @@
 -- The ALang IR is transformed straight into the dataflow IR.
 -- One important aspect of DFLang: it does not define any abstractions, i.e., there are no function definitions.
 --
+{-# LANGUAGE StandaloneDeriving  #-}
 module Ohua.DFLang.Lang where
 
 import           Control.DeepSeq
@@ -23,6 +24,8 @@ import           Data.Hashable
 import           Data.List       (intercalate)
 import           Data.Monoid
 import           Data.Sequence
+import           Data.Foldable
+import           Data.List
 import           Data.String
 import qualified Data.Text       as T
 import           Ohua.ALang.Lang
@@ -33,7 +36,7 @@ data DFExpr = DFExpr
     { letExprs  :: Seq LetExpr
     , returnVar :: !Binding
     }
-    deriving Eq
+    deriving (Eq)
 
 data LetExpr = LetExpr
     { callSiteId       :: !FnId
@@ -42,7 +45,7 @@ data LetExpr = LetExpr
     , callArguments    :: ![DFVar]
     , contextArg       :: !(Maybe Binding)
     }
-    deriving Eq
+    deriving (Eq)
 
 data DFFnRef
     = DFFunction !QualifiedBinding -- a build-in function of DFLang

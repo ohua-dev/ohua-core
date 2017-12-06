@@ -140,6 +140,7 @@ instance ExtractBindings a => ExtractBindings [a] where extractBindings = concat
 -- | Allowed forms for the left hand side of a let binding or in a lambda input.
 data AbstractAssignment binding
     = Direct !binding
+    | Recursive !binding
     | Destructure ![binding]
     deriving (Eq)
 
@@ -147,19 +148,23 @@ type Assignment = AbstractAssignment Binding
 
 instance Functor AbstractAssignment where
     fmap f (Direct d)       = Direct $ f d
+    fmap f (Recursive d)       = Direct $ f d
     fmap f (Destructure ds) = Destructure $ map f ds
 
 instance Foldable AbstractAssignment where
     foldr f b (Direct bnd)       = f bnd b
+    foldr f b (Recursive bnd)       = f bnd b
     foldr f b (Destructure bnds) = foldr f b bnds
 
 instance Traversable AbstractAssignment where
     sequenceA (Direct a)       = Direct <$> a
     sequenceA (Destructure as) = Destructure <$> sequenceA as
+    sequenceA (Recursive a) = Recursive <$> a
 
 instance Show binding => Show (AbstractAssignment binding) where
     show (Direct b)      = show b
-    show (Destructure d) = show d
+    show (Destructure b) = show b
+    show (Recursive b) = "(rec) " ++ show b 
 
 instance IsString Assignment where
     fromString = Direct . fromString
@@ -174,10 +179,12 @@ instance IsList Assignment where
 instance ExtractBindings Assignment where
     extractBindings (Direct bnd)       = [bnd]
     extractBindings (Destructure bnds) = bnds
+    extractBindings (Recursive bnd) = [bnd]
 
 instance NFData binding => NFData (AbstractAssignment binding) where
     rnf (Destructure ds) = rnf ds
     rnf (Direct d)       = rnf d
+    rnf (Recursive d)    = rnf d
 
 _Direct :: Prism' (AbstractAssignment binding) binding
 _Direct = prism' Direct $ \case { Direct a -> Just a; _ -> Nothing }
