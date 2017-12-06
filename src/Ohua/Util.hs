@@ -65,6 +65,10 @@ trace :: String -> a -> a
 trace msg a = unsafePerformIO (hPutStrLn stderr msg >> pure a)
 {-# NOINLINE trace #-}
 
+
+traceShowId :: Show a => a -> a
+traceShowId a = trace (show a) a
+
 forceAndReport :: (MonadIO m, NFData a) => String -> a -> m ()
 forceAndReport msg val = val `deepseq` liftIO (putStrLn msg)
 

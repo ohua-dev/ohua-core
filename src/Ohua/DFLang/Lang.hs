@@ -36,7 +36,7 @@ data DFExpr = DFExpr
     { letExprs  :: Seq LetExpr
     , returnVar :: !Binding
     }
-    deriving (Eq)
+    deriving (Eq, Show)
 
 data LetExpr = LetExpr
     { callSiteId       :: !FnId
@@ -45,12 +45,12 @@ data LetExpr = LetExpr
     , callArguments    :: ![DFVar]
     , contextArg       :: !(Maybe Binding)
     }
-    deriving (Eq)
+    deriving (Eq, Show)
 
 data DFFnRef
     = DFFunction !QualifiedBinding -- a build-in function of DFLang
     | EmbedSf !QualifiedBinding -- an generic dataflow function that wraps a stateful function call
-    deriving Eq
+    deriving (Eq, Show)
 
 data DFVar
     = DFEnvVar !HostExpr

@@ -21,7 +21,7 @@ import qualified Data.HashSet         as HS
 import qualified Data.HashMap.Strict  as HM
 import           Data.Maybe
 import           Data.Text            (pack)
-import           Debug.Trace
+import Ohua.Util
 
 
 -- the call in ALang is still (recur algoRef args).
@@ -33,16 +33,16 @@ data RecursiveLambdaSpec = RecursiveLambdaSpec {
                                 dfExpr :: DFExpr } deriving Show
 
 -- | Executed to generate the recursive lambda expression.
-recursionLowering :: MonadOhua m => [Binding] -> DFExpr -> m RecursiveLambdaSpec
+recursionLowering :: (MonadError Error m, MonadGenId m, MonadGenBnd m) => [Binding] -> DFExpr -> m RecursiveLambdaSpec
 --recursionLowering binding = (transformRecursiveTailCall
 recursionLowering lambdaFormals dfExpr = do
     result <- transformRecursiveTailCall lambdaFormals $ trace ("Lambda expression:\n" ++ show dfExpr) dfExpr
     return $ trace ("-----\ngenerated tailrec transformation:\n" ++ show result) result
 
-transformRecursiveTailCall :: MonadOhua m => [Binding] -> DFExpr -> m RecursiveLambdaSpec
+transformRecursiveTailCall :: (MonadError Error m, MonadGenId m, MonadGenBnd m) => [Binding] -> DFExpr -> m RecursiveLambdaSpec
 transformRecursiveTailCall lambdaFormals exprs = handleRecursiveTailCall lambdaFormals exprs $ traceShowId $ findExpr Refs.recur $ letExprs exprs
 
-handleRecursiveTailCall :: MonadOhua m => [Binding] -> DFExpr -> Maybe LetExpr -> m RecursiveLambdaSpec
+handleRecursiveTailCall :: (MonadError Error m, MonadGenBnd m, MonadGenId m) => [Binding] -> DFExpr -> Maybe LetExpr -> m RecursiveLambdaSpec
 handleRecursiveTailCall _ dfExpr Nothing = failWith $ pack $ "could not find recur in DFExpr:\n" ++ show dfExpr
 handleRecursiveTailCall lambdaFormals dfExpr (Just recurFn) = do
     let dfExprs = letExprs dfExpr
@@ -99,11 +99,12 @@ handleRecursiveTailCall lambdaFormals dfExpr (Just recurFn) = do
 
 
 -- | Executed whenever an initial call to a recursive algorithm is detected during the lowering.
-lowerRecAlgoCall :: (MonadOhua m, MonadWriter (Seq LetExpr) m) =>
-                            (FnName -> FnId -> Assignment -> [Expression] -> m (Seq LetExpr)) ->
-                            [Expression] -> Assignment -> RecursiveLambdaSpec ->
-                            m (FnName, FnId, [Expression])
-lowerRecAlgoCall lowerDefault actuals callAssignment recLambdaSpec =
+lowerRecAlgoCall :: (MonadWriter (Seq LetExpr) m, MonadGenId m) 
+                 => (QualifiedBinding -> FnId -> Assignment -> [Expression] -> m (Seq LetExpr)) 
+                 -> [Expression]
+                 -> RecursiveLambdaSpec 
+                 -> m (QualifiedBinding, FnId, [Expression])
+lowerRecAlgoCall lowerDefault actuals recLambdaSpec =
   let
       mkIdFn id i o = lowerDefault ALangRefs.id id o [i] in
       do

@@ -17,6 +17,7 @@
 {-# LANGUAGE OverloadedLists     #-}
 {-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE OverloadedStrings #-}
 module Ohua.DFLang.Passes where
 
 
@@ -51,8 +52,6 @@ import           Ohua.Monad
 import           Ohua.Types
 import           Ohua.Util
 
-import           Debug.Trace
-
 type Pass m = QualifiedBinding -> FnId -> Assignment -> [Expression] -> m (Seq LetExpr)
 
 --data AlgoSpec m = AlgoSpec { formalInputVars :: [Binding],
@@ -62,7 +61,8 @@ newtype LetRec m = LetRec { unLetRec :: HM.HashMap Binding (m RecursiveLambdaSpe
 
 type LetRecT m a = ReaderT (LetRec m) m a
 
-traceState :: (MonadOhua m, MonadWriter (Seq LetExpr) m) => LetRecT m a -> LetRecT m a
+traceState :: (MonadOhua env m, MonadWriter (Seq LetExpr) m) 
+           => LetRecT m a -> LetRecT m a
 traceState cont = (flip trace cont . ("State: " ++) . show . HM.keys . unLetRec) =<< ask
 
 -- | Check that a sequence of let expressions does not redefine bindings.
@@ -98,94 +98,80 @@ lowerALang expr = do
     checkSSA exprs
 #endif
     return $ DFExpr exprs var
-  where
-    go  (Var (Local bnd)) = return bnd
-    go  (Var _) = failWith "Non local return binding"
-    go  (Let assign expr rest) = do
-        (fn, fnId, args) <- handleApplyExpr expr
-        case HM.lookup fn hofNames of
-            Just (WHOF (_ :: Proxy p)) -> lowerHOF (name :: TaggedFnName p) assign args
-            Nothing       -> tell =<< lowerDefault fn fnId assign args
-        go rest
-    go  e = failWith $ "Expected `let` or binding, got " <> showT e
 
-lowerToDF :: (MonadOhua m, MonadWriter (Seq LetExpr) m) => Expression -> LetRecT m Binding
-lowerToDF (Var (Local bnd)) = return bnd
-lowerToDF (Var v) = lift $ failWith $ pack $ "Non local return binding: " ++ show v
+lowerToDF :: (MonadOhua env m, MonadWriter (Seq LetExpr) m) 
+          => Expression -> LetRecT m Binding
+lowerToDF (Var (Local bnd)) = pure bnd
+lowerToDF (Var v) = failWith $ "Non local return binding: " <> showT v
 lowerToDF (Let assign expr rest) = trace "Lowering Let -->" $ traceState $ handleDefinitionalExpr assign expr continuation
   where
     continuation = traceState $ lowerToDF rest
-lowerToDF g = lift $ failWith $ pack $ "Expected `let` or binding: " ++ show g
+lowerToDF g = failWith $ "Expected `let` or binding: " <> showT g
 
-handleDefinitionalExpr :: (MonadOhua m, MonadWriter (Seq LetExpr) m) =>
+handleDefinitionalExpr :: (MonadOhua env m, MonadWriter (Seq LetExpr) m) =>
                           Assignment -> Expression -> LetRecT m Binding -> LetRecT m Binding
 handleDefinitionalExpr assign l@(Lambda arg expr) cont = do
     -- TODO handle lambdas with multiple arguments -> this requires some ALang transformation to always get the form Lambda a Lambda b ...
-    let unRecursive x = case x of { Recursive b -> b;
-                                              _ -> error $ "Invariant broken. Assignment should be a 'letrec' but was: " ++ show x}
-    let unDirect x = case x of { Direct b -> b;
-                                        _ -> error $ " Invariant broken. Assignment should be a 'Direct' but was: " ++ show x}
-    let continuation = recursionLowering [unDirect arg] =<< lowerLambdaExpr assign expr
+    b <- case assign of
+            Recursive b -> pure b
+            x -> failWith $ "Invariant broken. Assignment should be a 'letrec' but was: " <> showT x
+    singleArg <- case arg of
+                    Direct b -> pure b
+                    x -> failWith $ "Invariant broken. Assignment should be a 'Direct' but was: " <> showT x
+
+    let continuation = recursionLowering [singleArg] =<< lowerLambdaExpr assign expr
 
     -- execute the rest of the traversal (the continuation) in the new LetRecT environment
-    local (LetRec . HM.insert (unRecursive assign) continuation . unLetRec) cont
+    local (LetRec . HM.insert b continuation . unLetRec) cont
 handleDefinitionalExpr assign l@(Apply _ _) cont = do
     let go (fn, fnId, args) = case HM.lookup fn hofNames of
                                    Just (WHOF (_ :: Proxy p)) -> lift $ lowerHOF (name :: TaggedFnName p) assign args
                                    Nothing                    -> lift $ tell =<< lowerDefault fn fnId assign args
-    go =<< trace ("lowering APPLY: " ++ show l) (handleApplyExpr assign l)
+    go =<< trace ("lowering APPLY: " ++ show l) (handleApplyExpr l)
     cont
-handleDefinitionalExpr _ e _ = lift $ failWith $ pack $ "Definitional expressions in a let can only be 'apply' or 'lambda' but got: " ++ show e
+handleDefinitionalExpr _ e _ = failWith $ "Definitional expressions in a let can only be 'apply' or 'lambda' but got: " <> showT e
 
 -- | Lower any not specially treated function type.
-lowerDefault :: MonadOhua m => Pass m
+lowerDefault :: MonadOhua env m => Pass m
 lowerDefault "ohua.lang/recur" fnId assign args = mapM expectVar args <&> \args' -> [LetExpr fnId assign Refs.recur args' Nothing]
 lowerDefault fn fnId assign args = mapM expectVar args <&> \args' -> [LetExpr fnId assign (EmbedSf fn) args' Nothing]
 
 -- | Analyze an apply expression, extracting the inner stateful function and the nested arguments as a list.
 -- Also generates a new function id for the inner function should it not have one yet.
-handleApplyExpr :: (MonadOhua m, MonadWriter (Seq LetExpr) m) =>
-                   Assignment -> Expression -> LetRecT m (FnName, FnId, [Expression])
-handleApplyExpr assign l@(Apply fn arg) =
-  let
+handleApplyExpr :: (MonadOhua env m, MonadWriter (Seq LetExpr) m) 
+                => Expression -> LetRecT m (QualifiedBinding, FnId, [Expression])
+handleApplyExpr l@(Apply fn arg) = ask >>= go l [] . unLetRec
+  where
     certainly = fromMaybe $ error "Invariant broken"
-    unwrapVar x = case x of { (Local b) -> b; g -> error $ "UnVar: Invariant broken: " ++ show g; }
-    go (Var (Sf fn id))               args _        = (fn, , args) <$> maybe generateId return id
-            -- reject algos for now
-    go l@(Var v)                      args recAlgos =
-          if HM.member (unwrapVar v) recAlgos then lowerRecAlgoCall lowerDefault args assign =<< lift (certainly $ HM.lookup (unwrapVar v) recAlgos) -- Justus, you should be proud of me for this line ;)
-                                              else failWith $ pack $ trace ("--> recAlgos" ++ show (HM.keys recAlgos)) $ "Expected Var Sf but got: " ++ show l
-    go (Apply fn arg) args recAlgos | case arg of { Var _ -> True; Lambda _ _  -> True; _ -> False} = go fn (arg:args) recAlgos
-    go (Apply fn arg)                 args _        = failWith$ pack $ "Arg to apply should have been reduced to Var, EnvVar or Lambda before df lowering. Found: " ++ show arg
-    go x                              _    _        = failWith $ pack $ "Expected Apply or Var but got: " ++ show x in
-    do
-      recAlgos <- ask
-      go l [] $ unLetRec recAlgos
-handleApplyExpr _ (Var (Sf fn id))  = (fn, , []) <$> maybe generateId return id -- what is this?
-handleApplyExpr _ g                 = lift $ failWith $ pack $ "Expected apply but got: " ++ show g
+    
+    unwrapVar (Local b) = b
+    unwrapVar g = error $ "UnVar: Invariant broken: " ++ show g
+
+    go ve@(Var v) args recAlgos =
+        case v of
+            Sf fn id -> (fn, , args) <$> maybe generateId return id
+            Local bnd 
+                | Just algo <- HM.lookup bnd recAlgos -> 
+                    lowerRecAlgoCall lowerDefault args =<< lift algo
+                | otherwise ->
+                    fromEnv (options . callLocalFunction) >>= \case
+                        Nothing -> failWith "Calling local functions is not supported in this adapter"
+                        Just fn -> (fn, , ve : args) <$> generateId
+            Env _ ->
+                fromEnv (options . callEnvExpr) >>= \case
+                    Nothing -> failWith "Calling environment functions is not supported in this adapter"
+                    Just fn -> (fn, , ve : args) <$> generateId
+    go (Apply fn arg) args recAlgos = go fn (arg:args) recAlgos
+    go x _ _ = failWith $ "Expected Apply or Var but got: " <> showT x
+
+handleApplyExpr (Var (Sf fn id)) = (fn, , []) <$> maybe generateId return id -- what is this?
+handleApplyExpr g                = lift $ failWith $ pack $ "Expected apply but got: " ++ show g
 
 
 -- | Analyze a lambda expression. Since we perform lambda inlining, this can only be a letrec.
-lowerLambdaExpr :: (MonadOhua m) => Assignment -> Expression -> m DFExpr
+lowerLambdaExpr :: (MonadOhua env m) => Assignment -> Expression -> m DFExpr
 lowerLambdaExpr (Recursive binding) expr = lowerALang expr
 lowerLambdaExpr a _ = failWith $ pack $ "Expression was not inlined but assignment is not a 'letrec': " ++ show a
-
--- | Inspect an expression expecting something which can be captured in a DFVar otherwies throws appropriate errors.
-expectVar :: MonadOhua m => Expression -> m DFVar
-expectVar (Var (Local bnd)) = pure $ DFVar bnd
-expectVar (Var (Env i))     = pure $ DFEnvVar i
-expectVar (Var _)           = failWith "Var must be local or env"
-expectVar _                 = failWith "Argument must be var"
-
--- FIXME is this function still used? if not delete it!
--- finds all functions that use vars from the lexical context and adds the context source to them.
--- needs to do the following two things
---        1. contextify all functions that do not have a bound arg -> context arg
---        2. provide lexical scope access to these args
-tieContext :: (Functor f, Foldable f) => Binding -> f LetExpr -> f LetExpr
-tieContext ctxSource exprs = tieContext0 bounds ctxSource exprs
-  where
-    bounds = findBoundVars exprs
 
 
 tieContext0 :: Functor f => Binding -> f LetExpr -> f LetExpr
@@ -199,48 +185,9 @@ tieContext0 ctxSource = fmap go
     isLocalArc (DFVar _) = True
     isLocalArc _         = False
 
--- | Find all locally bound variables.
-findBoundVars :: (Functor f, Foldable f) => f LetExpr -> HS.HashSet Binding
-findBoundVars = HS.fromList . fold . fmap (flattenAssign . returnAssignment)
-
-
-findFreeVars0 :: Foldable f => HS.HashSet Binding -> f LetExpr -> HS.HashSet Binding
-findFreeVars0 boundVars = HS.fromList . concatMap (mapMaybe f . callArguments)
-  where
-    f (DFVar b) | not (HS.member b boundVars) = Just b
-    f _         = Nothing
-
-
-renameWith :: Functor f => HM.HashMap Binding Binding -> f LetExpr -> f LetExpr
-renameWith m = fmap go
-  where
-    go e = e { callArguments = map (\case v@(DFVar var) -> maybe v DFVar $ HM.lookup var m; v -> v;) (callArguments e) }
-
-
--- | Ananlyze an apply expression, extracting the inner stateful function and the nested arguments as a list.
--- Also generates a new function id for the inner function should it not have one yet.
-handleApplyExpr :: MonadOhua envExpr m => Expression -> m (QualifiedBinding, FnId, [Expression])
-handleApplyExpr (Apply fn arg) = go fn [arg]
-  where
-    go ve@(Var v) args =
-        case v of
-            Sf fn id -> (fn, , args) <$> maybe generateId return id
-            Local _ ->
-                fromEnv (options . callLocalFunction) >>= \case
-                    Nothing -> failWith "Calling local functions is not supported in this adapter"
-                    Just fn -> (fn, , ve : args) <$> generateId
-            Env _ ->
-                fromEnv (options . callEnvExpr) >>= \case
-                    Nothing -> failWith "Calling environment functions is not supported in this adapter"
-                    Just fn -> (fn, , ve : args) <$> generateId
-    go (Apply fn arg) args   = go fn (arg:args)
-    go x _                   = failWith $ "Expected Apply or Var but got: " <> showT x
-handleApplyExpr (Var (Sf fn id)) = (fn, , []) <$> maybe generateId return id
-handleApplyExpr g = failWith $ "Expected apply but got: " <> showT g
-
 
 -- | Inspect an expression expecting something which can be captured in a DFVar otherwise throws appropriate errors.
-expectVar :: MonadOhua envExpr m => Expression -> m DFVar
+expectVar :: MonadError Error m => Expression -> m DFVar
 expectVar (Var (Local bnd)) = pure $ DFVar bnd
 expectVar (Var (Env i))     = pure $ DFEnvVar i
 expectVar (Var v)           = failWith $ "Var must be local or env, was " <> showT v
