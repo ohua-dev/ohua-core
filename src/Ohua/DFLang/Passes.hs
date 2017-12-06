@@ -98,16 +98,16 @@ lowerDefault :: MonadOhua envExpr m => Pass m
 lowerDefault fn fnId assign args = mapM expectVar args <&> \args' -> [LetExpr fnId assign (EmbedSf fn) args' Nothing]
 
 
-tieContext0 :: Functor f => HS.HashSet Binding -> Binding -> f LetExpr -> f LetExpr
-tieContext0 bounds ctxSource = fmap go
+tieContext0 :: Functor f => Binding -> f LetExpr -> f LetExpr
+tieContext0 ctxSource = fmap go
   where
-    go e | any isBoundArg (callArguments e) = e
+    go e | any isLocalArc (callArguments e) = e
          | Just ctxArg <- contextArg e
-         , isBoundArg (DFVar ctxArg) = e
+         , isLocalArc (DFVar ctxArg) = e
     go e = e { contextArg = Just ctxSource }
 
-    isBoundArg (DFVar v) = v `HS.member` bounds
-    isBoundArg _         = False
+    isLocalArc (DFVar _) = True
+    isLocalArc _         = False
 
 -- | Find all locally bound variables.
 findBoundVars :: (Functor f, Foldable f) => f LetExpr -> HS.HashSet Binding
@@ -177,7 +177,7 @@ lowerHOF _ assign args = do
             tell scopers
             scopeUnbound <- contextifyUnboundFunctions lam
             let tieContext1 = case scopeUnbound of
-                    Just (initExpr, bnd) -> (initExpr <>) . tieContext0 boundVars bnd
+                    Just (initExpr, bnd) -> (initExpr <>) . tieContext0 bnd
                     Nothing  -> id
             tell $ tieContext1 (renameWith (HM.fromList renaming) body)
         createContextExit assign >>= tell
