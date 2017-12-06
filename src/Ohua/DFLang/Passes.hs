@@ -112,6 +112,9 @@ handleDefinitionalExpr :: (MonadOhua env m, MonadWriter (Seq LetExpr) m) =>
                           Assignment -> Expression -> LetRecT m Binding -> LetRecT m Binding
 handleDefinitionalExpr assign l@(Lambda arg expr) cont = do
     -- TODO handle lambdas with multiple arguments -> this requires some ALang transformation to always get the form Lambda a Lambda b ...
+    handleTailRec <- fromEnv (options . transformRecursiveFunctions)
+    unless handleTailRec $
+        failWith "Handling recursive functions is not enabled, if you want to enable this experimental feature set `transformRecursiveFunctions` to true in the options passed to the compiler."
     b <- case assign of
             Recursive b -> pure b
             x -> failWith $ "Invariant broken. Assignment should be a 'letrec' but was: " <> showT x
@@ -142,11 +145,6 @@ handleApplyExpr :: (MonadOhua env m, MonadWriter (Seq LetExpr) m)
                 => Expression -> LetRecT m (QualifiedBinding, FnId, [Expression])
 handleApplyExpr l@(Apply fn arg) = ask >>= go l [] . unLetRec
   where
-    certainly = fromMaybe $ error "Invariant broken"
-    
-    unwrapVar (Local b) = b
-    unwrapVar g = error $ "UnVar: Invariant broken: " ++ show g
-
     go ve@(Var v) args recAlgos =
         case v of
             Sf fn id -> (fn, , args) <$> maybe generateId return id
@@ -169,7 +167,7 @@ handleApplyExpr g                = lift $ failWith $ pack $ "Expected apply but 
 
 
 -- | Analyze a lambda expression. Since we perform lambda inlining, this can only be a letrec.
-lowerLambdaExpr :: (MonadOhua env m) => Assignment -> Expression -> m DFExpr
+lowerLambdaExpr :: MonadOhua env m => Assignment -> Expression -> m DFExpr
 lowerLambdaExpr (Recursive binding) expr = lowerALang expr
 lowerLambdaExpr a _ = failWith $ pack $ "Expression was not inlined but assignment is not a 'letrec': " ++ show a
 

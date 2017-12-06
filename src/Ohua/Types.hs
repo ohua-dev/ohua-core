@@ -199,9 +199,14 @@ flattenAssign = extractBindings
 
 type Error = T.Text
 
-data Options = Options !(Maybe QualifiedBinding) !(Maybe QualifiedBinding)
+data Options = Options !(Maybe QualifiedBinding) !(Maybe QualifiedBinding) Bool
 
-instance Default Options where def = Options Nothing Nothing
+instance Default Options where 
+    def = 
+        Options 
+            Nothing 
+            Nothing 
+            False -- for no we always disable this option
 
 -- | State of the ohua compiler monad.
 data State envExpr = State !NameGenerator !FnId !(V.Vector envExpr)
@@ -229,10 +234,13 @@ simpleNameList :: Lens' NameGenerator [Binding]
 simpleNameList f (NameGenerator taken l) = NameGenerator taken <$> f l
 
 callEnvExpr :: Lens' Options (Maybe QualifiedBinding)
-callEnvExpr f (Options c l) = f c <&> \c' -> Options c' l
+callEnvExpr f (Options c l e) = f c <&> \c' -> Options c' l e
 
 callLocalFunction :: Lens' Options (Maybe QualifiedBinding)
-callLocalFunction f (Options c l) = f l <&> Options c
+callLocalFunction f (Options c l e) = f l <&> \l' -> Options c l' e
+
+transformRecursiveFunctions :: Lens' Options Bool
+transformRecursiveFunctions f (Options c l e) = f e <&> Options c l
 
 options :: Lens' Environment Options
 options f (Environment opts) = Environment <$> f opts
