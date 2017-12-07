@@ -1,13 +1,13 @@
 module Ohua.DFLang.Util where
 
-import qualified Data.HashMap.Strict  as HM
-import qualified Data.HashSet         as HS
-import           Data.Maybe
 import           Data.Foldable
+import qualified Data.HashMap.Strict as HM
+import qualified Data.HashSet        as HS
+import           Data.Maybe
 import           Data.Sequence
 
-import Ohua.DFLang.Lang
-import Ohua.Types
+import           Ohua.DFLang.Lang
+import           Ohua.Types
 
 -- | Find the usages of a binding
 findUsages :: Binding -> Seq LetExpr -> [LetExpr]

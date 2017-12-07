@@ -1,10 +1,10 @@
 module Ohua.ALang.Passes.TailRec where
 
-import Ohua.ALang.Lang
-import Ohua.Types
-import qualified Data.HashSet as HS
+import qualified Data.HashSet    as HS
+import           Ohua.ALang.Lang
+import           Ohua.Types
 
-import Debug.Trace
+import           Debug.Trace
 --
 -- This must run before algos are being inlined!
 --

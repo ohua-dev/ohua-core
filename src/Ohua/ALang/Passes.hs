@@ -27,7 +27,7 @@ import           Ohua.ALang.Util
 import           Ohua.Monad
 import           Ohua.Types
 import           Ohua.Util
-import Ohua.Util.Str as Str
+import           Ohua.Util.Str          as Str
 
 
 

@@ -1,7 +1,7 @@
 module Ohua.ALang.Refs where
 
 import           Ohua.Types
-import           Prelude          hiding (id)
+import           Prelude    hiding (id)
 
 size :: QualifiedBinding
 size = "ohua.lang/size"

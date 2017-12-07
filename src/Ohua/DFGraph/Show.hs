@@ -1,10 +1,10 @@
 module Ohua.DFGraph.Show where
 
+import qualified Data.Text              as T
 import           Ohua.ALang.Lang        (unwrapHostExpr)
 import           Ohua.DFGraph
 import           Ohua.Types             (unFnId)
 import           Text.PrettyPrint.Boxes
-import qualified Data.Text as T
 
 
 asTable :: OutGraph -> T.Text

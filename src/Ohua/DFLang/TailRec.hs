@@ -1,37 +1,37 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Ohua.DFLang.TailRec where
 
-import           Ohua.Types
 import           Ohua.ALang.Lang
 import           Ohua.ALang.Refs      as ALangRefs
-import           Ohua.Monad
 import           Ohua.DFLang.Lang
-import           Ohua.DFLang.Util
 import qualified Ohua.DFLang.Refs     as Refs
+import           Ohua.DFLang.Util
+import           Ohua.Monad
+import           Ohua.Types
 
+import           Control.Exception
 import           Control.Monad.Except
 import           Control.Monad.State
 import           Control.Monad.Writer
-import           Control.Exception
 
 import           Data.Foldable
+import qualified Data.HashMap.Strict  as HM
+import qualified Data.HashSet         as HS
+import           Data.Maybe
 import           Data.Sequence        (Seq, (<|), (|>))
 import qualified Data.Sequence        as S
-import qualified Data.HashSet         as HS
-import qualified Data.HashMap.Strict  as HM
-import           Data.Maybe
 import           Data.Text            (pack)
-import Ohua.Util
-import qualified Ohua.Util.Str as Str
+import           Ohua.Util
+import qualified Ohua.Util.Str        as Str
 
 
 -- the call in ALang is still (recur algoRef args).
 -- it needs to become (recur conditionOutput algoInArgs recurArgs).
 
-data RecursiveLambdaSpec = RecursiveLambdaSpec 
-    { formalInputs :: [Binding] -- as defined by the expression
+data RecursiveLambdaSpec = RecursiveLambdaSpec
+    { formalInputs          :: [Binding] -- as defined by the expression
     , lambdaFormalsToAlgoIn :: HM.HashMap Binding Binding
-    , dfExpr :: DFExpr 
+    , dfExpr                :: DFExpr
     } deriving Show
 
 -- | Executed to generate the recursive lambda expression.
@@ -92,26 +92,26 @@ handleRecursiveTailCall lambdaFormals dfExpr (Just recurFn) = do
     let recurInVarsArray = LetExpr recurInVarsArrayId (Direct recurInVarsArrayRet) Refs.array recurInVars $ contextArg recurFn
     -- remember: 'recur' produces the formals used inside the lambda expression!
     let updatedRecurExpr = LetExpr (callSiteId recurFn) (Destructure lambdaFormals) (functionRef recurFn) [conditionOutput, DFVar algoInVarsArrayRet, DFVar recurInVarsArrayRet] Nothing
-    return 
+    return
         $ RecursiveLambdaSpec lambdaFormals lambdaInToRecurInVars
         $ flip DFExpr (trace ("new return var: " ++ show newLambdaRetVar) newLambdaRetVar)
         $ algoInVarsArray <| (S.filter (/= recurFn) rewiredTOutExps |> recurInVarsArray |> updatedRecurExpr)
 
 
 -- | Executed whenever an initial call to a recursive algorithm is detected during the lowering.
-lowerRecAlgoCall :: (MonadWriter (Seq LetExpr) m, MonadGenId m) 
-                 => (QualifiedBinding -> FnId -> Assignment -> [Expression] -> m (Seq LetExpr)) 
+lowerRecAlgoCall :: (MonadWriter (Seq LetExpr) m, MonadGenId m)
+                 => (QualifiedBinding -> FnId -> Assignment -> [Expression] -> m (Seq LetExpr))
                  -> [Expression]
-                 -> RecursiveLambdaSpec 
+                 -> RecursiveLambdaSpec
                  -> m (QualifiedBinding, FnId, [Expression])
 lowerRecAlgoCall lowerDefault actuals (RecursiveLambdaSpec formalInputs lambdaFormalsToAlgoIn dfExpr) = do
         -- input side
-        
+
         mapM_ (\(x, y) -> do
                 id <- generateId
                 (tell. traceShowId) =<< mkIdFn id x y)
-            $ zip actuals 
-            $ map Direct 
+            $ zip actuals
+            $ map Direct
             $ trace ("input formals: " ++ show algoInInputFormals) algoInInputFormals
 
         -- recreate the body and 'tell' it to the writer
@@ -119,11 +119,11 @@ lowerRecAlgoCall lowerDefault actuals (RecursiveLambdaSpec formalInputs lambdaFo
 
         -- output side
         id <- generateId
-        return 
-            $ trace ("output side: " ++ show (returnVar dfExpr)) 
+        return
+            $ trace ("output side: " ++ show (returnVar dfExpr))
             $ (ALangRefs.id, id, [Var $ Local $ returnVar dfExpr])
   where
     mkIdFn id i o = lowerDefault ALangRefs.id id o [i]
-    algoInInputFormals = 
-        map (fromMaybe (error "Invariant broken") 
+    algoInInputFormals =
+        map (fromMaybe (error "Invariant broken")
         . flip HM.lookup lambdaFormalsToAlgoIn) formalInputs

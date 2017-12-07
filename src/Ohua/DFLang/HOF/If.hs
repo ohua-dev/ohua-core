@@ -22,7 +22,7 @@ import qualified Ohua.DFLang.Refs     as Refs
 import           Ohua.Monad
 import           Ohua.Types
 import           Ohua.Util
-import qualified Ohua.Util.Str as Str
+import qualified Ohua.Util.Str        as Str
 
 data IfFn = IfFn
     { conditionVariable :: !DFVar

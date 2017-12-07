@@ -24,7 +24,7 @@ import           Data.Maybe
 import           Ohua.ALang.Lang
 import           Ohua.DFGraph
 import           Ohua.Types
-import qualified Ohua.Util.Str as Str
+import qualified Ohua.Util.Str    as Str
 
 baseOptions = defaultOptions
     { unwrapUnaryRecords = True
@@ -48,7 +48,7 @@ qualBindOptions = baseOptions
         fieldLabelModifier baseOptions . fromMaybe (error "no prefix") . stripPrefix "qb"
     }
 
-instance ToJSON Str.Str where 
+instance ToJSON Str.Str where
     toJSON = toJSON . Str.toString
     toEncoding = toEncoding . Str.toString
 instance FromJSON Str.Str where parseJSON = fmap Str.fromString . parseJSON

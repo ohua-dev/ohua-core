@@ -2,6 +2,7 @@ module ALangVerify where
 
 import           Control.Arrow
 import           Control.Monad.Except
+import           Data.Default
 import           Data.Function
 import           Data.Functor.Identity
 import qualified Data.Map.Strict       as Map
@@ -11,9 +12,8 @@ import           Ohua.ALang.Lang
 import           Ohua.ALang.Passes
 import           Ohua.Monad
 import           Ohua.Types
+import qualified Ohua.Util.Str         as Str
 import           Test.Hspec
-import Data.Default
-import qualified Ohua.Util.Str as Str
 
 -- OhuaT Expr (Either [Char] Expression)
 justTrace :: Show e => IO e -> Expectation

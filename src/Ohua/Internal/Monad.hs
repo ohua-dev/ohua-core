@@ -16,27 +16,27 @@ module Ohua.Internal.Monad where
 
 import           Control.Monad.Except
 import           Control.Monad.Reader
-import           Control.Monad.RWS.Strict hiding (fail)
 import qualified Control.Monad.RWS.Lazy
+import           Control.Monad.RWS.Strict   hiding (fail)
 import qualified Control.Monad.State.Lazy
 import qualified Control.Monad.State.Strict
 import           Control.Monad.Writer
-import qualified Data.HashSet             as HS
-import           Data.List                (intercalate)
+import qualified Data.HashSet               as HS
+import           Data.List                  (intercalate)
 import           Data.Monoid
-import qualified Data.Text                as T
-import qualified Data.Text.IO             as T
-import qualified Data.Vector              as V
+import qualified Data.Text                  as T
+import qualified Data.Text.IO               as T
+import qualified Data.Vector                as V
 import           Lens.Micro.Platform
 import           Ohua.ALang.Lang
 import           Ohua.Internal.Logging
 import           Ohua.LensClasses
-import           Ohua.Types               as Ty
+import           Ohua.Types                 as Ty
 import           Ohua.Util
-import qualified Ohua.Util.Str as Str
+import qualified Ohua.Util.Str              as Str
 
 
-import Control.DeepSeq
+import           Control.DeepSeq
 
 -- The compiler monad.
 -- Encapsulates the state necessary to generate bindings

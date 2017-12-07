@@ -15,16 +15,16 @@
 {-# LANGUAGE ExplicitForAll      #-}
 {-# LANGUAGE NamedFieldPuns      #-}
 {-# LANGUAGE OverloadedLists     #-}
+{-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE OverloadedStrings #-}
 module Ohua.DFLang.Passes where
 
 
 import           Control.Arrow
 import           Control.Monad.Except
-import           Control.Monad.State
 import           Control.Monad.Reader
+import           Control.Monad.State
 import           Control.Monad.Writer
 --import           Control.Monad.Trans.Reader
 import           Data.Either
@@ -39,19 +39,20 @@ import           Data.Text            (pack)
 import           Lens.Micro
 import           Ohua.ALang.Lang
 import qualified Ohua.ALang.Refs      as ALangRefs
-import qualified Ohua.DFLang.Refs     as Refs
-import           Ohua.DFLang.TailRec  (lowerRecAlgoCall, recursionLowering, RecursiveLambdaSpec)
 import           Ohua.DFLang.HOF      as HOF
 import           Ohua.DFLang.HOF.If
 import           Ohua.DFLang.HOF.Seq
 import           Ohua.DFLang.HOF.Smap
 import           Ohua.DFLang.Lang     (DFExpr (..), DFFnRef (..), DFVar (..),
                                        LetExpr (..))
+import qualified Ohua.DFLang.Refs     as Refs
+import           Ohua.DFLang.TailRec  (RecursiveLambdaSpec, lowerRecAlgoCall,
+                                       recursionLowering)
 import           Ohua.DFLang.Util
 import           Ohua.Monad
 import           Ohua.Types
 import           Ohua.Util
-import qualified Ohua.Util.Str as Str
+import qualified Ohua.Util.Str        as Str
 
 type Pass m = QualifiedBinding -> FnId -> Assignment -> [Expression] -> m (Seq LetExpr)
 
@@ -62,7 +63,7 @@ newtype LetRec m = LetRec { unLetRec :: HM.HashMap Binding (m RecursiveLambdaSpe
 
 type LetRecT m a = ReaderT (LetRec m) m a
 
-traceState :: (MonadOhua env m, MonadWriter (Seq LetExpr) m) 
+traceState :: (MonadOhua env m, MonadWriter (Seq LetExpr) m)
            => LetRecT m a -> LetRecT m a
 traceState cont = (flip trace cont . ("State: " ++) . show . HM.keys . unLetRec) =<< ask
 
@@ -100,7 +101,7 @@ lowerALang expr = do
 #endif
     return $ DFExpr exprs var
 
-lowerToDF :: (MonadOhua env m, MonadWriter (Seq LetExpr) m) 
+lowerToDF :: (MonadOhua env m, MonadWriter (Seq LetExpr) m)
           => Expression -> LetRecT m Binding
 lowerToDF (Var (Local bnd)) = pure bnd
 lowerToDF (Var v) = failWith $ "Non local return binding: " <> Str.showS v
@@ -142,15 +143,15 @@ lowerDefault fn fnId assign args = mapM expectVar args <&> \args' -> [LetExpr fn
 
 -- | Analyze an apply expression, extracting the inner stateful function and the nested arguments as a list.
 -- Also generates a new function id for the inner function should it not have one yet.
-handleApplyExpr :: (MonadOhua env m, MonadWriter (Seq LetExpr) m) 
+handleApplyExpr :: (MonadOhua env m, MonadWriter (Seq LetExpr) m)
                 => Expression -> LetRecT m (QualifiedBinding, FnId, [Expression])
 handleApplyExpr l@(Apply fn arg) = ask >>= go l [] . unLetRec
   where
     go ve@(Var v) args recAlgos =
         case v of
             Sf fn id -> (fn, , args) <$> maybe generateId return id
-            Local bnd 
-                | Just algo <- HM.lookup bnd recAlgos -> 
+            Local bnd
+                | Just algo <- HM.lookup bnd recAlgos ->
                     lowerRecAlgoCall lowerDefault args =<< lift algo
                 | otherwise ->
                     fromEnv (options . callLocalFunction) >>= \case
@@ -214,7 +215,7 @@ lowerHOF _ assign args = do
             scopeUnbound <- contextifyUnboundFunctions lam
             let tieContext1 = case scopeUnbound of
                     Just (initExpr, bnd) -> (initExpr <>) . tieContext0 bnd
-                    Nothing  -> id
+                    Nothing              -> id
             tell $ tieContext1 (renameWith (HM.fromList renaming) body)
         createContextExit assign >>= tell
   where

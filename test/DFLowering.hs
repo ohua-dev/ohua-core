@@ -6,6 +6,7 @@ module DFLowering where
 
 import           Control.Arrow
 import           Control.Monad
+import           Data.Default
 import           Data.Foldable
 import           Data.Function
 import           Data.Functor.Identity
@@ -19,16 +20,15 @@ import           Data.String
 import qualified Data.Text                         as T
 import           Debug.Trace
 import           Ohua.ALang.Lang
+import qualified Ohua.ALang.Refs                   as ALangRefs
 import           Ohua.DFGraph
 import           Ohua.DFLang.Lang
 import           Ohua.DFLang.Passes
-import qualified Ohua.ALang.Refs                  as ALangRefs
 import qualified Ohua.DFLang.Refs                  as Refs
 import           Ohua.Monad
 import           Ohua.Types
+import qualified Ohua.Util.Str                     as Str
 import           Test.Hspec
-import Data.Default
-import qualified Ohua.Util.Str as Str
 
 
 newtype OhuaGrGraph = OhuaGrGraph { unGr :: Gr QualifiedBinding OhuaGrEdgeLabel } deriving Eq

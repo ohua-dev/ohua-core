@@ -1,27 +1,31 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving, UnboxedTuples #-}
-module Ohua.Util.Str 
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE UnboxedTuples              #-}
+module Ohua.Util.Str
     ( IsString(fromString, toString, singleton, null, concat, intercalate, cons, uncons, snoc, unsnoc, length, map, intersperse, reverse, splitAt, splitAtEnd, span, spanEnd, isPrefixOf, isSuffixOf, isInfixOf, filter, find, findEnd, index, split, elem)
     , strip, stripStart, stripEnd, take, takeEnd, drop, dropEnd, takeWhile, takeWhileEnd, dropWhile, dropWhileEnd, dropAround, break, lines, unlines, showS
     , (<>)
     , Str
     ) where
 
-import qualified Data.List as X
-import qualified Prelude as P
-import Prelude ((.), (==), Maybe(Just,Nothing), pure, Char, Int, ($), id, Bool, String, otherwise, fst, snd, (-), Eq, Ord, not)
-import Control.Applicative ((<|>))
-import Control.Arrow (first)
-import Data.Char (isSpace)
-import Data.Foldable (foldl')
-import qualified Data.Foldable as F
-import Data.Function (on)
-import qualified Data.String as S
-import Data.Monoid
-import Data.Hashable
-import Control.DeepSeq
-import System.IO (stderr, stdout, stdin, Handle)
-import qualified System.IO as SysIO
-import Control.Monad.IO.Class
+import           Control.Applicative    ((<|>))
+import           Control.Arrow          (first)
+import           Control.DeepSeq
+import           Control.Monad.IO.Class
+import           Data.Char              (isSpace)
+import           Data.Foldable          (foldl')
+import qualified Data.Foldable          as F
+import           Data.Function          (on)
+import           Data.Hashable
+import qualified Data.List              as X
+import           Data.Monoid
+import qualified Data.String            as S
+import           Prelude                (Bool, Char, Eq, Int,
+                                         Maybe (Just, Nothing), Ord, String,
+                                         fst, id, not, otherwise, pure, snd,
+                                         ($), (-), (.), (==))
+import qualified Prelude                as P
+import           System.IO              (Handle, stderr, stdin, stdout)
+import qualified System.IO              as SysIO
 
 
 class (Monoid s, P.Eq s, P.Ord s, Hashable s, NFData s) => IsString s where
@@ -30,7 +34,7 @@ class (Monoid s, P.Eq s, P.Ord s, Hashable s, NFData s) => IsString s where
 
     fromString :: P.String -> s
     fromString = concat . P.map singleton
-    
+
     toString :: s -> P.String
     toString s | Just (x, xs) <- uncons s = x:toString xs
     toString _ = []
@@ -60,8 +64,8 @@ class (Monoid s, P.Eq s, P.Ord s, Hashable s, NFData s) => IsString s where
     unsnoc :: s -> Maybe (s, Char)
     unsnoc = P.fmap (first fromString) . f id . toString
       where
-        f _ [] = P.Nothing
-        f app [x] = P.Just (app [], x)
+        f _ []       = P.Nothing
+        f app [x]    = P.Just (app [], x)
         f app (x:xs) = f (app . (x:)) xs
 
     length :: s -> Int
@@ -77,13 +81,13 @@ class (Monoid s, P.Eq s, P.Ord s, Hashable s, NFData s) => IsString s where
     reverse = onString $ X.reverse
 
     -- replace :: s -> s -> s -> s
-    -- replace = 
+    -- replace =
 
     splitAt :: Int -> s -> (s, s)
     splitAt = onStrTup . X.splitAt
 
     splitAtEnd :: Int -> s -> (s, s)
-    splitAtEnd i s = onStrTup (X.splitAt (length s - i)) s 
+    splitAtEnd i s = onStrTup (X.splitAt (length s - i)) s
     -- TODO test whether we need a (-1) here
 
     span :: (Char -> Bool) -> s -> (s, s)
@@ -118,7 +122,7 @@ class (Monoid s, P.Eq s, P.Ord s, Hashable s, NFData s) => IsString s where
         f p [] = Nothing
         f p (x:xs) | p x = f p xs <|> Just x
                    | otherwise = f p xs
-    
+
     index :: (Char -> Bool) -> s -> Maybe Int
     index p s = X.findIndex p (toString s)
 
@@ -143,7 +147,7 @@ class (Monoid s, P.Eq s, P.Ord s, Hashable s, NFData s) => IsString s where
 
 
 -- | An opaque string type to make refactoring against different string libraries easier
-newtype Str = Str { unStr :: P.String } 
+newtype Str = Str { unStr :: P.String }
     deriving (Monoid, Eq, Ord, S.IsString, Hashable, NFData)
 
 instance P.Show Str where
@@ -161,7 +165,7 @@ instance IsString P.String where
 
 
 onString :: IsString s => (String -> P.String) -> s -> s
-onString f = fromString . f . toString 
+onString f = fromString . f . toString
 
 onStrTup :: IsString s => (String -> (String, P.String)) -> s -> (s, s)
 onStrTup f s = (fromString s1, fromString s2)

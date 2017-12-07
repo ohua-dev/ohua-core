@@ -81,8 +81,8 @@ filterLogger :: (LogSource -> LogLevel -> Bool)
              -> LoggingT m a
              -> LoggingT m a
 filterLogger p (LoggingT f) = LoggingT $ \logger ->
-    f $ \loc src level msg -> 
-        if (p src level) then 
+    f $ \loc src level msg ->
+        if (p src level) then
             logger loc src level msg
         else pure ()
 

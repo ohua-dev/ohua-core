@@ -30,7 +30,7 @@ import           GHC.Generics
 import           Lens.Micro
 import           Ohua.LensClasses
 import           Ohua.Util
-import qualified Ohua.Util.Str as Str
+import qualified Ohua.Util.Str      as Str
 
 
 -- | The numeric id of a function call site
@@ -140,23 +140,23 @@ type Assignment = AbstractAssignment Binding
 
 instance Functor AbstractAssignment where
     fmap f (Direct d)       = Direct $ f d
-    fmap f (Recursive d)       = Direct $ f d
+    fmap f (Recursive d)    = Direct $ f d
     fmap f (Destructure ds) = Destructure $ map f ds
 
 instance Foldable AbstractAssignment where
     foldr f b (Direct bnd)       = f bnd b
-    foldr f b (Recursive bnd)       = f bnd b
+    foldr f b (Recursive bnd)    = f bnd b
     foldr f b (Destructure bnds) = foldr f b bnds
 
 instance Traversable AbstractAssignment where
     sequenceA (Direct a)       = Direct <$> a
     sequenceA (Destructure as) = Destructure <$> sequenceA as
-    sequenceA (Recursive a) = Recursive <$> a
+    sequenceA (Recursive a)    = Recursive <$> a
 
 instance Show binding => Show (AbstractAssignment binding) where
     show (Direct b)      = show b
     show (Destructure b) = show b
-    show (Recursive b) = "(rec) " ++ show b 
+    show (Recursive b)   = "(rec) " ++ show b
 
 instance IsString Assignment where
     fromString = Direct . fromString
@@ -171,7 +171,7 @@ instance IsList Assignment where
 instance ExtractBindings Assignment where
     extractBindings (Direct bnd)       = [bnd]
     extractBindings (Destructure bnds) = bnds
-    extractBindings (Recursive bnd) = [bnd]
+    extractBindings (Recursive bnd)    = [bnd]
 
 instance NFData binding => NFData (AbstractAssignment binding) where
     rnf (Destructure ds) = rnf ds
@@ -193,11 +193,11 @@ type Error = Str.Str
 
 data Options = Options !(Maybe QualifiedBinding) !(Maybe QualifiedBinding) Bool
 
-instance Default Options where 
-    def = 
-        Options 
-            Nothing 
-            Nothing 
+instance Default Options where
+    def =
+        Options
+            Nothing
+            Nothing
             False -- for no we always disable this option
 
 -- | State of the ohua compiler monad.

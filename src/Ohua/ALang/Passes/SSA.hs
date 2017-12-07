@@ -24,7 +24,7 @@ import           Ohua.ALang.Lang
 import           Ohua.Monad
 import           Ohua.Types
 import           Ohua.Util
-import qualified Ohua.Util.Str as Str
+import qualified Ohua.Util.Str        as Str
 
 
 type LocalScope = HM.HashMap Binding Binding

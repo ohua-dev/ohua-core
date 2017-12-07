@@ -76,7 +76,7 @@ instance HigherOrderFunction SmapFn where
 
     contextifyUnboundFunctions lam = do
         ctxSource <- generateBindingWith "_smap_context"
-        ctxOp <- do 
+        ctxOp <- do
             ctxId <- generateId
             pure $ LetExpr ctxId (Direct ctxSource) Refs.seq [DFVar elemSource] Nothing
         pure $ Just ([ctxOp], ctxSource)
