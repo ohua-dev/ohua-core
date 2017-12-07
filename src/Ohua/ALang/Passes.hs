@@ -27,6 +27,7 @@ import           Ohua.ALang.Util
 import           Ohua.Monad
 import           Ohua.Types
 import           Ohua.Util
+import Ohua.Util.Str as Str
 
 
 
@@ -194,7 +195,7 @@ removeCurrying e = fst <$> evalRWST (inlinePartials e) mempty ()
         tell $ HS.singleton bnd
         val <- asks (HM.lookup bnd)
         inlinePartials =<< Apply
-            <$> maybe (failWith $ "No suitable value found for binding " <> showT bnd) return val
+            <$> maybe (failWith $ "No suitable value found for binding " <> Str.showS bnd) return val
             <*> inlinePartials arg
     inlinePartials (Apply function arg) = Apply <$> inlinePartials function <*> inlinePartials arg
     inlinePartials (Let assign val body) = Let assign <$> inlinePartials val <*> inlinePartials body
@@ -216,7 +217,7 @@ noDuplicateIds = void . flip runStateT mempty . lrPrewalkExprM go
   where
     go e@(Var (Sf _ (Just id))) = do
         s <- get
-        when (id `HS.member` s) $ failWith $ "Duplicate id " <> showT id
+        when (id `HS.member` s) $ failWith $ "Duplicate id " <> Str.showS id
         modify (HS.insert id)
         return e
     go e = return e
@@ -228,7 +229,7 @@ noDuplicateIds = void . flip runStateT mempty . lrPrewalkExprM go
 applyToSf :: MonadOhua envExpr m => Expression -> m ()
 applyToSf = foldlExprM (const . go) ()
   where
-    go (Apply (Var (Local bnd)) _) = failWith $ "Illegal Apply to local var " <> showT bnd
+    go (Apply (Var (Local bnd)) _) = failWith $ "Illegal Apply to local var " <> Str.showS bnd
     go _ = return ()
 
 -- FIXME this function is never called. was it supposed to be part of the below validity check?
@@ -246,7 +247,7 @@ noUndefinedBindings = flip runReaderT mempty . go
     go (Let assign val body) = go val >> local (HS.union $ HS.fromList $ flattenAssign assign) (go body)
     go (Var (Local bnd)) = do
         isDefined <- asks (HS.member bnd)
-        unless isDefined $ failWith $ "Not in scope " <> showT bnd
+        unless isDefined $ failWith $ "Not in scope " <> Str.showS bnd
     go (Apply function arg) = go function >> go arg
     go (Lambda assign body) = local (HS.union $ HS.fromList $ flattenAssign assign) $ go body
     go (Var _) = return ()

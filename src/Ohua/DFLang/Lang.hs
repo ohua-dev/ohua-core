@@ -30,6 +30,7 @@ import           Data.String
 import qualified Data.Text       as T
 import           Ohua.ALang.Lang
 import           Ohua.Types
+import qualified Ohua.Util.Str as Str
 
 -- | A sequence of let statements with a terminating binding to be used as return value
 data DFExpr = DFExpr
@@ -81,19 +82,17 @@ instance NFData DFVar where
     rnf (DFVar v)    = rnf v
 
 
-showDFExpr :: DFExpr -> T.Text
+showDFExpr :: DFExpr -> Str.Str
 showDFExpr (DFExpr lets retVar) =
-    T.unlines $ (toList $ fmap showLet lets) <> [showBnd retVar]
+    Str.unlines $ (toList $ fmap showLet lets) <> [showBnd retVar]
   where
-    showT :: Show a => a -> T.Text
-    showT = T.pack . show
     showBnd (Binding b) = b
     showAssign (Direct v)       = showBnd v
-    showAssign (Destructure vs) = "[" <> T.intercalate ", " (map showBnd vs) <> "]"
-    showRef (DFFunction a) = showT a
-    showRef (EmbedSf a)    = showT a
-    showVar (DFEnvVar h) = showT h
+    showAssign (Destructure vs) = "[" <> Str.intercalate ", " (map showBnd vs) <> "]"
+    showRef (DFFunction a) = Str.showS a
+    showRef (EmbedSf a)    = Str.showS a
+    showVar (DFEnvVar h) = Str.showS h
     showVar (DFVar v)    = showBnd v
     showLet (LetExpr id ass ref args ctxArc) =
-        "let " <> showAssign ass <> " = " <> showRef ref <> "<" <> showT id <> "> ("
-        <> T.intercalate ", " (map showVar args) <> ")" <> maybe "" (\a -> " [" <> showBnd a <>"]") ctxArc
+        "let " <> showAssign ass <> " = " <> showRef ref <> "<" <> Str.showS id <> "> ("
+        <> Str.intercalate ", " (map showVar args) <> ")" <> maybe "" (\a -> " [" <> showBnd a <>"]") ctxArc

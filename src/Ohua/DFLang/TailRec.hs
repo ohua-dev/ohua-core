@@ -22,6 +22,7 @@ import qualified Data.HashMap.Strict  as HM
 import           Data.Maybe
 import           Data.Text            (pack)
 import Ohua.Util
+import qualified Ohua.Util.Str as Str
 
 
 -- the call in ALang is still (recur algoRef args).
@@ -44,7 +45,7 @@ transformRecursiveTailCall :: (MonadError Error m, MonadGenId m, MonadGenBnd m) 
 transformRecursiveTailCall lambdaFormals exprs = handleRecursiveTailCall lambdaFormals exprs $ traceShowId $ findExpr Refs.recur $ letExprs exprs
 
 handleRecursiveTailCall :: (MonadError Error m, MonadGenBnd m, MonadGenId m) => [Binding] -> DFExpr -> Maybe LetExpr -> m RecursiveLambdaSpec
-handleRecursiveTailCall _ dfExpr Nothing = failWith $ pack $ "could not find recur in DFExpr:\n" ++ show dfExpr
+handleRecursiveTailCall _ dfExpr Nothing = failWith $ "could not find recur in DFExpr:\n" <> Str.showS dfExpr
 handleRecursiveTailCall lambdaFormals dfExpr (Just recurFn) = do
     let dfExprs = letExprs dfExpr
     -- helpers

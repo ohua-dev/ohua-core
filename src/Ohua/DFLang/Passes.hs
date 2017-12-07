@@ -51,6 +51,7 @@ import           Ohua.DFLang.Util
 import           Ohua.Monad
 import           Ohua.Types
 import           Ohua.Util
+import qualified Ohua.Util.Str as Str
 
 type Pass m = QualifiedBinding -> FnId -> Assignment -> [Expression] -> m (Seq LetExpr)
 
@@ -75,7 +76,7 @@ checkSSA = flip evalStateT mempty . mapM_ go
             f a | HS.member a defined = Just a
             f _ = Nothing
         case msum $ map f produced of
-            Just b  -> failWith $ "Rebinding of " <> showT b
+            Just b  -> failWith $ "Rebinding of " <> Str.showS b
             Nothing -> return ()
         modify (addAll produced)
 
@@ -102,11 +103,11 @@ lowerALang expr = do
 lowerToDF :: (MonadOhua env m, MonadWriter (Seq LetExpr) m) 
           => Expression -> LetRecT m Binding
 lowerToDF (Var (Local bnd)) = pure bnd
-lowerToDF (Var v) = failWith $ "Non local return binding: " <> showT v
+lowerToDF (Var v) = failWith $ "Non local return binding: " <> Str.showS v
 lowerToDF (Let assign expr rest) = trace "Lowering Let -->" $ traceState $ handleDefinitionalExpr assign expr continuation
   where
     continuation = traceState $ lowerToDF rest
-lowerToDF g = failWith $ "Expected `let` or binding: " <> showT g
+lowerToDF g = failWith $ "Expected `let` or binding: " <> Str.showS g
 
 handleDefinitionalExpr :: (MonadOhua env m, MonadWriter (Seq LetExpr) m) =>
                           Assignment -> Expression -> LetRecT m Binding -> LetRecT m Binding
@@ -117,10 +118,10 @@ handleDefinitionalExpr assign l@(Lambda arg expr) cont = do
         failWith "Handling recursive functions is not enabled, if you want to enable this experimental feature set `transformRecursiveFunctions` to true in the options passed to the compiler."
     b <- case assign of
             Recursive b -> pure b
-            x -> failWith $ "Invariant broken. Assignment should be a 'letrec' but was: " <> showT x
+            x -> failWith $ "Invariant broken. Assignment should be a 'letrec' but was: " <> Str.showS x
     singleArg <- case arg of
                     Direct b -> pure b
-                    x -> failWith $ "Invariant broken. Assignment should be a 'Direct' but was: " <> showT x
+                    x -> failWith $ "Invariant broken. Assignment should be a 'Direct' but was: " <> Str.showS x
 
     let continuation = recursionLowering [singleArg] =<< lowerLambdaExpr assign expr
 
@@ -132,7 +133,7 @@ handleDefinitionalExpr assign l@(Apply _ _) cont = do
                                    Nothing                    -> lift $ tell =<< lowerDefault fn fnId assign args
     go =<< trace ("lowering APPLY: " ++ show l) (handleApplyExpr l)
     cont
-handleDefinitionalExpr _ e _ = failWith $ "Definitional expressions in a let can only be 'apply' or 'lambda' but got: " <> showT e
+handleDefinitionalExpr _ e _ = failWith $ "Definitional expressions in a let can only be 'apply' or 'lambda' but got: " <> Str.showS e
 
 -- | Lower any not specially treated function type.
 lowerDefault :: MonadOhua env m => Pass m
@@ -160,16 +161,16 @@ handleApplyExpr l@(Apply fn arg) = ask >>= go l [] . unLetRec
                     Nothing -> failWith "Calling environment functions is not supported in this adapter"
                     Just fn -> (fn, , ve : args) <$> generateId
     go (Apply fn arg) args recAlgos = go fn (arg:args) recAlgos
-    go x _ _ = failWith $ "Expected Apply or Var but got: " <> showT x
+    go x _ _ = failWith $ "Expected Apply or Var but got: " <> Str.showS x
 
 handleApplyExpr (Var (Sf fn id)) = (fn, , []) <$> maybe generateId return id -- what is this?
-handleApplyExpr g                = lift $ failWith $ pack $ "Expected apply but got: " ++ show g
+handleApplyExpr g                = failWith $ "Expected apply but got: " <> Str.showS g
 
 
 -- | Analyze a lambda expression. Since we perform lambda inlining, this can only be a letrec.
 lowerLambdaExpr :: MonadOhua env m => Assignment -> Expression -> m DFExpr
 lowerLambdaExpr (Recursive binding) expr = lowerALang expr
-lowerLambdaExpr a _ = failWith $ pack $ "Expression was not inlined but assignment is not a 'letrec': " ++ show a
+lowerLambdaExpr a _ = failWith $ "Expression was not inlined but assignment is not a 'letrec': " <> Str.showS a
 
 
 tieContext0 :: Functor f => Binding -> f LetExpr -> f LetExpr
@@ -188,8 +189,8 @@ tieContext0 ctxSource = fmap go
 expectVar :: MonadError Error m => Expression -> m DFVar
 expectVar (Var (Local bnd)) = pure $ DFVar bnd
 expectVar (Var (Env i))     = pure $ DFEnvVar i
-expectVar (Var v)           = failWith $ "Var must be local or env, was " <> showT v
-expectVar a                 = failWith $ "Argument must be var, was " <> showT a
+expectVar (Var v)           = failWith $ "Var must be local or env, was " <> Str.showS v
+expectVar a                 = failWith $ "Argument must be var, was " <> Str.showS a
 
 
 lowerHOF :: forall f m envExpr . (MonadOhua envExpr m, HigherOrderFunction f, MonadWriter (Seq LetExpr) m)
@@ -222,7 +223,7 @@ lowerHOF _ assign args = do
     handleArg (Lambda assign body) = do
         DFExpr lets bnd <- lowerALang body
         return $ Right (Lam assign bnd, lets)
-    handleArg a = failWith $ "unexpected type of argument, expected var or lambda, got " <> showT a
+    handleArg a = failWith $ "unexpected type of argument, expected var or lambda, got " <> Str.showS a
 
 
 hofs :: [WHOF]

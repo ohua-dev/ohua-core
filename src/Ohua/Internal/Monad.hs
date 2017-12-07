@@ -33,6 +33,7 @@ import           Ohua.Internal.Logging
 import           Ohua.LensClasses
 import           Ohua.Types               as Ty
 import           Ohua.Util
+import qualified Ohua.Util.Str as Str
 
 
 import Control.DeepSeq
@@ -67,7 +68,7 @@ instance MonadGenBnd (OhuaM env) where
         pure h
     generateBindingWith (Binding prefix) = OhuaM $ do
         taken <- use $ nameGenerator . takenNames
-        let a = map (T.pack . show) ([0..] :: [Int])
+        let a = map Str.showS ([0..] :: [Int])
         deepseqM (take 10 a)
         let (h:_) = dropWhile (`HS.member` taken) $ map (Binding . (prefix' <>)) a
         nameGenerator . takenNames %= HS.insert h
@@ -193,7 +194,7 @@ runFromBindings opts f taken = runExceptT $ fst <$> evalRWST (runOhuaM f) env st
 
 initNameGen :: HS.HashSet Binding -> NameGenerator
 initNameGen taken = NameGenerator taken
-    [ Binding $ T.pack $ char : maybe [] show num
+    [ Binding $ Str.fromString $ char : maybe [] show num
     | num <- Nothing : map Just [(0 :: Integer)..]
     , char <- ['a'..'z']
     ]

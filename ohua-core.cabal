@@ -52,6 +52,7 @@ library
     , Ohua.DFGraph.Show
     , Ohua.Serialize.JSON
     , Ohua.Util
+    , Ohua.Util.Str
   other-modules:
       Ohua.Internal.Monad
     , Ohua.Internal.Logging

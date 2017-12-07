@@ -22,9 +22,7 @@ import qualified Ohua.DFLang.Refs     as Refs
 import           Ohua.Monad
 import           Ohua.Types
 import           Ohua.Util
-
-import           Debug.Trace
-
+import qualified Ohua.Util.Str as Str
 
 data IfFn = IfFn
     { conditionVariable :: !DFVar
@@ -42,7 +40,7 @@ instance HigherOrderFunction IfFn where
         , LamArg thenBr@(Lam{beginAssignment=Direct ret})
         , LamArg elseBr
         ] = pure $ IfFn v thenBr elseBr ret
-    parseCallAndInitState args = failWith $ "Unexpected number or type of argument for if " <> showT args
+    parseCallAndInitState args = failWith $ "Unexpected number or type of argument for if " <> Str.showS args
 
     createContextEntry = do
         f <- get

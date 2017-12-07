@@ -24,6 +24,7 @@ import           Ohua.ALang.Lang
 import           Ohua.Monad
 import           Ohua.Types
 import           Ohua.Util
+import qualified Ohua.Util.Str as Str
 
 
 type LocalScope = HM.HashMap Binding Binding
@@ -94,4 +95,4 @@ isSSA = either Just (const Nothing) . flip evalState mempty . runExceptT . go
 checkSSA :: MonadOhua envExpr m => Expression -> m ()
 checkSSA = maybe (return ()) (throwError . mkMsg) . isSSA
   where
-    mkMsg bnd = "Redefinition of binding " <> showT bnd
+    mkMsg bnd = "Redefinition of binding " <> Str.showS bnd

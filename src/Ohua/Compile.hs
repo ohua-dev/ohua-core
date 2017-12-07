@@ -34,6 +34,7 @@ import           Ohua.DFLang.Passes
 import           Ohua.Monad
 import           Ohua.Types
 import           Ohua.Util
+import qualified Ohua.Util.Str as Str
 
 
 data CustomPasses env = CustomPasses
@@ -70,7 +71,7 @@ pipeline CustomPasses{..} e = do
 
     dfE <- lowerALang optimizedE
 
-    forceLog (showDFExpr dfE) ()
+    forceLog (pack $ Str.toString $ showDFExpr dfE) ()
 
 #ifdef DEBUG
     Ohua.DFLang.Passes.checkSSAExpr dfE
@@ -103,12 +104,12 @@ checkHigherOrderFunctionSupport (Let _ e rest) = do
   where
     checkNestedExpr (Apply f arg) = do
         supportsHOF <- checkNestedExpr f
-        when (isLambda arg && not supportsHOF) $ failWith $ "Lambdas may only be input to higher order functions, not " <> showT f
+        when (isLambda arg && not supportsHOF) $ failWith $ "Lambdas may only be input to higher order functions, not " <> Str.showS f
         pure True
     checkNestedExpr (Var (Sf n _)) = pure $ HM.member n hofNames
     checkNestedExpr (Var _) = pure False
-    checkNestedExpr a = failWith $ "Expected var or apply expr, got " <> showT a
+    checkNestedExpr a = failWith $ "Expected var or apply expr, got " <> Str.showS a
     isLambda (Lambda _ _) = True
     isLambda _            = False
 checkHigherOrderFunctionSupport (Var _) = pure ()
-checkHigherOrderFunctionSupport a = failWith $ "Expected let or var, got " <> showT a
+checkHigherOrderFunctionSupport a = failWith $ "Expected let or var, got " <> Str.showS a

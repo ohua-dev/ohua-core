@@ -24,13 +24,13 @@ import           Data.Maybe
 import           Data.Monoid
 import           Data.Sequence      as S
 import           Data.String
-import qualified Data.Text          as T
 import qualified Data.Vector        as V
 import           GHC.Exts
 import           GHC.Generics
 import           Lens.Micro
 import           Ohua.LensClasses
 import           Ohua.Util
+import qualified Ohua.Util.Str as Str
 
 
 -- | The numeric id of a function call site
@@ -42,14 +42,14 @@ instance Hashable FnId where hashWithSalt s = hashWithSalt s . unFnId
 instance NFData FnId where rnf (FnId i) = rnf i
 
 -- | A binding name
-newtype Binding = Binding { unBinding :: T.Text }
+newtype Binding = Binding { unBinding :: Str.Str }
     deriving (Eq, Hashable, Generic, Ord, Monoid)
 
 instance Show Binding where show = show . unBinding
 instance NFData Binding where rnf (Binding b) = rnf b
 
 instance IsString Binding where
-    fromString = Binding . fromString
+    fromString = Binding . Str.fromString
 
 type FnName = Binding
 
@@ -62,7 +62,7 @@ newtype NSRef = NSRef { unwrapNSRef :: V.Vector Binding }
     deriving (Eq, Generic)
 
 instance Show NSRef where
-    show = T.unpack . T.intercalate "." . map unBinding . nsRefToList
+    show = Str.toString . Str.intercalate "." . map unBinding . nsRefToList
 
 
 -- | Creates a 'NSRef' from a hierarchical sorted list of namespaces
@@ -88,7 +88,7 @@ data QualifiedBinding = QualifiedBinding
     } deriving (Eq, Generic)
 
 instance Show QualifiedBinding where
-    show (QualifiedBinding ns n) = show $ show ns ++ "/" ++ T.unpack (unBinding n)
+    show (QualifiedBinding ns n) = show $ show ns ++ "/" ++ Str.toString (unBinding n)
 
 instance Hashable QualifiedBinding where
     hashWithSalt s (QualifiedBinding a b) = hashWithSalt s (a, b)
@@ -112,25 +112,22 @@ instance Hashable SomeBinding where
     hashWithSalt s (Qual b)   = hashWithSalt s (1 :: Int, b)
 
 instance IsString SomeBinding where
-    fromString = either error id . symbolFromString . T.pack
+    fromString = either error id . symbolFromString
 
 -- | Attempt to parse a string into either a simple binding or a qualified binding.
 -- Assumes a form "name.space/value" for qualified bindings.
-symbolFromString :: T.Text -> Either String SomeBinding
-symbolFromString s | T.null s = Left "Symbols cannot be empty"
+symbolFromString :: String -> Either String SomeBinding
+symbolFromString s | Str.null s = Left "Symbols cannot be empty"
                    | otherwise =
-    case T.break (== '/') s of
-        (name, ns) | T.null name -> Left "Unexpected '/' at start"
-                   | T.null ns -> Right $ Unqual $ Binding name
-        (ns, rest) | Just ('/', name) <- T.uncons rest ->
-            if '/' `textElem` name then
+    case Str.break (== '/') s of
+        (name, ns) | Str.null name -> Left "Unexpected '/' at start"
+                   | Str.null ns -> Right $ Unqual $ Binding (Str.fromString name)
+        (ns, rest) | Just ('/', name) <- Str.uncons rest ->
+            if '/' `Str.elem` name then
                 Left "Too many '/' delimiters found."
             else
-                Right $ Qual $ QualifiedBinding (nsRefFromList $ map Binding $ T.split (== '.') ns) (Binding name)
+                Right $ Qual $ QualifiedBinding (nsRefFromList $ map Binding $ Str.split (== '.') (fromString ns)) (Binding $ fromString name)
         _ -> error "Leading slash expected after `break`"
-
-  where
-    textElem c t = isJust $ (== c) `T.findIndex` t
 
 class ExtractBindings a where
     extractBindings :: a -> [Binding]
@@ -197,7 +194,7 @@ flattenAssign :: Assignment -> [Binding]
 flattenAssign = extractBindings
 
 
-type Error = T.Text
+type Error = Str.Str
 
 data Options = Options !(Maybe QualifiedBinding) !(Maybe QualifiedBinding) Bool
 

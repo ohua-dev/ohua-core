@@ -10,7 +10,9 @@ import           Ohua.DFGraph
 import           Ohua.IR.Functions
 import           Ohua.Types
 import           Test.QuickCheck
+import qualified Ohua.Util.Str as Str
 
+instance Arbitrary Str.Str where arbitrary = Str.fromString <$> arbitrary
 instance Arbitrary T.Text where arbitrary = T.pack <$> arbitrary
 instance Arbitrary Operator where
     arbitrary = Operator <$> arbitrary <*> arbitrary
