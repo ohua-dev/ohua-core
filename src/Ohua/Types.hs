@@ -34,19 +34,16 @@ import qualified Ohua.Util.Str as Str
 
 
 -- | The numeric id of a function call site
-newtype FnId = FnId { unFnId :: Int } deriving (Eq, Ord, Generic, Enum, Num)
+newtype FnId = FnId { unFnId :: Int } deriving (Eq, Ord, Generic, Enum, Num, NFData, Hashable)
 
 instance Show FnId where
     show = show . unFnId
-instance Hashable FnId where hashWithSalt s = hashWithSalt s . unFnId
-instance NFData FnId where rnf (FnId i) = rnf i
 
 -- | A binding name
 newtype Binding = Binding { unBinding :: Str.Str }
-    deriving (Eq, Hashable, Generic, Ord, Monoid)
+    deriving (Eq, Hashable, Generic, Ord, Monoid, NFData)
 
 instance Show Binding where show = show . unBinding
-instance NFData Binding where rnf (Binding b) = rnf b
 
 instance IsString Binding where
     fromString = Binding . Str.fromString
@@ -59,7 +56,7 @@ unwrapFnName = id
 
 -- | Hierarchical reference to a namespace
 newtype NSRef = NSRef { unwrapNSRef :: V.Vector Binding }
-    deriving (Eq, Generic)
+    deriving (Eq, Generic, NFData)
 
 instance Show NSRef where
     show = Str.toString . Str.intercalate "." . map unBinding . nsRefToList
@@ -78,8 +75,6 @@ instance Hashable NSRef where
     hashWithSalt salt = hashWithSalt salt . nsRefToList
     {-# INLINE hashWithSalt #-}
 
-instance NFData NSRef where
-    rnf (NSRef a) = rnf a
 
 -- | A qualified binding. References a particular bound value inside a namespace.
 data QualifiedBinding = QualifiedBinding

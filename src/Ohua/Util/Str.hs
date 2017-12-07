@@ -19,6 +19,9 @@ import qualified Data.String as S
 import Data.Monoid
 import Data.Hashable
 import Control.DeepSeq
+import System.IO (stderr, stdout, stdin, Handle)
+import qualified System.IO as SysIO
+import Control.Monad.IO.Class
 
 
 class (Monoid s, P.Eq s, P.Ord s, Hashable s, NFData s) => IsString s where
@@ -126,9 +129,22 @@ class (Monoid s, P.Eq s, P.Ord s, Hashable s, NFData s) => IsString s where
     elem :: Char -> s -> Bool
     elem c = P.elem c . toString
 
+    hPutStr :: MonadIO m => Handle -> s -> m ()
+    hPutStr h = liftIO . SysIO.hPutStr h . toString
+
+    hPutStrLn :: MonadIO m => Handle -> s -> m ()
+    hPutStrLn h s = do
+        hPutStr h s
+        liftIO $ SysIO.hPutChar h '\n'
+
+
+    hGetLine :: MonadIO m => Handle -> m s
+    hGetLine = P.fmap fromString . liftIO . SysIO.hGetLine
+
 
 -- | An opaque string type to make refactoring against different string libraries easier
-newtype Str = Str { unStr :: P.String } deriving (Monoid, Eq, Ord, S.IsString, Hashable, NFData)
+newtype Str = Str { unStr :: P.String } 
+    deriving (Monoid, Eq, Ord, S.IsString, Hashable, NFData)
 
 instance P.Show Str where
     show = P.show . unStr
@@ -151,6 +167,12 @@ onStrTup :: IsString s => (String -> (String, P.String)) -> s -> (s, s)
 onStrTup f s = (fromString s1, fromString s2)
   where (s1, s2) = f $ toString s
 
+
+putStr :: (IsString s, MonadIO m) => s -> m ()
+putStr = hPutStr stdout
+
+putStrLn :: (IsString s, MonadIO m) => s -> m ()
+putStrLn = hPutStrLn stdout
 
 break :: IsString s => (Char -> Bool) -> s -> (s, s)
 break = span . (not .)

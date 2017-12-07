@@ -203,6 +203,9 @@ runHandleLoggingT h = (`runLoggingT` defaultOutput h)
 runStderrLoggingT :: MonadIO m => LoggingT m a -> m a
 runStderrLoggingT = runHandleLoggingT stderr
 
+runSilentLoggingT :: Applicative m => LoggingT m a -> m a
+runSilentLoggingT = flip runLoggingT $ \_ _ _ _ -> pure ()
+
 
 data LogStr = LogStr !Int Builder
 

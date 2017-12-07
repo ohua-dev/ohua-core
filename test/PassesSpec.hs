@@ -29,6 +29,7 @@ import           Test.Hspec
 import           Test.Hspec.QuickCheck
 import           Test.QuickCheck
 import           Test.QuickCheck.Property   as P
+import Data.Default
 
 import           Ohua.Types.Arbitrary
 
@@ -46,7 +47,7 @@ smapName = "ohua.lang/smap"
 instance Num ResolvedSymbol where fromInteger = Env . fromInteger
 instance Num Expression where fromInteger = Var . fromInteger
 
-runPasses expr = flip runOhuaT expr $ performSSA >=> (normalize >=> \e -> checkProgramValidity e >> return e)
+runPasses expr = runSilentLoggingT $ flip (runFromExpr def) expr $ performSSA >=> (normalize >=> \e -> checkProgramValidity e >> return e)
 
 type ALangCheck = Either String
 
@@ -80,7 +81,7 @@ prop_passes input = ioProperty $ do
     () <- return $ input `deepseq` ()
     transformed <- runPasses input
     return $ case transformed of
-        Right (program, _) ->
+        Right program ->
             case checkInvariants program of
                 Left err -> failed { P.reason = err }
                 Right _  -> succeeded
@@ -123,18 +124,17 @@ passesSpec = do
             lambdaStaysInput e = False
 
         it "Reduces lambdas as far as possible but does not remove them when argument" $
-            runPasses lambda_with_app_as_arg `shouldSatisfyRet` either (const False) (lambdaStaysInput . fst)
+            runPasses lambda_with_app_as_arg `shouldSatisfyRet` either (const False) lambdaStaysInput
 
-        let normalize' = fmap fst . runIdentity . runOhuaT normalize
+        let normalize' = runSilentLoggingT . runFromExpr def normalize
             e = Let "f" (Lambda "x" ("some/fn" `Apply` "x")) $
                 Let "g" ("f" `Apply` "a")
-                "g" `Apply` "b"
+                "g" `Apply` "b" :: Expression
 
         it "reduces curried functions which are produced by a lambda" $
-            normalize' e `shouldBe` Right (Let "c" ("some/fn" `Apply` "a" `Apply` "b" ) "c")
+            normalize' e `shouldReturn` Right (Let "c" ("some/fn" `Apply` "a" `Apply` "b" ) "c")
 
     describe "reassignment inlining" $ do
-        let normalize' = fmap fst . runIdentity . runOhuaT normalize
         it "inlines reassignments in argument lambdas" $
             inlineReassignments ("ohua.lang/smap" `Apply` Lambda "i_0" (Let "x_1" "i_0" ("ohua.math/add" `Apply` "x_1" `Apply` "x_1")) `Apply` "x")
             `shouldBe`
@@ -148,18 +148,18 @@ passesSpec = do
 
 
     describe "remove currying pass" $ do
-        let removeCurrying = fmap fst . runIdentity . flip runOhuaT0 mempty . Ohua.ALang.Passes.removeCurrying
+        let removeCurrying = runSilentLoggingT . flip (runFromBindings def) mempty . Ohua.ALang.Passes.removeCurrying
         it "inlines curring" $
             removeCurrying (Let "a" ("mod/fun" `Apply` "b") ("a" `Apply` "c"))
-            `shouldBe`
+            `shouldReturn`
             Right ("mod/fun" `Apply` "b" `Apply` "c")
         it "inlines curring 2" $
             removeCurrying (Let "a" ("mod/fun" `Apply` "b") $ Let "x" ("a" `Apply` "c") "x")
-            `shouldBe`
+            `shouldReturn`
             Right (Let "x" ("mod/fun" `Apply` "b" `Apply` "c") "x")
         it "removes currying even for redefintions" $
             removeCurrying (Let "a" "some/sf" $ Let "b" "a" $ "b" `Apply` "c")
-            `shouldBe`
+            `shouldReturn`
             Right ("some/sf" `Apply` "c")
         it "inlines multiple layers of currying" $
             removeCurrying
@@ -167,7 +167,7 @@ passesSpec = do
                 Let "f'" (Apply "f" "b") $
                 Let "x" (Apply "f'" "c")
                 "x" )
-            `shouldBe`
+            `shouldReturn`
             Right (Let "x" ("some-ns/fn-with-3-args" `Apply` "a" `Apply` "b" `Apply` "c") "x")
 
     -- TODO

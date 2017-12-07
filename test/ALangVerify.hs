@@ -12,12 +12,14 @@ import           Ohua.ALang.Passes
 import           Ohua.Monad
 import           Ohua.Types
 import           Test.Hspec
+import Data.Default
+import qualified Ohua.Util.Str as Str
 
 -- OhuaT Expr (Either [Char] Expression)
-justTrace :: Show e => e -> Expectation
-justTrace e = traceShow e $ return ()
+justTrace :: Show e => IO e -> Expectation
+justTrace e = e >>= print
 
---f :: Expression -> OhuaT m a
+-- f :: Expression -> OhuaT m a
 
 currying :: Spec
 currying = describe "resolution of curried functions" $ do
@@ -29,8 +31,7 @@ currying = describe "resolution of curried functions" $ do
           Let "f'" (Apply "f" "b") $
           Let "x" (Apply "f'" "c")
           "x"
-  let f :: Expression -> OhuaT (Either String) Expression
-      f = normalize
-  let runALangTransforms = either error id . runOhuaT f
+  let f = normalize
+  let runALangTransforms = fmap (either (error . Str.toString) id) . runSilentLoggingT . runFromExpr def f
   let output = runALangTransforms sourceExpr
   it "just some output" $ justTrace output

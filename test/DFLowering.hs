@@ -27,6 +27,8 @@ import qualified Ohua.DFLang.Refs                  as Refs
 import           Ohua.Monad
 import           Ohua.Types
 import           Test.Hspec
+import Data.Default
+import qualified Ohua.Util.Str as Str
 
 
 newtype OhuaGrGraph = OhuaGrGraph { unGr :: Gr QualifiedBinding OhuaGrEdgeLabel } deriving Eq
@@ -72,7 +74,7 @@ traceGr g = trace (prettify $ unGr g) g
 
 
 runLowering :: Expression -> IO DFExpr
-runLowering = fmap (either (error . T.unpack) fst) . runOhuaT lowerALang
+runLowering = fmap (either (error . Str.toString) id) . runSilentLoggingT . runFromExpr def lowerALang
 
 
 -- | IMPORTANT: Both source and target expression must be in SSA form
