@@ -176,7 +176,7 @@ instance (MonadReadEnvironment m, Monad m, Monoid w) => MonadReadEnvironment (Wr
 instance (MonadReadEnvironment m, Monad m, Monoid w) => MonadReadEnvironment (Control.Monad.RWS.Lazy.RWST e w s m)
 instance (MonadReadEnvironment m, Monad m, Monoid w) => MonadReadEnvironment (Control.Monad.RWS.Strict.RWST e w s m)
 
-type MonadOhua env m = (MonadGenId m, MonadGenBnd m, MonadReadEnvExpr m, MonadRecordEnvExpr m, MonadError Error m, MonadIO m, MonadReadEnvironment m, EnvExpr m ~ env)
+type MonadOhua env m = (MonadGenId m, MonadGenBnd m, MonadReadEnvExpr m, MonadRecordEnvExpr m, MonadError Error m, MonadIO m, MonadReadEnvironment m, EnvExpr m ~ env, MonadLogger m)
 
 -- | Run a compiler
 -- Creates the state from the tree being passed in

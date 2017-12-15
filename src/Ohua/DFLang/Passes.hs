@@ -67,6 +67,10 @@ traceState :: (MonadOhua env m, MonadWriter (Seq LetExpr) m)
            => LetRecT m a -> LetRecT m a
 traceState cont = (flip trace cont . ("State: " ++) . show . HM.keys . unLetRec) =<< ask
 
+logState :: MonadLogger m => LetRecT m ()
+logState = ask >>= logDebugN . ("Current state: " <>) . showT . HM.keys . unLetRec
+
+
 -- | Check that a sequence of let expressions does not redefine bindings.
 checkSSA :: (Foldable f, MonadOhua envExpr m) => f LetExpr -> m ()
 checkSSA = flip evalStateT mempty . mapM_ go
@@ -94,7 +98,8 @@ checkSSAExpr (DFExpr l _) = checkSSA l
 -- 'checkProgramValidity'.
 lowerALang :: MonadOhua envExpr m => Expression -> m DFExpr
 lowerALang expr = do
-    (var, exprs) <- runWriterT $ (flip runReaderT (LetRec mempty) . lowerToDF) $ flip trace expr $ "ALang expression to lower: " ++ show expr
+    logDebugN $ "Lowering alang expr: " <> showT expr
+    (var, exprs) <- runWriterT $ runReaderT (lowerToDF expr) (LetRec mempty)
 --    (var, exprs) <- runWriterT (go expr)
 #ifdef DEBUG
     checkSSA exprs
@@ -105,9 +110,12 @@ lowerToDF :: (MonadOhua env m, MonadWriter (Seq LetExpr) m)
           => Expression -> LetRecT m Binding
 lowerToDF (Var (Local bnd)) = pure bnd
 lowerToDF (Var v) = failWith $ "Non local return binding: " <> Str.showS v
-lowerToDF (Let assign expr rest) = trace "Lowering Let -->" $ traceState $ handleDefinitionalExpr assign expr continuation
+lowerToDF (Let assign expr rest) = do 
+    logDebugN "Lowering Let -->"
+    logState
+    handleDefinitionalExpr assign expr continuation
   where
-    continuation = traceState $ lowerToDF rest
+    continuation = lowerToDF rest
 lowerToDF g = failWith $ "Expected `let` or binding: " <> Str.showS g
 
 handleDefinitionalExpr :: (MonadOhua env m, MonadWriter (Seq LetExpr) m) =>
@@ -129,10 +137,10 @@ handleDefinitionalExpr assign l@(Lambda arg expr) cont = do
     -- execute the rest of the traversal (the continuation) in the new LetRecT environment
     local (LetRec . HM.insert b continuation . unLetRec) cont
 handleDefinitionalExpr assign l@(Apply _ _) cont = do
-    let go (fn, fnId, args) = case HM.lookup fn hofNames of
-                                   Just (WHOF (_ :: Proxy p)) -> lift $ lowerHOF (name :: TaggedFnName p) assign args
-                                   Nothing                    -> lift $ tell =<< lowerDefault fn fnId assign args
-    go =<< trace ("lowering APPLY: " ++ show l) (handleApplyExpr l)
+    (fn, fnId, args) <- handleApplyExpr l
+    case HM.lookup fn hofNames of
+        Just (WHOF (_ :: Proxy p)) -> lift $ lowerHOF (name :: TaggedFnName p) assign args
+        Nothing                    -> lift $ tell =<< lowerDefault fn fnId assign args
     cont
 handleDefinitionalExpr _ e _ = failWith $ "Definitional expressions in a let can only be 'apply' or 'lambda' but got: " <> Str.showS e
 

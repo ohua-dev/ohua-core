@@ -21,8 +21,6 @@ import           Ohua.ALang.Lang
 import           Ohua.DFLang.Lang
 import           Ohua.Types
 
-import           Debug.Trace
-
 data Operator = Operator
     { operatorId   :: !FnId
     , operatorType :: !QualifiedBinding
@@ -69,7 +67,7 @@ instance NFData a => NFData (AbstractOutGraph a)
 
 
 toGraph :: DFExpr -> OutGraph
-toGraph a@(DFExpr lets _) = trace ("DFExpr to convert to graph:\n" ++ show a) $ OutGraph ops arcs
+toGraph a@(DFExpr lets _) = OutGraph ops arcs
   where
     ops = map toOp $ toList lets
     toOp e = Operator (callSiteId e) (deRef e)

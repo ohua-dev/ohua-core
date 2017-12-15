@@ -52,6 +52,7 @@ class (MonadLogger m, MonadIO m) => MonadLoggerIO m where
 
 instance MonadLogger m => MonadLogger (ExceptT e m)
 instance MonadLogger m => MonadLogger (ReaderT r m)
+instance (MonadLogger m, Monoid w) => MonadLogger (WriterT w m)
 instance MonadLogger m => MonadLogger (StateT s m)
 instance MonadLogger m => MonadLogger (Strict.StateT s m)
 instance (MonadLogger m, Monoid w) => MonadLogger (RWST r w s m)
