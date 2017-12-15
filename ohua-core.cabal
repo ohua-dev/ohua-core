@@ -23,12 +23,12 @@ flag debug
 library
   exposed-modules:
       Ohua.Compile
-    , Ohua.IR
+    -- , Ohua.IR
     , Ohua.Types
     , Ohua.LensClasses
     , Ohua.Monad
     , Ohua.ParseTools.Refs
-    , Ohua.IR.Functions
+    -- , Ohua.IR.Functions
     , Ohua.ALang.Lang
     , Ohua.ALang.Refs
     , Ohua.ALang.NS

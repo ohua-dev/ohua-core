@@ -7,7 +7,6 @@ import           Control.Monad
 import qualified Data.Text         as T
 import           Ohua.ALang.Lang
 import           Ohua.DFGraph
-import           Ohua.IR.Functions
 import           Ohua.Types
 import qualified Ohua.Util.Str     as Str
 import           Test.QuickCheck
