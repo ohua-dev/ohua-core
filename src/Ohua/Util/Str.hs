@@ -1,7 +1,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE UnboxedTuples              #-}
 module Ohua.Util.Str
-    ( IsString(fromString, toString, singleton, null, concat, intercalate, cons, uncons, snoc, unsnoc, length, map, intersperse, reverse, splitAt, splitAtEnd, span, spanEnd, isPrefixOf, isSuffixOf, isInfixOf, filter, find, findEnd, index, split, elem)
+    ( IsString(fromString, toString, singleton, null, concat, intercalate, cons, uncons, snoc, unsnoc, head, tail, init, last, length, map, intersperse, reverse, splitAt, splitAtEnd, span, spanEnd, isPrefixOf, isSuffixOf, isInfixOf, filter, find, findEnd, index, split, elem)
     , strip, stripStart, stripEnd, take, takeEnd, drop, dropEnd, takeWhile, takeWhileEnd, dropWhile, dropWhileEnd, dropAround, break, lines, unlines, words, unwords, showS
     , (<>)
     , Str
@@ -21,8 +21,8 @@ import           Data.Monoid
 import qualified Data.String            as S
 import           Prelude                (Bool, Char, Eq, Int,
                                          Maybe (Just, Nothing), Ord, String,
-                                         fst, id, not, otherwise, pure, snd,
-                                         ($), (-), (.), (==), fmap)
+                                         fmap, fst, id, not, otherwise, pure,
+                                         snd, ($), (-), (.), (==))
 import qualified Prelude                as P
 import           System.IO              (Handle, stderr, stdin, stdout)
 import qualified System.IO              as SysIO
@@ -35,12 +35,12 @@ import qualified System.IO              as SysIO
 -- All of these functions have default implementations, though you do have to
 -- at least implement the minimal rewuired methods, otherwise you face non-termination.
 
--- Many of the functions however are imlpemented by converting to @String@ and then 
+-- Many of the functions however are imlpemented by converting to @String@ and then
 -- using the string version of the function, which is often inefficient.
 -- You therefore should provide an efficient implementation for the following functions
--- in addition to 'fromString', 'toString', 'singleton', 'uncons': 
--- 'unsnoc', 'length', 'map', 'intersperse', 'reverse', 'splitAt', 'splitAtEnd', 
--- 'span', 'spanEnd', 'isPrefixOf', 'isInfixOf', 'isSuffixOf', 'filter', 'find', 
+-- in addition to 'fromString', 'toString', 'singleton', 'uncons':
+-- 'unsnoc', 'length', 'map', 'intersperse', 'reverse', 'splitAt', 'splitAtEnd',
+-- 'span', 'spanEnd', 'isPrefixOf', 'isInfixOf', 'isSuffixOf', 'filter', 'find',
 -- 'findEnd', 'index', 'elem', 'hPutStr', 'hGetLine'.
 class (Monoid s, P.Eq s, P.Ord s, Hashable s, NFData s) => IsString s where
 
@@ -105,8 +105,8 @@ class (Monoid s, P.Eq s, P.Ord s, Hashable s, NFData s) => IsString s where
     last = fmap snd . unsnoc
 
     -- | Get the initial string with the last character removed
-    inits :: s -> Maybe s
-    inits = fmap fst . unsnoc
+    init :: s -> Maybe s
+    init = fmap fst . unsnoc
 
     -- | Get the length of the string
     length :: s -> Int
@@ -136,7 +136,7 @@ class (Monoid s, P.Eq s, P.Ord s, Hashable s, NFData s) => IsString s where
     splitAtEnd i s = onStrTup (X.splitAt (length s - i)) s
     -- TODO test whether we need a (-1) here
 
-    -- | Splits a string into a prefix in which all characters satisfy a predicate 
+    -- | Splits a string into a prefix in which all characters satisfy a predicate
     -- and a remaining string.
     span :: (Char -> Bool) -> s -> (s, s)
     span = onStrTup . X.span
@@ -145,7 +145,7 @@ class (Monoid s, P.Eq s, P.Ord s, Hashable s, NFData s) => IsString s where
     break :: (Char -> Bool) -> s -> (s, s)
     break = span . (not .)
 
-    -- | Splits a string into a suffix where all characters satisfy a predicate and a 
+    -- | Splits a string into a suffix where all characters satisfy a predicate and a
     -- remaining initial string
     spanEnd :: (Char -> Bool) -> s -> (s, s)
     spanEnd = onStrTup . f id id
@@ -155,42 +155,42 @@ class (Monoid s, P.Eq s, P.Ord s, Hashable s, NFData s) => IsString s where
             | p x = f (appSat . (x:)) appNoSat p xs
             | otherwise = f id (appNoSat . appSat . (x:)) p xs
 
-    -- | Retains only the first @n@ characters of the string. 
+    -- | Retains only the first @n@ characters of the string.
     -- Retains the whole string if @n >= length@.
     take :: Int -> s -> s
     take i = fst . splitAt i
 
-    -- | Retains only the last @n@ characters of the string. 
+    -- | Retains only the last @n@ characters of the string.
     -- Retains the whole string if @n >= length@.
     takeEnd ::Int -> s -> s
     takeEnd i = snd . splitAtEnd i
-    
+
     -- | The string after removing the first @n@ characters.
     -- If @n >= length@ the result is the empty string.
     drop :: Int -> s -> s
     drop i = snd . splitAt i
-    
+
     -- | The string after removing the last @n@ characters.
     -- If @n >= length@ the result is the empty string.
     dropEnd :: Int -> s -> s
     dropEnd i = snd . splitAtEnd i
-    
+
     -- | Retain the prefix of the String which satisfies the predicate.
     takeWhile :: (Char -> Bool) -> s -> s
     takeWhile p = fst . span p
-    
+
     -- | Retain the suffix of the string which satisfies the predicate.
     takeWhileEnd :: (Char -> Bool) -> s -> s
     takeWhileEnd p = fst . spanEnd p
-    
+
     -- | Remove the prefix in which all characters satisfy the predicate.
     dropWhile :: (Char -> Bool) -> s -> s
     dropWhile p = snd . span p
-    
+
     -- | Remove the suffix in which all characters satisfy the predicate.
     dropWhileEnd :: (Char -> Bool) -> s -> s
     dropWhileEnd p = snd . spanEnd p
-    
+
     -- | Remove the prefix and suffix in which all characters satisfy the predicate.
     dropAround :: (Char -> Bool) -> s -> s
     dropAround f = dropWhile f . dropWhileEnd f
@@ -280,7 +280,7 @@ onStrTup f s = (fromString s1, fromString s2)
   where (s1, s2) = f $ toString s
 
 -- | Write the string to the handle and prepend a newline
-hPutStrLn :: IsString s => MonadIO m => Handle -> s -> m ()
+hPutStrLn :: (IsString s, MonadIO m) => Handle -> s -> m ()
 hPutStrLn h s = do
     hPutStr h s
     liftIO $ SysIO.hPutChar h '\n'
