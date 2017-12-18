@@ -88,7 +88,6 @@ class HigherOrderFunction f where
 
     -- | Create scope nodes for __all__ free variables of __one of the lambdas__ that were input to 'parseCallAndInitState'.
     -- This methiod is never called with a lambda which was not in the list given to 'parseCallAndInitState'.
-    -- The compiler checks that this makes all previously free variables locally bound variables.
     scopeFreeVariables :: (MonadOhua envExpr m, MonadState f m) => Lambda -> [Binding] -> m (Seq LetExpr, Renaming)
 
     -- | Whether the compiler should add context args for all functions in this lambda

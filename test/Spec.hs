@@ -11,12 +11,12 @@ import qualified TestALangUtils
 
 
 main = hspec $ do
-    -- passesSpec
-    -- DFLowering.smapSpec
-    -- StrTest.strTest
-    -- DFLowering.ifSpec
+    passesSpec
+    StrTest.strTest
     DFLowering.generalLowering
-    -- DFLowering.seqSpec
-    -- ALangVerify.currying
-    -- TestALangUtils.spec
-    -- TestAesonConvert.spec
+    DFLowering.ifSpec
+    DFLowering.seqSpec
+    DFLowering.smapSpec
+    ALangVerify.currying
+    TestALangUtils.spec
+    TestAesonConvert.spec

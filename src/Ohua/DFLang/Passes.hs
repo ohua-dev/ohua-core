@@ -182,13 +182,23 @@ lowerLambdaExpr (Recursive binding) expr = lowerALang expr
 lowerLambdaExpr a _ = failWith $ "Expression was not inlined but assignment is not a 'letrec': " <> Str.showS a
 
 
-tieContext0 :: Functor f => Binding -> f LetExpr -> f LetExpr
-tieContext0 ctxSource = fmap go
+tieContext0 :: (Monad m, Functor f, Monoid (f LetExpr), Foldable f) 
+            => m (Maybe (f LetExpr, Binding))
+            -> f LetExpr 
+            -> m (f LetExpr)
+tieContext0 initExpr lets
+    | all hasLocalArcs lets = pure lets
+    | otherwise = initExpr <&> maybe lets
+        (\(initExprs, scopeBnd) -> initExprs <> fmap (go scopeBnd) lets)
   where
-    go e | any isLocalArc (callArguments e) = e
-         | Just ctxArg <- contextArg e
-         , isLocalArc (DFVar ctxArg) = e
-    go e = e { contextArg = Just ctxSource }
+    hasLocalArcs e 
+        | any isLocalArc (callArguments e) = True
+        | Just ctxArg <- contextArg e
+        , isLocalArc (DFVar ctxArg) = True
+    hasLocalArcs _ = False
+
+    go _ e | hasLocalArcs e = e
+    go ctxSource e = e { contextArg = Just ctxSource }
 
     isLocalArc (DFVar _) = True
     isLocalArc _         = False
@@ -220,11 +230,7 @@ lowerHOF _ assign args = do
                 else
                     scopeFreeVariables lam freeVars
             tell scopers
-            scopeUnbound <- contextifyUnboundFunctions lam
-            let tieContext1 = case scopeUnbound of
-                    Just (initExpr, bnd) -> (initExpr <>) . tieContext0 bnd
-                    Nothing              -> id
-            tell $ tieContext1 (renameWith (HM.fromList renaming) body)
+            tell =<< tieContext0 (contextifyUnboundFunctions lam) (renameWith (HM.fromList renaming) body)
         createContextExit assign >>= tell
   where
     handleArg (Var (Local v)) = return $ Left $ DFVar v

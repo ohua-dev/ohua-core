@@ -27,9 +27,14 @@ smapFun = DFFunction "ohua.lang/smapFun"
 id :: DFFnRef
 id = EmbedSf Refs.id
 
+
+bool :: DFFnRef 
+bool = EmbedSf Refs.bool
+
 -- FIXME should be ohua.lang/if
 ifThenElse :: DFFnRef
-ifThenElse = EmbedSf "ohua.lang/bool"
+ifThenElse = bool
+{-# DEPRECATED ifThenElse "use 'bool' instead" #-}
 
 
 switch ::DFFnRef

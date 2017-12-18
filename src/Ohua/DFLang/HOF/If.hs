@@ -48,7 +48,7 @@ instance HigherOrderFunction IfFn where
         let Direct thenBnd = beginAssignment $ thenBranch f
             Direct elseBnd = beginAssignment $ elseBranch f
         modify $ \s -> s { ifRet = thenBnd }
-        pure [ LetExpr ifId (Destructure [thenBnd, elseBnd]) Refs.ifThenElse [conditionVariable f] Nothing ]
+        pure [ LetExpr ifId (Destructure [thenBnd, elseBnd]) Refs.bool [conditionVariable f] Nothing ]
 
     createContextExit assignment = do
         switchId <- generateId

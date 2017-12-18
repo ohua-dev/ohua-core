@@ -16,12 +16,17 @@ scope :: QualifiedBinding
 scope = "ohua.lang/scope"
 
 recur :: QualifiedBinding
-recur = "lang/recur"
+recur = "ohua.lang/recur"
 
 array :: QualifiedBinding
-array = "lang/array"
+array = "ohua.lang/array"
 
 smap :: QualifiedBinding
 smap = "ohua.lang/smap"
 
+bool :: QualifiedBinding
+bool = "ohua.lang/bool"
 
+
+seq :: QualifiedBinding
+seq = "ohua.lang/seq"
