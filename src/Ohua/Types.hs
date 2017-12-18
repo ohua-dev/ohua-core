@@ -31,6 +31,8 @@ import           Lens.Micro
 import           Ohua.LensClasses
 import           Ohua.Util
 import qualified Ohua.Util.Str      as Str
+import Control.Comonad
+import Data.Functor.Classes (Show1(liftShowsPrec))
 
 
 -- | The numeric id of a function call site
@@ -184,6 +186,8 @@ _Direct = prism' Direct $ \case { Direct a -> Just a; _ -> Nothing }
 _Destructure :: Prism' (AbstractAssignment binding) [binding]
 _Destructure = prism' Destructure $ \case { Destructure a -> Just a; _ -> Nothing }
 
+_Recursive :: Prism' (AbstractAssignment binding) binding
+_Recursive = prism' Recursive $ \case { Recursive r -> Just r; _ -> Nothing }
 
 flattenAssign :: Assignment -> [Binding]
 flattenAssign = extractBindings
@@ -240,6 +244,14 @@ options f (Environment opts) = Environment <$> f opts
 data Annotated annotation value = Annotated !annotation !value
     deriving (Eq, Show)
 
+instance Show annotation => Show1 (Annotated annotation) where
+    liftShowsPrec showInner _ prec (Annotated ann val) = showParen (prec > app_prec) $
+        showString "Annotated " 
+        . showsPrec (succ app_prec) ann 
+        . showString " " 
+        . showInner (succ app_prec) val
+      where app_prec = 0
+
 instance (NFData annotation, NFData value) => NFData (Annotated annotation value) where
     rnf (Annotated ann val) = ann `deepseq` rnf val
 
@@ -267,6 +279,11 @@ instance Foldable (Annotated ann) where
 instance Traversable (Annotated ann) where
     traverse = bitraverse pure
 
+instance Comonad (Annotated ann) where
+    extract (Annotated _ val) = val
+    duplicate x@(Annotated ann _) = Annotated ann x
+    extend f a@(Annotated ann val) = Annotated ann (f a)
+
 -- | A type expression
 data TyExpr binding
     = TyRef binding -- ^ A primitive referece to a type
@@ -292,6 +309,12 @@ data TyVar tyConRef tyVarRef
     = TyCon tyConRef
     | TyVar tyVarRef
     deriving (Show, Eq)
+
+instance Bifunctor TyVar where
+    bimap f _ (TyCon c) = TyCon (f c)
+    bimap _ g (TyVar v) = TyVar (g v)
+
+instance Functor (TyVar a) where fmap = bimap id
 
 -- | Typical instantiation of a @TyVar@
 type SomeTyVar = TyVar SomeBinding SomeBinding
