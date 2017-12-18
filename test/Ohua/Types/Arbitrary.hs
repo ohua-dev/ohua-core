@@ -4,11 +4,11 @@ module Ohua.Types.Arbitrary where
 
 
 import           Control.Monad
-import qualified Data.Text         as T
+import qualified Data.Text       as T
 import           Ohua.ALang.Lang
 import           Ohua.DFGraph
 import           Ohua.Types
-import qualified Ohua.Util.Str     as Str
+import qualified Ohua.Util.Str   as Str
 import           Test.QuickCheck
 
 instance Arbitrary Str.Str where arbitrary = Str.fromString <$> arbitrary

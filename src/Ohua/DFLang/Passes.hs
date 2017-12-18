@@ -110,7 +110,7 @@ lowerToDF :: (MonadOhua env m, MonadWriter (Seq LetExpr) m)
           => Expression -> LetRecT m Binding
 lowerToDF (Var (Local bnd)) = pure bnd
 lowerToDF (Var v) = failWith $ "Non local return binding: " <> Str.showS v
-lowerToDF (Let assign expr rest) = do 
+lowerToDF (Let assign expr rest) = do
     logDebugN "Lowering Let -->"
     logState
     handleDefinitionalExpr assign expr continuation
@@ -182,22 +182,22 @@ lowerLambdaExpr (Recursive binding) expr = lowerALang expr
 lowerLambdaExpr a _ = failWith $ "Expression was not inlined but assignment is not a 'letrec': " <> Str.showS a
 
 
-tieContext0 :: (Monad m, Functor f, Monoid (f LetExpr), Foldable f) 
+tieContext0 :: (Monad m, Functor f, Monoid (f LetExpr), Foldable f)
             => m (Maybe (f LetExpr, Binding))
-            -> f LetExpr 
+            -> f LetExpr
             -> m (f LetExpr)
 tieContext0 initExpr lets
     | all hasLocalArcs lets = pure lets
     | otherwise = initExpr <&> maybe lets
         (\(initExprs, scopeBnd) -> initExprs <> fmap (go scopeBnd) lets)
   where
-    hasLocalArcs e 
+    hasLocalArcs e
         | any isLocalArc (callArguments e) = True
         | Just ctxArg <- contextArg e
         , isLocalArc (DFVar ctxArg) = True
     hasLocalArcs _ = False
 
-    go _ e | hasLocalArcs e = e
+    go _ e         | hasLocalArcs e = e
     go ctxSource e = e { contextArg = Just ctxSource }
 
     isLocalArc (DFVar _) = True

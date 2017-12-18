@@ -12,27 +12,27 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Ohua.Types where
 
+import           Control.Comonad
 import           Control.DeepSeq
 import           Data.Bifoldable
 import           Data.Bifunctor
 import           Data.Bitraversable
-import qualified Data.Char          as C
+import qualified Data.Char            as C
 import           Data.Default
+import           Data.Functor.Classes (Show1 (liftShowsPrec))
 import           Data.Hashable
-import qualified Data.HashSet       as HS
+import qualified Data.HashSet         as HS
 import           Data.Maybe
 import           Data.Monoid
-import           Data.Sequence      as S
+import           Data.Sequence        as S
 import           Data.String
-import qualified Data.Vector        as V
+import qualified Data.Vector          as V
 import           GHC.Exts
 import           GHC.Generics
 import           Lens.Micro
 import           Ohua.LensClasses
 import           Ohua.Util
-import qualified Ohua.Util.Str      as Str
-import Control.Comonad
-import Data.Functor.Classes (Show1(liftShowsPrec))
+import qualified Ohua.Util.Str        as Str
 
 
 -- | The numeric id of a function call site
@@ -246,9 +246,9 @@ data Annotated annotation value = Annotated !annotation !value
 
 instance Show annotation => Show1 (Annotated annotation) where
     liftShowsPrec showInner _ prec (Annotated ann val) = showParen (prec > app_prec) $
-        showString "Annotated " 
-        . showsPrec (succ app_prec) ann 
-        . showString " " 
+        showString "Annotated "
+        . showsPrec (succ app_prec) ann
+        . showString " "
         . showInner (succ app_prec) val
       where app_prec = 0
 

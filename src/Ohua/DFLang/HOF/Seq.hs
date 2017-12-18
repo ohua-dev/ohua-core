@@ -16,9 +16,9 @@ import           Control.Monad.State
 import           Data.Sequence        as S
 import           Ohua.DFLang.HOF
 import           Ohua.DFLang.Lang
+import qualified Ohua.DFLang.Refs     as Refs
 import           Ohua.Monad
 import           Ohua.Types
-import qualified Ohua.DFLang.Refs as Refs
 
 data SeqFn = SeqFn {
   before    :: Binding,
@@ -41,7 +41,7 @@ instance HigherOrderFunction SeqFn where
     seqExprOut <- generateBindingWith "seq"
     seqId <- generateId
     bndBefore <- gets before
-    pure $ Just 
+    pure $ Just
       ( [LetExpr seqId (Direct seqExprOut) Refs.seq [DFVar bndBefore] Nothing]
       , seqExprOut
       )

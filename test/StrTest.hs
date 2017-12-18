@@ -1,15 +1,16 @@
-{-# LANGUAGE ExplicitForAll, ScopedTypeVariables #-}
+{-# LANGUAGE ExplicitForAll      #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module StrTest where
 
 
 import           Control.Arrow
 import           Data.Char
+import qualified Data.List             as L
 import           Ohua.Util.Str         as Str
 import           Prelude               as P
 import           Test.Hspec
 import           Test.Hspec.QuickCheck
 import           Test.QuickCheck
-import qualified Data.List as L
 
 
 strClassProps :: forall s . IsString s => (String -> s) -> Spec
@@ -44,9 +45,9 @@ strClassProps toStr = do
     -- TODO add "unlines" test once semantics are decided
     -- prop "unlines" $ \strs -> P.unlines strs == toString (Str.unlines (P.map toStr strs))
   where
-    fromPartial f1 f2 [] = f1 (toStr "") == Nothing
+    fromPartial f1 f2 []  = f1 (toStr "") == Nothing
     fromPartial f1 f2 str = f1 (toStr str) == Just (f2 str)
 
 
-strTest = describe "Equivalence of Str and String" $ 
+strTest = describe "Equivalence of Str and String" $
     strClassProps (fromString :: String -> Str)

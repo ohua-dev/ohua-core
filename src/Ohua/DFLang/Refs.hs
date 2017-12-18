@@ -28,7 +28,7 @@ id :: DFFnRef
 id = EmbedSf Refs.id
 
 
-bool :: DFFnRef 
+bool :: DFFnRef
 bool = EmbedSf Refs.bool
 
 -- FIXME should be ohua.lang/if

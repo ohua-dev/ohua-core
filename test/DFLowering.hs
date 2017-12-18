@@ -1,7 +1,8 @@
 {-# LANGUAGE BangPatterns       #-}
 {-# LANGUAGE FlexibleInstances  #-}
+{-# LANGUAGE NamedFieldPuns     #-}
 {-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE UnboxedTuples,NamedFieldPuns      #-}
+{-# LANGUAGE UnboxedTuples      #-}
 module DFLowering where
 
 import           Control.Arrow
@@ -41,9 +42,9 @@ data OhuaGrEdgeLabel = OhuaGrEdgeLabel
     } deriving (Eq, Ord)
 
 instance Show OhuaGrEdgeLabel where
-    show OhuaGrEdgeLabel{sourceIndex, targetIndex} = 
-        "{ srcIdx = " ++ show sourceIndex ++ 
-        ", targetIdx = " ++ show targetIndex ++ 
+    show OhuaGrEdgeLabel{sourceIndex, targetIndex} =
+        "{ srcIdx = " ++ show sourceIndex ++
+        ", targetIdx = " ++ show targetIndex ++
         "}"
 
 instance Show OhuaGrGraph where
