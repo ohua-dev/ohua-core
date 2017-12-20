@@ -65,9 +65,9 @@ instance HigherOrderFunction SmapFn where
     scopeFreeVariables _ freeVars = do
         SmapFn{sizeSource} <- get
         let mkReplicator var = do
-                id <- generateId
+                funid <- generateId
                 newVar <- generateBindingWith var
-                pure (LetExpr id (Direct newVar) Refs.oneToN [DFVar sizeSource, DFVar var] Nothing, newVar)
+                pure (LetExpr funid (Direct newVar) Refs.oneToN [DFVar sizeSource, DFVar var] Nothing, newVar)
         (replicators, replications) <- unzip <$> mapM mkReplicator freeVars
         return
             ( S.fromList replicators

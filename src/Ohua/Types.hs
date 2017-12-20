@@ -10,6 +10,7 @@
 -- This source code is licensed under the terms described in the associated LICENSE.TXT file
 {-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE MultiWayIf                 #-}
 module Ohua.Types where
 
 import           Control.Comonad
@@ -17,14 +18,10 @@ import           Control.DeepSeq
 import           Data.Bifoldable
 import           Data.Bifunctor
 import           Data.Bitraversable
-import qualified Data.Char            as C
 import           Data.Default
 import           Data.Functor.Classes (Show1 (liftShowsPrec))
 import           Data.Hashable
 import qualified Data.HashSet         as HS
-import           Data.Maybe
-import           Data.Monoid
-import           Data.Sequence        as S
 import           Data.String
 import qualified Data.Vector          as V
 import           GHC.Exts
@@ -117,13 +114,16 @@ symbolFromString :: String -> Either String SomeBinding
 symbolFromString s | Str.null s = Left "Symbols cannot be empty"
                    | otherwise =
     case Str.break (== '/') s of
-        (name, ns) | Str.null name -> Left "Unexpected '/' at start"
-                   | Str.null ns -> Right $ Unqual $ Binding (Str.fromString name)
-        (ns, rest) | Just ('/', name) <- Str.uncons rest ->
-            if '/' `Str.elem` name then
-                Left "Too many '/' delimiters found."
-            else
-                Right $ Qual $ QualifiedBinding (nsRefFromList $ map Binding $ Str.split (== '.') (fromString ns)) (Binding $ fromString name)
+        (symNs, slashName)
+            | Str.null symNs -> Left "Unexpected '/' at start"
+            | Str.null slashName -> Right $ Unqual $ Binding (Str.fromString symNs)
+            | Just ('/', symName) <- Str.uncons slashName ->
+                if  | '/' `Str.elem` symName -> Left "Too many '/' delimiters found."
+                    | Str.null symName -> Left "Name cannot be empty"
+                    | otherwise ->
+                        Right $ Qual $ QualifiedBinding
+                            (nsRefFromList $ map Binding $ Str.split (== '.') (fromString symNs))
+                            (Binding $ fromString symName)
         _ -> error "Leading slash expected after `break`"
 
 class ExtractBindings a where
@@ -245,7 +245,7 @@ data Annotated annotation value = Annotated !annotation !value
     deriving (Eq, Show)
 
 instance Show annotation => Show1 (Annotated annotation) where
-    liftShowsPrec showInner _ prec (Annotated ann val) = showParen (prec > app_prec) $
+    liftShowsPrec showInner _ prescedence (Annotated ann val) = showParen (prescedence > app_prec) $
         showString "Annotated "
         . showsPrec (succ app_prec) ann
         . showString " "
@@ -282,7 +282,7 @@ instance Traversable (Annotated ann) where
 instance Comonad (Annotated ann) where
     extract (Annotated _ val) = val
     duplicate x@(Annotated ann _) = Annotated ann x
-    extend f a@(Annotated ann val) = Annotated ann (f a)
+    extend f a@(Annotated ann _) = Annotated ann (f a)
 
 -- | A type expression
 data TyExpr binding
@@ -297,7 +297,7 @@ instance Functor TyExpr where
 
 instance Foldable TyExpr where
     foldr f c (TyRef r) = f r c
-    foldr f c (TyApp e1 e2) = recur e2 $ recur e2 c
+    foldr f c (TyApp e1 e2) = recur e1 $ recur e2 c
       where recur = flip (foldr f)
 
 instance Traversable TyExpr where

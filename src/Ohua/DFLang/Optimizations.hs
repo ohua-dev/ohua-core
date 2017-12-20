@@ -11,7 +11,6 @@
 module Ohua.DFLang.Optimizations where
 
 
-import           Control.Monad.Except
 import           Ohua.DFLang.Lang
 import           Ohua.Monad
 

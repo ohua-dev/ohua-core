@@ -3,7 +3,6 @@ module Ohua.DFLang.Refs where
 
 import qualified Ohua.ALang.Refs  as Refs
 import           Ohua.DFLang.Lang
-import           Ohua.Types
 import           Prelude          hiding (id)
 
 

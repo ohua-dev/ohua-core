@@ -13,16 +13,14 @@
 module Ohua.DFLang.HOF.If where
 
 
-import           Control.Monad.Except
 import           Control.Monad.State
 import           Data.Monoid
 import           Ohua.DFLang.HOF
 import           Ohua.DFLang.Lang
-import qualified Ohua.DFLang.Refs     as Refs
+import qualified Ohua.DFLang.Refs    as Refs
 import           Ohua.Monad
 import           Ohua.Types
-import           Ohua.Util
-import qualified Ohua.Util.Str        as Str
+import qualified Ohua.Util.Str       as Str
 
 data IfFn = IfFn
     { conditionVariable :: !DFVar

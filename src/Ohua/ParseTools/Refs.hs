@@ -2,7 +2,6 @@
 module Ohua.ParseTools.Refs where
 
 
-import qualified Data.Vector     as V
 import           Ohua.ALang.Lang
 import           Ohua.Types
 

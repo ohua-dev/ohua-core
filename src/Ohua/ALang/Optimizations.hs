@@ -11,9 +11,7 @@
 module Ohua.ALang.Optimizations where
 
 
-import           Control.Monad.Except
 import           Ohua.ALang.Lang
-import           Ohua.Monad
 
 
 runOptimizations :: Monad m => Expression -> m Expression

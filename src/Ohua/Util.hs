@@ -15,8 +15,7 @@ module Ohua.Util where
 import           Control.DeepSeq
 import           Control.Exception
 import           Control.Monad.Except
-import           Control.Monad.IO.Class
-import qualified Data.Text              as T
+import qualified Data.Text            as T
 import           Lens.Micro
 import           System.IO
 import           System.IO.Unsafe
@@ -75,3 +74,7 @@ forceAndReport msg val = val `deepseq` liftIO (putStrLn msg)
 
 forceTraceReport :: (Applicative f, NFData a) => String -> a -> f ()
 forceTraceReport msg val = val `deepseq` trace msg (pure ())
+
+
+intentionally_not_implemented :: a
+intentionally_not_implemented = error "This is intentionally not implemented, don't use it!"

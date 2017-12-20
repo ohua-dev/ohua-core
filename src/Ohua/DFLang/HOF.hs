@@ -25,7 +25,6 @@ module Ohua.DFLang.HOF
     ) where
 
 
-import           Control.Monad.Except
 import           Control.Monad.State
 import           Data.Proxy
 import           Data.Sequence

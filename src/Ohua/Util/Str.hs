@@ -1,8 +1,8 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE UnboxedTuples              #-}
 module Ohua.Util.Str
-    ( IsString(fromString, toString, singleton, null, concat, intercalate, cons, uncons, snoc, unsnoc, head, tail, init, last, length, map, intersperse, reverse, splitAt, splitAtEnd, span, spanEnd, isPrefixOf, isSuffixOf, isInfixOf, filter, find, findEnd, index, split, elem)
-    , strip, stripStart, stripEnd, take, takeEnd, drop, dropEnd, takeWhile, takeWhileEnd, dropWhile, dropWhileEnd, dropAround, break, lines, unlines, words, unwords, showS
+    ( IsString(fromString, toString, singleton, null, concat, intercalate, cons, uncons, snoc, unsnoc, head, tail, init, last, length, map, intersperse, reverse, splitAt, splitAtEnd, span, spanEnd, isPrefixOf, isSuffixOf, isInfixOf, filter, find, findEnd, index, split, elem, hPutStr, hGetLine)
+    , strip, stripStart, stripEnd, take, takeEnd, drop, dropEnd, takeWhile, takeWhileEnd, dropWhile, dropWhileEnd, dropAround, break, lines, unlines, words, unwords, showS, hPutStrLn, putStr, putStrLn
     , (<>)
     , Str
     ) where
@@ -24,7 +24,7 @@ import           Prelude                (Bool, Char, Eq, Int,
                                          fmap, fst, id, not, otherwise, pure,
                                          snd, ($), (-), (.), (==))
 import qualified Prelude                as P
-import           System.IO              (Handle, stderr, stdin, stdout)
+import           System.IO              (Handle, stdout)
 import qualified System.IO              as SysIO
 
 
@@ -217,9 +217,9 @@ class (Monoid s, P.Eq s, P.Ord s, Hashable s, NFData s) => IsString s where
 
     -- | Return the first character that satisfies the predicate starting from the end of the string.
     findEnd :: (Char -> Bool) -> s -> Maybe Char
-    findEnd p s = f p (toString s)
+    findEnd pred s = f pred (toString s)
       where
-        f p [] = Nothing
+        f _ [] = Nothing
         f p (x:xs) | p x = f p xs <|> Just x
                    | otherwise = f p xs
 

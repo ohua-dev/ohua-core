@@ -10,7 +10,7 @@ import           Control.Monad.Base
 import           Control.Monad.Except        (ExceptT, MonadError (..))
 import           Control.Monad.IO.Class
 import           Control.Monad.Reader        (MonadReader (..), ReaderT)
-import           Control.Monad.RWS.Lazy      (MonadRWS (..), RWST)
+import           Control.Monad.RWS.Lazy      (MonadRWS, RWST)
 import qualified Control.Monad.RWS.Strict    as Strict
 import           Control.Monad.State.Lazy    (MonadState (..), StateT)
 import qualified Control.Monad.State.Strict  as Strict
@@ -24,20 +24,17 @@ import qualified Data.ByteString.Char8       as S8
 import qualified Data.ByteString.Lazy        as BL
 import           Data.Monoid
 import           Data.String
-import           Data.Text                   (Text, pack, unpack)
+import           Data.Text                   (Text)
 import qualified Data.Text                   as T
 import qualified Data.Text.Encoding          as T
 import qualified Data.Text.Lazy              as TL
 import qualified Data.Text.Lazy.Encoding     as TL
-import           System.IO                   (BufferMode (LineBuffering),
-                                              Handle, IOMode (AppendMode),
-                                              hClose, hSetBuffering, openFile,
-                                              stderr, stdout)
+import           System.IO                   (Handle, stderr)
 
 
 class Monad m => MonadLogger m where
     monadLoggerLog :: ToLogStr msg => Loc -> LogSource -> LogLevel -> msg -> m ()
-    default monadLoggerLog :: (MonadLogger m', Trans.MonadTrans t, MonadLogger (t m'), ToLogStr msg, m ~ t m')
+    default monadLoggerLog :: (MonadLogger m', Trans.MonadTrans t, ToLogStr msg, m ~ t m')
                            => Loc -> LogSource -> LogLevel -> msg -> m ()
     monadLoggerLog loc src lvl msg = Trans.lift $ monadLoggerLog loc src lvl msg
 
@@ -187,7 +184,7 @@ defaultLogStr :: Loc
               -> LogLevel
               -> LogStr
               -> LogStr
-defaultLogStr loc src level msg =
+defaultLogStr _ src level msg =
     "[" `mappend` defaultLogLevelStr level `mappend`
     (if T.null src
         then mempty
@@ -197,14 +194,14 @@ defaultLogStr loc src level msg =
     "\n"
 
 
-runHandleLoggingT :: MonadIO m => Handle -> LoggingT m a -> m a
+runHandleLoggingT :: Handle -> LoggingT m a -> m a
 runHandleLoggingT h = (`runLoggingT` defaultOutput h)
 
 
-runStderrLoggingT :: MonadIO m => LoggingT m a -> m a
+runStderrLoggingT :: LoggingT m a -> m a
 runStderrLoggingT = runHandleLoggingT stderr
 
-runSilentLoggingT :: Applicative m => LoggingT m a -> m a
+runSilentLoggingT :: LoggingT m a -> m a
 runSilentLoggingT = flip runLoggingT $ \_ _ _ _ -> pure ()
 
 

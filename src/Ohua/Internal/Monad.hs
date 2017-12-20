@@ -22,17 +22,11 @@ import qualified Control.Monad.State.Lazy
 import qualified Control.Monad.State.Strict
 import           Control.Monad.Writer
 import qualified Data.HashSet               as HS
-import           Data.List                  (intercalate)
-import           Data.Monoid
-import qualified Data.Text                  as T
-import qualified Data.Text.IO               as T
 import qualified Data.Vector                as V
 import           Lens.Micro.Platform
 import           Ohua.ALang.Lang
 import           Ohua.Internal.Logging
-import           Ohua.LensClasses
 import           Ohua.Types                 as Ty
-import           Ohua.Util
 import qualified Ohua.Util.Str              as Str
 
 
@@ -50,10 +44,10 @@ newtype OhuaM env a = OhuaM {
 
 class MonadGenBnd m where
     generateBinding :: m Binding
-    default generateBinding :: (MonadGenBnd n, MonadTrans t, Monad n, t n ~ m) => t n Binding
+    default generateBinding :: (MonadGenBnd n, MonadTrans t, Monad n, t n ~ m) => m Binding
     generateBinding = lift generateBinding
     generateBindingWith :: Binding -> m Binding
-    default generateBindingWith :: (MonadGenBnd n, MonadTrans t, Monad n, t n ~ m) => Binding -> t n Binding
+    default generateBindingWith :: (MonadGenBnd n, MonadTrans t, Monad n, t n ~ m) => Binding -> m Binding
     generateBindingWith = lift . generateBindingWith
 
 deepseqM :: (Monad m, NFData a) => a -> m ()
@@ -96,7 +90,7 @@ instance MonadGenId (OhuaM env) where
     generateId = OhuaM $ do
         idCounter %= succ
         use idCounter
-    resetIdCounter id = OhuaM $ idCounter .= id
+    resetIdCounter val = OhuaM $ idCounter .= val
 
 instance (MonadGenId m, Monad m) => MonadGenId (ReaderT e m)
 instance (MonadGenId m, Monad m, Monoid w) => MonadGenId (WriterT w m)
@@ -111,17 +105,17 @@ class HasEnvExpr (m :: * -> *) where
 instance HasEnvExpr (OhuaM e) where
     type EnvExpr (OhuaM e) = e
 
-instance HasEnvExpr m => HasEnvExpr (ReaderT e m) where
+instance HasEnvExpr (ReaderT e m) where
     type EnvExpr (ReaderT e m) = EnvExpr m
-instance HasEnvExpr m => HasEnvExpr (WriterT w m) where
+instance HasEnvExpr (WriterT w m) where
     type EnvExpr (WriterT w m) = EnvExpr m
-instance HasEnvExpr m => HasEnvExpr (Control.Monad.State.Strict.StateT s m) where
+instance HasEnvExpr (Control.Monad.State.Strict.StateT s m) where
     type EnvExpr (Control.Monad.State.Strict.StateT s m) = EnvExpr m
-instance HasEnvExpr m => HasEnvExpr (Control.Monad.State.Lazy.StateT s m) where
+instance HasEnvExpr (Control.Monad.State.Lazy.StateT s m) where
     type EnvExpr (Control.Monad.State.Lazy.StateT s m) = EnvExpr m
-instance HasEnvExpr m => HasEnvExpr (Control.Monad.RWS.Lazy.RWST e w s m) where
+instance HasEnvExpr (Control.Monad.RWS.Lazy.RWST e w s m) where
     type EnvExpr (Control.Monad.RWS.Lazy.RWST e w s m) = EnvExpr m
-instance HasEnvExpr m => HasEnvExpr (Control.Monad.RWS.Strict.RWST e w s m) where
+instance HasEnvExpr (Control.Monad.RWS.Strict.RWST e w s m) where
     type EnvExpr (Control.Monad.RWS.Strict.RWST e w s m) = EnvExpr m
 
 class HasEnvExpr m => MonadReadEnvExpr m where
@@ -185,10 +179,10 @@ runFromExpr :: Options -> (Expression -> OhuaM env result) -> Expression -> Logg
 runFromExpr opts f tree = runFromBindings opts (f tree) $ HS.fromList $ extractBindings tree
 
 runFromBindings :: Options -> OhuaM env result -> HS.HashSet Binding -> LoggingT IO (Either Error result)
-runFromBindings opts f taken = runExceptT $ fst <$> evalRWST (runOhuaM f) env state
+runFromBindings opts f taken = runExceptT $ fst <$> evalRWST (runOhuaM f) env s0
   where
     nameGen = initNameGen taken
-    state = State nameGen 0 mempty
+    s0 = State nameGen 0 mempty
     env = Environment opts
 
 

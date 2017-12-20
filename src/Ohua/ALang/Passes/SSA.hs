@@ -23,7 +23,6 @@ import           Data.Monoid
 import           Ohua.ALang.Lang
 import           Ohua.Monad
 import           Ohua.Types
-import           Ohua.Util
 import qualified Ohua.Util.Str        as Str
 
 
@@ -68,6 +67,7 @@ ssa (Let assignment value body) = do
 -- instead and collapse it down at the very end ...
 handleAssignment :: (MonadOhua envExpr m, MonadReader LocalScope m) => Assignment -> m t -> m (Assignment, t)
 handleAssignment (Direct d) = fmap (first Direct) . ssaRename d
+handleAssignment (Recursive d) = fmap (first Recursive) . ssaRename d
 handleAssignment (Destructure ds) = fmap (first Destructure) . foldl (\f bnd -> f . fmap flattenTuple . ssaRename bnd) id ds . fmap ([],)
 
 

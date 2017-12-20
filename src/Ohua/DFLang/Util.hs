@@ -15,10 +15,11 @@ findUsages binding = toList . Data.Sequence.filter (elem (DFVar binding) . callA
 
 -- | Find the definition of a binding
 findDefinition :: Binding -> Seq LetExpr -> Maybe LetExpr
-findDefinition binding = find g where
-    g :: LetExpr -> Bool
-    g expr = case returnAssignment expr of Direct b -> b == binding
-                                           Destructure bindings -> binding `elem` bindings
+findDefinition binding = find (g . returnAssignment)
+  where
+    g (Direct b)             = b == binding
+    g (Destructure bindings) = binding `elem` bindings
+    g (Recursive r)          = r == binding
 
 -- | Find the first call site of an expression by function reference.
 findExpr :: DFFnRef -> Seq LetExpr -> Maybe LetExpr

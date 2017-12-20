@@ -11,12 +11,13 @@
 module Ohua.ALang.Show where
 
 import           Ohua.ALang.Lang
-import           Ohua.Types      hiding (Env)
+import           Ohua.Types
 
 
 showAssigment :: Assignment -> String
 showAssigment (Direct x)      = show x
 showAssigment (Destructure d) = show d
+showAssigment (Recursive r)   = "(rec) " ++ show r
 
 showLambda :: Expression -> String
 showLambda (Var x) = showSymbol x

@@ -11,7 +11,6 @@ import           Ohua.Types
 
 import           Control.Exception
 import           Control.Monad.Except
-import           Control.Monad.State
 import           Control.Monad.Writer
 
 import           Data.Foldable
@@ -20,7 +19,6 @@ import qualified Data.HashSet         as HS
 import           Data.Maybe
 import           Data.Sequence        (Seq, (<|), (|>))
 import qualified Data.Sequence        as S
-import           Data.Text            (pack)
 import           Ohua.Util
 import qualified Ohua.Util.Str        as Str
 
@@ -37,22 +35,22 @@ data RecursiveLambdaSpec = RecursiveLambdaSpec
 -- | Executed to generate the recursive lambda expression.
 recursionLowering :: (MonadError Error m, MonadGenId m, MonadGenBnd m) => [Binding] -> DFExpr -> m RecursiveLambdaSpec
 --recursionLowering binding = (transformRecursiveTailCall
-recursionLowering lambdaFormals dfExpr = do
-    result <- transformRecursiveTailCall lambdaFormals $ trace ("Lambda expression:\n" ++ show dfExpr) dfExpr
+recursionLowering lambdaFormals dfExpr0 = do
+    result <- transformRecursiveTailCall lambdaFormals $ trace ("Lambda expression:\n" ++ show dfExpr0) dfExpr0
     return $ trace ("-----\ngenerated tailrec transformation:\n" ++ show result) result
 
 transformRecursiveTailCall :: (MonadError Error m, MonadGenId m, MonadGenBnd m) => [Binding] -> DFExpr -> m RecursiveLambdaSpec
 transformRecursiveTailCall lambdaFormals exprs = handleRecursiveTailCall lambdaFormals exprs $ traceShowId $ findExpr Refs.recur $ letExprs exprs
 
 handleRecursiveTailCall :: (MonadError Error m, MonadGenBnd m, MonadGenId m) => [Binding] -> DFExpr -> Maybe LetExpr -> m RecursiveLambdaSpec
-handleRecursiveTailCall _ dfExpr Nothing = failWith $ "could not find recur in DFExpr:\n" <> Str.showS dfExpr
-handleRecursiveTailCall lambdaFormals dfExpr (Just recurFn) = do
-    let dfExprs = letExprs dfExpr
+handleRecursiveTailCall _ dfExpr0 Nothing = failWith $ "could not find recur in DFExpr:\n" <> Str.showS dfExpr0
+handleRecursiveTailCall lambdaFormals dfExpr0 (Just recurFn) = do
+    let dfExprs = letExprs dfExpr0
     -- helpers
     let unAssignment e x = case x of
                               Direct b -> b
                               _        -> error $ "invariant broken: '" ++ e ++ "' always gives direct output"
-    let unMaybe id = fromMaybe (error $ "Invariant broken: should have found something but got Nothing! " ++ id)
+    let unMaybe fid = fromMaybe (error $ "Invariant broken: should have found something but got Nothing! " ++ fid)
     let unDFVar x = case x of { DFVar b -> b; _ -> error $ "invariant broken: should be DFVar but was: " ++ show x; }
 
     -- get the condition result
@@ -73,7 +71,7 @@ handleRecursiveTailCall lambdaFormals dfExpr (Just recurFn) = do
 
     let switchRetBnd = unAssignment "switch" switchRet
     let rewiredTOutExps = flip renameWith minusSwitchExprs $ HM.singleton switchRetBnd (unDFVar terminationBranch)
-    let newLambdaRetVar = unDFVar $ flip assert terminationBranch $ returnVar dfExpr == switchRetBnd
+    let newLambdaRetVar = unDFVar $ flip assert terminationBranch $ returnVar dfExpr0 == switchRetBnd
 
     -- get the algo-in vars. note that for the recursive case this includes all free vars (even those accessed via the lexical scope).
     -- FIXME this should not be necessary once we implemented lambda lifting on ALang!

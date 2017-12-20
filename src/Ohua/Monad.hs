@@ -17,7 +17,6 @@ module Ohua.Monad
     ) where
 
 import           Control.Monad.Except
-import           Control.Monad.IO.Class
 import           Lens.Micro
 import           Ohua.Internal.Logging
 import           Ohua.Internal.Monad

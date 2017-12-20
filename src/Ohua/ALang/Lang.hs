@@ -19,11 +19,10 @@ import           Data.Bitraversable
 import           Data.Functor.Identity
 import           Data.Hashable
 import           Data.String
-import qualified Data.Text             as T
 import           GHC.Generics
 import           Lens.Micro            ((^.))
 import           Ohua.LensClasses
-import           Ohua.Types            hiding (Env)
+import           Ohua.Types
 import           Ohua.Util
 
 
@@ -40,7 +39,13 @@ instance Show HostExpr where
     show = show . unwrapHostExpr
 
 -- Only exists to allow literal integers to be interpreted as host expressions
-instance Num HostExpr where fromInteger = HostExpr . fromInteger
+instance Num HostExpr where
+    fromInteger = HostExpr . fromInteger
+    (+) = intentionally_not_implemented
+    (-) = intentionally_not_implemented
+    (*) = intentionally_not_implemented
+    abs = intentionally_not_implemented
+    signum = intentionally_not_implemented
 instance Hashable HostExpr where hashWithSalt s = hashWithSalt s . unwrapHostExpr
 
 instance NFData HostExpr

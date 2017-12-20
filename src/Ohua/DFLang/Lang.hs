@@ -20,16 +20,13 @@ module Ohua.DFLang.Lang where
 
 import           Control.DeepSeq
 import           Data.Foldable   (toList)
-import           Data.Foldable
 import           Data.Hashable
-import           Data.List       (intercalate)
-import           Data.List
 import           Data.Monoid
 import           Data.Sequence
 import           Data.String
-import qualified Data.Text       as T
 import           Ohua.ALang.Lang
 import           Ohua.Types
+import           Ohua.Util
 import qualified Ohua.Util.Str   as Str
 
 -- | A sequence of let statements with a terminating binding to be used as return value
@@ -64,8 +61,13 @@ instance Hashable DFVar where
    hashWithSalt s (DFEnvVar e) = hashWithSalt s (1::Int, e)
 
 instance IsString DFVar where fromString = DFVar . fromString
-instance Num DFVar where fromInteger = DFEnvVar . fromInteger
-
+instance Num DFVar where
+    fromInteger = DFEnvVar . fromInteger
+    (+) = intentionally_not_implemented
+    (-) = intentionally_not_implemented
+    (*) = intentionally_not_implemented
+    abs = intentionally_not_implemented
+    signum = intentionally_not_implemented
 
 instance NFData DFExpr where
     rnf (DFExpr a b) = a `deepseq` rnf b
@@ -89,10 +91,11 @@ showDFExpr (DFExpr lets retVar) =
     showBnd (Binding b) = b
     showAssign (Direct v)       = showBnd v
     showAssign (Destructure vs) = "[" <> Str.intercalate ", " (map showBnd vs) <> "]"
+    showAssign (Recursive r) = "(rec) " <> showBnd r
     showRef (DFFunction a) = Str.showS a
     showRef (EmbedSf a)    = Str.showS a
     showVar (DFEnvVar h) = Str.showS h
     showVar (DFVar v)    = showBnd v
-    showLet (LetExpr id ass ref args ctxArc) =
-        "let " <> showAssign ass <> " = " <> showRef ref <> "<" <> Str.showS id <> "> ("
+    showLet (LetExpr fid ass ref args ctxArc) =
+        "let " <> showAssign ass <> " = " <> showRef ref <> "<" <> Str.showS fid <> "> ("
         <> Str.intercalate ", " (map showVar args) <> ")" <> maybe "" (\a -> " [" <> showBnd a <>"]") ctxArc

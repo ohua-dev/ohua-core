@@ -11,12 +11,11 @@
 {-# LANGUAGE OverloadedLists #-}
 module Ohua.DFLang.HOF.Seq where
 
-import           Control.Monad.Except
 import           Control.Monad.State
-import           Data.Sequence        as S
+import           Data.Sequence       as S
 import           Ohua.DFLang.HOF
 import           Ohua.DFLang.Lang
-import qualified Ohua.DFLang.Refs     as Refs
+import qualified Ohua.DFLang.Refs    as Refs
 import           Ohua.Monad
 import           Ohua.Types
 
@@ -28,14 +27,14 @@ data SeqFn = SeqFn {
 instance HigherOrderFunction SeqFn where
   name = "ohua.lang/seq"
 
-  parseCallAndInitState [Variable (DFVar before), LamArg after] = return $ SeqFn before after
-  parseCallAndInitState as = failWith "seq not defined for arguments: " -- TODO ++ show as
+  parseCallAndInitState [Variable (DFVar before0), LamArg after] = return $ SeqFn before0 after
+  parseCallAndInitState _ = failWith "seq not defined for arguments: " -- TODO ++ show arguments
 
   createContextEntry = return S.empty
 
-  createContextExit assignment = return S.empty
+  createContextExit _ = return S.empty
 
-  scopeFreeVariables lam freeVars = return (S.empty, [])
+  scopeFreeVariables _ _ = return (S.empty, [])
 
   contextifyUnboundFunctions _ = do
     seqExprOut <- generateBindingWith "seq"

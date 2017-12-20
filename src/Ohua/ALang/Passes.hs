@@ -19,14 +19,12 @@ import           Control.Monad.RWS.Lazy
 import           Control.Monad.State
 import           Control.Monad.Writer
 import           Data.Bifunctor
-import           Data.Bitraversable
 import qualified Data.HashMap.Strict    as HM
 import qualified Data.HashSet           as HS
 import           Ohua.ALang.Lang
 import           Ohua.ALang.Util
 import           Ohua.Monad
 import           Ohua.Types
-import           Ohua.Util
 import           Ohua.Util.Str          as Str
 
 
@@ -36,9 +34,9 @@ import           Ohua.Util.Str          as Str
 inlineLambdaRefs :: MonadOhua envExpr m => Expression -> m Expression
 inlineLambdaRefs (Let assignment l@(Lambda _ _) body) =
     case assignment of
-        Direct bnd -> inlineLambdaRefs $ substitute bnd l body
-        Recursive bnd -> return $ Let assignment l body
-        _          -> failWith "invariant broken, cannot destructure lambda"
+        Direct bnd  -> inlineLambdaRefs $ substitute bnd l body
+        Recursive _ -> return $ Let assignment l body
+        _           -> failWith "invariant broken, cannot destructure lambda"
 inlineLambdaRefs (Let assignment value body) = Let assignment <$> inlineLambdaRefs value <*> inlineLambdaRefs body
 inlineLambdaRefs (Apply body argument) = liftM2 Apply (inlineLambdaRefs body) (inlineLambdaRefs argument)
 inlineLambdaRefs (Lambda argument body) = Lambda argument <$> inlineLambdaRefs body
@@ -55,7 +53,7 @@ inlineLambda (Apply v@(Var _) argument) = Apply v (inlineLambda argument)
 inlineLambda (Apply v@(Apply _ _) argument) = reduceLetCWith f (inlineLambda v)
   where
     f (Lambda assignment body) = Let assignment inlinedArg body
-    f v                        = Apply v inlinedArg
+    f v0                       = Apply v0 inlinedArg
     inlinedArg = inlineLambda argument
 inlineLambda v@(Apply _ _) = reduceLetCWith inlineLambda v
 inlineLambda (Let name value body) = Let name (inlineLambda value) (inlineLambda body)
@@ -110,6 +108,7 @@ inlineReassignments (Let assign val@(Var _) body) =
     case assign of
         Direct bnd2 -> inlineReassignments $ substitute bnd2 val body
         Destructure _ -> Let assign (Apply (Var (Sf idName Nothing)) val) $ inlineReassignments body
+        Recursive _ -> error "TODO implement inlining reassignments for recursive bindings"
 inlineReassignments (Let assign val body) = Let assign (inlineReassignments val) $ inlineReassignments body
 inlineReassignments (Apply e1 e2) = Apply (inlineReassignments e1) (inlineReassignments e2)
 inlineReassignments (Lambda assign e) = Lambda assign $ inlineReassignments e
@@ -145,10 +144,10 @@ ensureAtLeastOneCall e@(Var _) = do
     pure $ Let (Direct newBnd) (Var (Sf idName Nothing) `Apply` e) $ Var (Local newBnd)
 ensureAtLeastOneCall e = lrPostwalkExprM f e
   where
-    f (Lambda bnd e@(Var _)) = do
+    f expr@(Lambda bnd (Var _)) = do
         newBnd <- generateBinding
-        pure $ Lambda bnd $ Let (Direct newBnd) (Var (Sf idName Nothing) `Apply` e) $ Var (Local newBnd)
-    f e = pure e
+        pure $ Lambda bnd $ Let (Direct newBnd) (Var (Sf idName Nothing) `Apply` expr) $ Var (Local newBnd)
+    f other = pure other
 
 
 -- | Removes bindings that are never used.
@@ -200,7 +199,7 @@ removeCurrying e = fst <$> evalRWST (inlinePartials e) mempty ()
     inlinePartials (Apply function arg) = Apply <$> inlinePartials function <*> inlinePartials arg
     inlinePartials (Let assign val body) = Let assign <$> inlinePartials val <*> inlinePartials body
     inlinePartials (Lambda a body) = Lambda a <$> inlinePartials body
-    inlinePartials e = return e
+    inlinePartials expr = return expr
 
 
 -- | Ensures the expression is a sequence of let statements terminated with a local variable.
@@ -215,10 +214,10 @@ hasFinalLet _               = failWith "Final value is not a var"
 noDuplicateIds :: MonadOhua envExpr m => Expression -> m ()
 noDuplicateIds = void . flip runStateT mempty . lrPrewalkExprM go
   where
-    go e@(Var (Sf _ (Just id))) = do
-        s <- get
-        when (id `HS.member` s) $ failWith $ "Duplicate id " <> Str.showS id
-        modify (HS.insert id)
+    go e@(Var (Sf _ (Just funid))) = do
+        isMember <- gets (HS.member funid)
+        when isMember $ failWith $ "Duplicate id " <> Str.showS funid
+        modify (HS.insert funid)
         return e
     go e = return e
 
@@ -235,7 +234,7 @@ applyToSf = foldlExprM (const . go) ()
 -- FIXME this function is never called. was it supposed to be part of the below validity check?
 lamdasAreInputToHigherOrderFunctions :: MonadOhua envExpr m => Expression -> m ()
 lamdasAreInputToHigherOrderFunctions _                         = return ()
-lamdasAreInputToHigherOrderFunctions (Apply v (Lambda _ body)) = undefined
+-- lamdasAreInputToHigherOrderFunctions (Apply v (Lambda _ body)) = undefined
 
 
 -- | Checks that all local bindings are defined before use.
