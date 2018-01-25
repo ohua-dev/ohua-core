@@ -38,14 +38,14 @@ import qualified Ohua.Util.Str             as Str
 
 
 data CustomPasses env = CustomPasses
-    { passAfterDFLowering :: DFExpr -> OhuaM env DFExpr
-    }
+  { passAfterDFLowering :: DFExpr -> OhuaM env DFExpr
+  }
 
 noCustomPasses :: CustomPasses env
 noCustomPasses = CustomPasses pure
 
 instance Default (CustomPasses env) where
-    def = noCustomPasses
+  def = noCustomPasses
 
 
 forceLog :: (MonadLogger m, NFData a) => Text -> a -> m ()

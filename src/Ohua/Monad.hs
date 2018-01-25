@@ -14,6 +14,10 @@ module Ohua.Monad
     , LogLevel(..), LogSource, logDebugN, logInfoN
     , logWarnN, logErrorN, logOtherN
     , MonadOhua
+    -- ** Helper functions for building instances of 'MonadGenBnd'
+    , generateBindingIn, generateBindingWithIn
+    , generateBindingFromGenerator, generateBindingFromGeneratorWith
+    , initNameGen
     ) where
 
 import           Control.Monad.Except

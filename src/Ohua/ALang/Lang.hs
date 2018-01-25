@@ -144,12 +144,11 @@ data AExpr bndType refType
 
 
 instance Bifunctor AExpr where
-    bimap f g expr =
-        case expr of
-            Var v -> Var $ g v
-            Let assign val body -> Let (fmap f assign) (recur val) (recur body)
-            Apply e1 e2 -> Apply (recur e1) (recur e2)
-            Lambda assign body -> Lambda (fmap f assign) (recur body)
+    bimap f g = \case
+      Var v -> Var $ g v
+      Let assign val body -> Let (fmap f assign) (recur val) (recur body)
+      Apply e1 e2 -> Apply (recur e1) (recur e2)
+      Lambda assign body -> Lambda (fmap f assign) (recur body)
       where recur = bimap f g
 
 instance Functor (AExpr a) where
@@ -168,12 +167,11 @@ instance Foldable (AExpr a) where
     foldr = bifoldr (flip const)
 
 instance Bitraversable AExpr where
-    bitraverse f g expr =
-        case expr of
-            Var v -> Var <$> g v
-            Let assign val body -> Let <$> traverse f assign <*> recur val <*> recur body
-            Apply e1 e2 -> Apply <$> recur e1 <*> recur e2
-            Lambda assign body -> Lambda <$> traverse f assign <*> recur body
+    bitraverse f g = \case
+      Var v -> Var <$> g v
+      Let assign val body -> Let <$> traverse f assign <*> recur val <*> recur body
+      Apply e1 e2 -> Apply <$> recur e1 <*> recur e2
+      Lambda assign body -> Lambda <$> traverse f assign <*> recur body
 
       where recur = bitraverse f g
 

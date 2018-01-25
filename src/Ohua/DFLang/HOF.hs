@@ -46,9 +46,9 @@ tagFnName = TaggedFnName
 
 -- | Description of a lambda hiding the actual contents of the function.
 data Lambda = Lam
-    { beginAssignment :: !Assignment
-    , resultBinding   :: !Binding
-    } deriving (Eq, Show)
+  { beginAssignment :: !Assignment
+  , resultBinding   :: !Binding
+  } deriving (Eq, Show)
 
 
 -- | Possible shapes of arguments to higher order functions

@@ -55,10 +55,15 @@ unwrapFnName = id
 
 -- | Hierarchical reference to a namespace
 newtype NSRef = NSRef { unwrapNSRef :: V.Vector Binding }
-    deriving (Eq, Generic, NFData)
+    deriving (Eq, Generic, NFData, Ord)
 
 instance Show NSRef where
     show = Str.toString . Str.intercalate "." . map unBinding . nsRefToList
+
+instance IsList NSRef where
+  type Item NSRef = Binding
+  fromList = NSRef . fromList
+  toList = toList . unwrapNSRef
 
 
 -- | Creates a 'NSRef' from a hierarchical sorted list of namespaces
@@ -79,7 +84,7 @@ instance Hashable NSRef where
 data QualifiedBinding = QualifiedBinding
     { qbNamespace :: NSRef
     , qbName      :: Binding
-    } deriving (Eq, Generic)
+    } deriving (Eq, Generic, Ord)
 
 instance Show QualifiedBinding where
     show (QualifiedBinding ns n) = show $ show ns ++ "/" ++ Str.toString (unBinding n)

@@ -11,6 +11,7 @@
 {-# LANGUAGE ConstraintKinds            #-}
 {-# LANGUAGE DefaultSignatures          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE Rank2Types                 #-}
 module Ohua.Internal.Monad where
 
 
@@ -38,9 +39,16 @@ import           Control.DeepSeq
 -- In development this collects errors via a MonadWriter, in production this collection will
 -- be turned off and be replaced by an exception, as such errors should technically not occur
 -- there
-newtype OhuaM env a = OhuaM {
-    runOhuaM :: RWST Environment () (Ty.State env) (ExceptT Error (LoggingT IO)) a }
-    deriving (Functor, Applicative, Monad, MonadIO, MonadError Error, MonadLogger, MonadLoggerIO)
+newtype OhuaM env a = OhuaM
+  { runOhuaM :: RWST Environment () (Ty.State env) (ExceptT Error (LoggingT IO)) a
+  } deriving ( Functor
+             , Applicative
+             , Monad
+             , MonadIO
+             , MonadError Error
+             , MonadLogger
+             , MonadLoggerIO
+             )
 
 class MonadGenBnd m where
     generateBinding :: m Binding
@@ -54,20 +62,36 @@ deepseqM :: (Monad m, NFData a) => a -> m ()
 deepseqM a = a `deepseq` pure ()
 
 instance MonadGenBnd (OhuaM env) where
-    generateBinding = OhuaM $ do
-        taken <- use $ nameGenerator . takenNames
-        (h:t) <- dropWhile (`HS.member` taken) <$> use (nameGenerator . simpleNameList)
-        nameGenerator . simpleNameList .= t
-        nameGenerator . takenNames %= HS.insert h
-        pure h
-    generateBindingWith (Binding prefix) = OhuaM $ do
-        taken <- use $ nameGenerator . takenNames
-        let a = map Str.showS ([0..] :: [Int])
-        deepseqM (take 10 a)
-        let (h:_) = dropWhile (`HS.member` taken) $ map (Binding . (prefix' <>)) a
-        nameGenerator . takenNames %= HS.insert h
-        pure h
-      where prefix' = prefix <> "_"
+    generateBinding = OhuaM $ generateBindingIn nameGenerator
+    generateBindingWith = OhuaM . generateBindingWithIn nameGenerator
+
+generateBindingFromGenerator :: NameGenerator -> (Binding, NameGenerator)
+generateBindingFromGenerator g = (h, g')
+  where
+    taken = g ^. takenNames
+    (h:t) = dropWhile (`HS.member` taken) (g ^. simpleNameList)
+    g' = g & simpleNameList .~ t
+           & takenNames %~ HS.insert h
+
+generateBindingFromGeneratorWith :: Binding -> NameGenerator -> (Binding, NameGenerator)
+generateBindingFromGeneratorWith (Binding prefix) g = (h, g')
+  where
+    taken = g ^. takenNames
+    prefix' = prefix <> "_"
+    (h:_) = dropWhile (`HS.member` taken) $ map (Binding . (prefix' <>) . Str.showS) ([0..] :: [Int])
+    g' = g & takenNames %~ HS.insert h
+
+generateBindingIn :: MonadState s m => Lens' s NameGenerator -> m Binding
+generateBindingIn accessor = do
+  (bnd, gen') <- generateBindingFromGenerator <$> use accessor
+  accessor .= gen'
+  pure bnd
+
+generateBindingWithIn :: MonadState s m => Lens' s NameGenerator -> Binding -> m Binding
+generateBindingWithIn accessor prefix = do
+  (bnd, gen') <- generateBindingFromGeneratorWith prefix <$> use accessor
+  accessor .= gen'
+  pure bnd
 
 instance (MonadGenBnd m, Monad m) => MonadGenBnd (ReaderT e m)
 instance (MonadGenBnd m, Monad m, Monoid w) => MonadGenBnd (WriterT w m)
@@ -87,10 +111,10 @@ class MonadGenId m where
 
 
 instance MonadGenId (OhuaM env) where
-    generateId = OhuaM $ do
-        idCounter %= succ
-        use idCounter
-    resetIdCounter val = OhuaM $ idCounter .= val
+  generateId = OhuaM $ do
+    idCounter %= succ
+    use idCounter
+  resetIdCounter val = OhuaM $ idCounter .= val
 
 instance (MonadGenId m, Monad m) => MonadGenId (ReaderT e m)
 instance (MonadGenId m, Monad m, Monoid w) => MonadGenId (WriterT w m)
@@ -170,7 +194,16 @@ instance (MonadReadEnvironment m, Monad m, Monoid w) => MonadReadEnvironment (Wr
 instance (MonadReadEnvironment m, Monad m, Monoid w) => MonadReadEnvironment (Control.Monad.RWS.Lazy.RWST e w s m)
 instance (MonadReadEnvironment m, Monad m, Monoid w) => MonadReadEnvironment (Control.Monad.RWS.Strict.RWST e w s m)
 
-type MonadOhua env m = (MonadGenId m, MonadGenBnd m, MonadReadEnvExpr m, MonadRecordEnvExpr m, MonadError Error m, MonadIO m, MonadReadEnvironment m, EnvExpr m ~ env, MonadLogger m)
+type MonadOhua env m = ( MonadGenId m
+                       , MonadGenBnd m
+                       , MonadReadEnvExpr m
+                       , MonadRecordEnvExpr m
+                       , MonadError Error m
+                       , MonadIO m
+                       , MonadReadEnvironment m
+                       , EnvExpr m ~ env
+                       , MonadLogger m
+                       )
 
 -- | Run a compiler
 -- Creates the state from the tree being passed in
