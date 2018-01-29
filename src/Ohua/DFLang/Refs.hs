@@ -36,8 +36,13 @@ ifThenElse = bool
 {-# DEPRECATED ifThenElse "use 'bool' instead" #-}
 
 
-switch ::DFFnRef
-switch = DFFunction "ohua.lang/select"
+switch :: DFFnRef
+switch = select
+{-# DEPRECATED switch "use 'select' instead" #-}
+
+
+select :: DFFnRef
+select = DFFunction "ohua.lang/select"
 
 
 scope :: DFFnRef
