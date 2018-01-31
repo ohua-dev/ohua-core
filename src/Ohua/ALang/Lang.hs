@@ -308,8 +308,12 @@ lrPostwalkExpr f = runIdentity . lrPostwalkExprM (return . f)
 -- lrMapBndsRefs = bimap
 
 
--- lrMapBnds :: (bndT -> bndT') -> AExpr bndT refT -> AExpr bndT' refT
--- lrMapBnds = flip bimap id
+mapBnds :: (bndT -> bndT') -> AExpr bndT refT -> AExpr bndT' refT
+mapBnds f = cata $ embed . \case
+  LetF assign a b -> LetF (fmap f assign) a b
+  LambdaF assign b -> LambdaF (fmap f assign) b
+  VarF v -> VarF v
+  ApplyF a b -> ApplyF a b
 
 
 -- lrMapRefs :: (refT -> refT') -> AExpr bndT refT -> AExpr bndT refT'
@@ -317,4 +321,4 @@ lrPostwalkExpr f = runIdentity . lrPostwalkExprM (return . f)
 
 
 removeTyAnns :: TyAnnExpr a -> Expr a
-removeTyAnns = lrMapBnds (^. value)
+removeTyAnns = mapBnds (^. value)

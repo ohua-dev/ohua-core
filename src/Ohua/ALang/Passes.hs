@@ -163,7 +163,7 @@ ensureAtLeastOneCall e = cata f e
 removeUnusedBindings :: Expression -> Expression
 removeUnusedBindings = fst . runWriter . cata go
   where
-    go (VarF val@(Local b)) = tell (HS.singleton b) >> return (Var v)
+    go (VarF val@(Local b)) = tell (HS.singleton b) >> return (Var val)
     go (LetF bnds val body) = do
         (inner, used) <- listen body
         if not $ any (`HS.member` used) $ flattenAssign bnds
@@ -171,7 +171,7 @@ removeUnusedBindings = fst . runWriter . cata go
             return inner
           else do
             val' <- val
-            pure $ embed $ Let bnds val' inner
+            pure $ Let bnds val' inner
     go e = embed <$> sequence e
 
 
@@ -184,13 +184,13 @@ removeUnusedBindings = fst . runWriter . cata go
 -- It is recommended therefore to check this with 'noUndefinedBindings'.
 -- If an undefined binding is left behind which indicates the source expression
 -- was not fulfilling all its invariants.
-removeCurrying :: MonadOhua envExpr m => Expression -> m Expression
+removeCurrying :: forall m. MonadError Error m => Expression -> m Expression
 removeCurrying e = fst <$> evalRWST (para inlinePartials e) mempty ()
   where
     inlinePartials (LetF assign@(Direct bnd) (_, val) (_, body)) = do
         val' <- val
         (body', touched) <- listen $ local (HM.insert bnd val') body
-        return $
+        pure $
             if bnd `HS.member` touched then
                 body'
             else
@@ -199,8 +199,8 @@ removeCurrying e = fst <$> evalRWST (para inlinePartials e) mempty ()
         tell $ HS.singleton bnd
         val <- asks (HM.lookup bnd)
         Apply
-          (fromMaybe (failWith $ "No suitable value found for binding " <> Str.showS bnd) val)
-          <$> arg
+          <$> (maybe (failWith $ "No suitable value found for binding " <> Str.showS bnd) pure val)
+          <*> arg
     inlinePartials e = embed <$> traverse snd e
 
 
