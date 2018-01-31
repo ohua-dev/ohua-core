@@ -8,7 +8,12 @@
 -- Portability : portable
 
 -- This source code is licensed under the terms described in the associated LICENSE.TXT file
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveFoldable             #-}
+{-# LANGUAGE DeriveFunctor              #-}
+{-# LANGUAGE DeriveGeneric              #-}
+{-# LANGUAGE DeriveTraversable          #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE PatternSynonyms            #-}
 module Ohua.ALang.Lang where
 
 
@@ -16,6 +21,8 @@ import           Control.DeepSeq
 import           Data.Bifoldable
 import           Data.Bifunctor
 import           Data.Bitraversable
+import           Data.Functor.Classes
+import           Data.Functor.Foldable
 import           Data.Functor.Identity
 import           Data.Hashable
 import           Data.String
@@ -24,7 +31,6 @@ import           Lens.Micro            ((^.))
 import           Ohua.LensClasses
 import           Ohua.Types
 import           Ohua.Util
-
 
 -- bindingType is the type of general bindings
 -- Binding is the type for function arguments and `let`s etc which we know to always be local
@@ -134,68 +140,49 @@ instance NFData a => NFData (Symbol a) where
 
 -- | An expression in the algorithm language.
 -- Abstracted over a concrete type of local binding (target) and a type of reference (source).
-data AExpr bndType refType
-    = Var refType -- ^ A reference to a value
-    | Let (AbstractAssignment bndType) (AExpr bndType refType) (AExpr bndType refType) -- ^ Binding of a value to one ore more identifiers
-    | Apply (AExpr bndType refType) (AExpr bndType refType) -- ^ Function application
-    | Lambda (AbstractAssignment bndType) (AExpr bndType refType) -- ^ Anonymous function definition
-    deriving (Show, Eq)
+data AExprF bndType refType a
+  = VarF refType -- ^ A reference to a value
+  | LetF (AbstractAssignment bndType) a a -- ^ Binding of a value to one ore more identifiers
+  | ApplyF a a -- ^ Function application
+  | LambdaF (AbstractAssignment bndType) a -- ^ Anonymous function definition
+  deriving (Functor, Foldable, Traversable, Show, Eq)
 
+type instance Base (AExpr bndType refType) = AExprF bndType refType
 
+newtype AExpr bndType refType = AExpr { unAExpr :: AExprF bndType refType (AExpr bndType refType) }
+  deriving (Show, Eq)
 
-instance Bifunctor AExpr where
-    bimap f g = \case
-      Var v -> Var $ g v
-      Let assign val body -> Let (fmap f assign) (recur val) (recur body)
-      Apply e1 e2 -> Apply (recur e1) (recur e2)
-      Lambda assign body -> Lambda (fmap f assign) (recur body)
-      where recur = bimap f g
+instance Recursive (AExpr bndType refType) where
+  project = unAExpr
 
-instance Functor (AExpr a) where
-    fmap = bimap id
+instance Corecursive (AExpr bndType refType) where
+  embed = AExpr
 
-instance Bifoldable AExpr where
-    bifoldr f g c expr =
-        case expr of
-            Var v               -> g v c
-            Let assign val body -> foldr f (recur val $ recur body c) assign
-            Apply e1 e2         -> recur e1 $ recur e2 c
-            Lambda assign body  -> foldr f (recur body c) assign
-      where recur = flip $ bifoldr f g
-
-instance Foldable (AExpr a) where
-    foldr = bifoldr (flip const)
-
-instance Bitraversable AExpr where
-    bitraverse f g = \case
-      Var v -> Var <$> g v
-      Let assign val body -> Let <$> traverse f assign <*> recur val <*> recur body
-      Apply e1 e2 -> Apply <$> recur e1 <*> recur e2
-      Lambda assign body -> Lambda <$> traverse f assign <*> recur body
-
-      where recur = bitraverse f g
-
-instance Traversable (AExpr a) where
-    traverse = bitraverse pure
+pattern Var v = AExpr (VarF v)
+pattern Let a b c = AExpr (LetF a b c)
+pattern Apply a b = AExpr (ApplyF a b)
+pattern Lambda a b = AExpr (LambdaF a b)
 
 instance IsString b => IsString (AExpr a b) where
     fromString = Var . fromString
 
 instance ExtractBindings b => ExtractBindings (Expr b) where
-    extractBindings (Var v) = extractBindings v
-    extractBindings (Let assign val body) = extractBindings assign ++ extractBindings val ++ extractBindings body
-    extractBindings (Apply function argument) = extractBindings function ++ extractBindings argument
-    extractBindings (Lambda assign body) = extractBindings assign ++ extractBindings body
+    extractBindings = cata $ \case
+      VarF b -> extractBindings b
+      LetF assign a b -> extractBindings assign ++ a ++ b
+      ApplyF a b -> a ++ b
+      LambdaF assign a -> extractBindings assign ++ a
 
 
 instance (NFData a, NFData b) => NFData (AExpr a b) where
-    rnf (Let a b c)  = rnf a `seq` rnf b `seq` rnf c
-    rnf (Var a)      = rnf a
-    rnf (Apply a b)  = rnf a `seq` rnf b
-    rnf (Lambda a b) = rnf a `seq` rnf b
+    rnf = cata $ \case
+      VarF b -> rnf b
+      LetF assign a b -> assign `deepseq` a `deepseq` rnf b
+      ApplyF a b -> a `deepseq` rnf b
+      LambdaF assign b -> assign `deepseq` rnf b
 
 -- | Backward compatible alias
-type Expr = AExpr Binding
+type Expr refType = AExpr Binding refType
 
 -- | An Alang expression with optionally type annotated bindings (let bindings and lambda arguments)
 type OptTyAnnExpr = AExpr (Annotated (Maybe DefaultTyExpr) Binding)
@@ -216,23 +203,23 @@ lrPrewalkExprM f e = f e >>= \case
     e' -> return e'
 
 
--- | Traverse an ALang expression from right to left and top down.
-rlPrewalkExprM :: Monad m => (AExpr bndT refT -> m (AExpr bndT refT)) -> AExpr bndT refT -> m (AExpr bndT refT)
-rlPrewalkExprM f e = f e >>= \case
-    Let bnd val body -> flip (Let bnd) <$> lrPrewalkExprM f body <*> lrPrewalkExprM f val
-    Apply fn arg -> flip Apply <$> lrPrewalkExprM f arg <*> lrPrewalkExprM f fn
-    Lambda assign body -> Lambda assign <$> lrPrewalkExprM f body
-    e' -> return e'
+-- -- | Traverse an ALang expression from right to left and top down.
+-- rlPrewalkExprM :: Monad m => (AExpr bndT refT -> m (AExpr bndT refT)) -> AExpr bndT refT -> m (AExpr bndT refT)
+-- rlPrewalkExprM f e = f e >>= \case
+--   Let bnd val body -> flip (Let bnd) <$> rlPrewalkExprM f body <*> rlPrewalkExprM f val
+--   Apply fn arg -> flip Apply <$> rlPrewalkExprM f arg <*> rlPrewalkExprM f fn
+--   Lambda assign body -> Lambda assign <$> rlPrewalkExprM f body
+--   e' -> return e'
 
 
--- | Same as 'lrPrewalkExprM' but does not carry a monadic value.
-lrPrewalkExpr :: (AExpr bndT refT -> AExpr bndT refT) -> AExpr bndT refT -> (AExpr bndT refT)
-lrPrewalkExpr f = runIdentity . lrPrewalkExprM (return . f)
+-- -- | Same as 'lrPrewalkExprM' but does not carry a monadic value.
+-- lrPrewalkExpr :: (AExpr bndT refT -> AExpr bndT refT) -> AExpr bndT refT -> (AExpr bndT refT)
+-- lrPrewalkExpr f = runIdentity . lrPrewalkExprM (return . f)
 
 
--- | Same as 'rlPrewalkExprM' but does not carry a monadic value.
-rlPrewalkExpr :: (AExpr bndT refT -> AExpr bndT refT) -> AExpr bndT refT -> (AExpr bndT refT)
-rlPrewalkExpr f = runIdentity . rlPrewalkExprM (return . f)
+-- -- | Same as 'rlPrewalkExprM' but does not carry a monadic value.
+-- rlPrewalkExpr :: (AExpr bndT refT -> AExpr bndT refT) -> AExpr bndT refT -> (AExpr bndT refT)
+-- rlPrewalkExpr f = runIdentity . rlPrewalkExprM (return . f)
 
 
 -- | Traverse an ALang expression from left to right and from the bottom up.
@@ -244,13 +231,13 @@ lrPostwalkExprM f e = f =<< case e of
     _ -> return e
 
 
--- | Traverse an ALang expression from right to left and from the bottom up.
-rlPostwalkExprM :: Monad m => (AExpr bndT refT -> m (AExpr bndT refT)) -> AExpr bndT refT -> m (AExpr bndT refT)
-rlPostwalkExprM f e = f =<< case e of
-    Let assign val body -> flip (Let assign) <$> lrPostwalkExprM f body <*> lrPostwalkExprM f val
-    Apply fn arg -> flip Apply <$> lrPostwalkExprM f arg <*>  lrPostwalkExprM f fn
-    Lambda assign body -> Lambda assign <$> lrPostwalkExprM f body
-    _ -> return e
+-- -- | Traverse an ALang expression from right to left and from the bottom up.
+-- rlPostwalkExprM :: Monad m => (AExpr bndT refT -> m (AExpr bndT refT)) -> AExpr bndT refT -> m (AExpr bndT refT)
+-- rlPostwalkExprM f e = f =<< case e of
+--     Let assign val body -> flip (Let assign) <$> lrPostwalkExprM f body <*> lrPostwalkExprM f val
+--     Apply fn arg -> flip Apply <$> lrPostwalkExprM f arg <*>  lrPostwalkExprM f fn
+--     Lambda assign body -> Lambda assign <$> lrPostwalkExprM f body
+--     _ -> return e
 
 
 -- | Same as 'lrPostwalkExprM' but does not carry a monad.
@@ -258,75 +245,75 @@ lrPostwalkExpr :: (AExpr bndT refT -> AExpr bndT refT) -> AExpr bndT refT -> (AE
 lrPostwalkExpr f = runIdentity . lrPostwalkExprM (return . f)
 
 
--- | Same as 'lrPostwalkExprM' bot does not carry a monad.
-rlPostwalkExpr :: (AExpr bndT refT -> AExpr bndT refT) -> AExpr bndT refT -> (AExpr bndT refT)
-rlPostwalkExpr f = runIdentity . rlPostwalkExprM (return . f)
+-- -- | Same as 'lrPostwalkExprM' bot does not carry a monad.
+-- rlPostwalkExpr :: (AExpr bndT refT -> AExpr bndT refT) -> AExpr bndT refT -> (AExpr bndT refT)
+-- rlPostwalkExpr f = runIdentity . rlPostwalkExprM (return . f)
 
 
--- | Generic fold over an ALang expression.
--- Folds from top down and from left to right.
-foldlExprM :: Monad m => (AExpr bndT refT -> b -> m b) -> b -> AExpr bndT refT -> m b
-foldlExprM f b e = do
-    b' <- f e b
-    case e of
-        Apply e1 e2 -> do
-            b1 <- foldlExprM f b' e1
-            foldlExprM f b1 e2
-        Let _ e1 e2 -> do
-            b1 <- foldlExprM f b' e1
-            foldlExprM f b1 e2
-        Lambda _ e1 -> foldlExprM f b' e1
-        _ -> return b'
+-- -- | Generic fold over an ALang expression.
+-- -- Folds from top down and from left to right.
+-- foldlExprM :: Monad m => (AExpr bndT refT -> b -> m b) -> b -> AExpr bndT refT -> m b
+-- foldlExprM f b e = do
+--     b' <- f e b
+--     case e of
+--         Apply e1 e2 -> do
+--             b1 <- foldlExprM f b' e1
+--             foldlExprM f b1 e2
+--         Let _ e1 e2 -> do
+--             b1 <- foldlExprM f b' e1
+--             foldlExprM f b1 e2
+--         Lambda _ e1 -> foldlExprM f b' e1
+--         _ -> return b'
 
 
--- | Generic fold over an ALang expression.
--- Folds from bottom up and from right to left.
-foldrExprM :: Monad m => (a -> AExpr bndT refT -> m a) -> AExpr bndT refT -> a -> m a
-foldrExprM f e a = do
-    a' <- case e of
-        Apply e1 e2 -> do
-            a2 <- foldrExprM f e2 a
-            foldrExprM f e1 a2
-        Let _ e1 e2 -> do
-            a2 <- foldrExprM f e2 a
-            foldrExprM f e1 a2
-        Lambda _ e1 -> foldrExprM f e1 a
-        _ -> return a
-    f a' e
+-- -- | Generic fold over an ALang expression.
+-- -- Folds from bottom up and from right to left.
+-- foldrExprM :: Monad m => (a -> AExpr bndT refT -> m a) -> AExpr bndT refT -> a -> m a
+-- foldrExprM f e a = do
+--     a' <- case e of
+--         Apply e1 e2 -> do
+--             a2 <- foldrExprM f e2 a
+--             foldrExprM f e1 a2
+--         Let _ e1 e2 -> do
+--             a2 <- foldrExprM f e2 a
+--             foldrExprM f e1 a2
+--         Lambda _ e1 -> foldrExprM f e1 a
+--         _ -> return a
+--     f a' e
 
 
--- | Same as 'foldlExprM' but does not carry a monad.
-foldlExpr :: (AExpr bndT refT -> b -> b) -> b -> AExpr bndT refT -> b
-foldlExpr f b e = runIdentity $ foldlExprM (\x y -> return $ f x y) b e
+-- -- | Same as 'foldlExprM' but does not carry a monad.
+-- foldlExpr :: (AExpr bndT refT -> b -> b) -> b -> AExpr bndT refT -> b
+-- foldlExpr f b e = runIdentity $ foldlExprM (\x y -> return $ f x y) b e
 
 
--- | Same as 'foldrExprM' but does not carry a monad.
-foldrExpr :: (a -> AExpr bndT refT -> a) -> AExpr bndT refT -> a -> a
-foldrExpr f e b = runIdentity $ foldrExprM (\x y -> return $ f x y) e b
+-- -- | Same as 'foldrExprM' but does not carry a monad.
+-- foldrExpr :: (a -> AExpr bndT refT -> a) -> AExpr bndT refT -> a -> a
+-- foldrExpr f e b = runIdentity $ foldrExprM (\x y -> return $ f x y) e b
 
 
-lrMapBndsRefsA :: Applicative f => (bndT -> f bndT') -> (refT -> f refT') -> AExpr bndT refT -> f (AExpr bndT' refT')
-lrMapBndsRefsA = bitraverse
+-- lrMapBndsRefsA :: Applicative f => (bndT -> f bndT') -> (refT -> f refT') -> AExpr bndT refT -> f (AExpr bndT' refT')
+-- lrMapBndsRefsA = bitraverse
 
 
-lrMapBndsA :: Applicative f => (bndT -> f bndT') -> AExpr bndT refT -> f (AExpr bndT' refT)
-lrMapBndsA = flip bitraverse pure
+-- lrMapBndsA :: Applicative f => (bndT -> f bndT') -> AExpr bndT refT -> f (AExpr bndT' refT)
+-- lrMapBndsA = flip bitraverse pure
 
 
-lrMapRefsA :: Applicative f => (refT -> f refT') -> AExpr bndT refT -> f (AExpr bndT refT')
-lrMapRefsA = bitraverse pure
+-- lrMapRefsA :: Applicative f => (refT -> f refT') -> AExpr bndT refT -> f (AExpr bndT refT')
+-- lrMapRefsA = bitraverse pure
 
 
-lrMapBndsRefs :: (bndT -> bndT') -> (refT -> refT') -> AExpr bndT refT -> AExpr bndT' refT'
-lrMapBndsRefs = bimap
+-- lrMapBndsRefs :: (bndT -> bndT') -> (refT -> refT') -> AExpr bndT refT -> AExpr bndT' refT'
+-- lrMapBndsRefs = bimap
 
 
-lrMapBnds :: (bndT -> bndT') -> AExpr bndT refT -> AExpr bndT' refT
-lrMapBnds = flip bimap id
+-- lrMapBnds :: (bndT -> bndT') -> AExpr bndT refT -> AExpr bndT' refT
+-- lrMapBnds = flip bimap id
 
 
-lrMapRefs :: (refT -> refT') -> AExpr bndT refT -> AExpr bndT refT'
-lrMapRefs = bimap id
+-- lrMapRefs :: (refT -> refT') -> AExpr bndT refT -> AExpr bndT refT'
+-- lrMapRefs = bimap id
 
 
 removeTyAnns :: TyAnnExpr a -> Expr a

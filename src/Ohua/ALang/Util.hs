@@ -10,6 +10,7 @@
 -- This source code is licensed under the terms described in the associated LICENSE.TXT file
 module Ohua.ALang.Util where
 
+import           Data.Functor.Foldable
 import           Ohua.ALang.Lang
 import           Ohua.Types
 
@@ -18,10 +19,10 @@ substitute :: Binding -> Expression -> Expression -> Expression
 -- Postwalk avoids an infinite recursion in a case where `val` uses a `var` binding.
 -- This should never happen but might if this this invariant is violated for some reason
 -- and the violation is not caught.
-substitute !var val = lrPostwalkExpr f
+substitute !var val = cata f
   where
-    f (Var (Local v)) | var == v = val
-    f e               = e
+    f (VarF (Local v)) | var == v = val
+    f e                = embed e
 -- substitute var val e =
 --     case e of
 --         Var (Local v)

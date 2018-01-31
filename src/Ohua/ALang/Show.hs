@@ -10,33 +10,37 @@
 -- This source code is licensed under the terms described in the associated LICENSE.TXT file
 module Ohua.ALang.Show where
 
+import           Data.Functor.Foldable
 import           Ohua.ALang.Lang
 import           Ohua.Types
+import           Ohua.Util.Str          (toString)
+import           Text.PrettyPrint.Boxes
 
 
-showAssigment :: Assignment -> String
-showAssigment (Direct x)      = show x
-showAssigment (Destructure d) = show d
-showAssigment (Recursive r)   = "(rec) " ++ show r
+renderExpr :: Expression -> Box
+renderExpr = fst . cata worker
+  where
+    parenthesize (e, True) = "(" <> e <> ")"
+    parenthesize (e, _)    = e
 
-showLambda :: Expression -> String
-showLambda (Var x) = showSymbol x
-showLambda (Lambda arg body) = "λ " ++ showAssigment arg ++ ". " ++ showLambda body ++ ""
-showLambda (Let assignment value body) = "let " ++ showAssigment assignment ++ " = " ++ showLambda value ++ " in " ++ showLambda body
-showLambda (Apply function argument) = showFunction function ++ " " ++ showArgument argument
+    needParens = (, True)
+    noParens = (, False)
 
-showFunction :: Expression -> String
-showFunction e@(Lambda _ _) = "(" ++ showLambda e ++ ")"
-showFunction e@(Let _ _ _)  = "(" ++ showLambda e ++ ")"
-showFunction e              = showLambda e
+    worker (VarF b) = noParens $ showSym b
+    worker (LetF assign val body) =
+      needParens $ vcat left [ "let" <+> showAssign assign <+> "=" <+> fst val
+                             , "in" <+> fst body
+                             ]
+    worker (ApplyF fun val) = needParens $ fst fun <+> parenthesize val
+    worker (LambdaF assign body) = needParens $ "λ" <+> showAssign assign <+> "→" <+> fst body
 
-showArgument :: Expression -> String
-showArgument e@(Lambda _ _) = "(" ++ showLambda e ++ ")"
-showArgument e@(Let _ _ _)  = "(" ++ showLambda e ++ ")"
-showArgument e@(Apply _ _)  = "(" ++ showLambda e ++ ")"
-showArgument e              = showLambda e
+    showSym (Local b) = text $ show (b :: Binding)
+    showSym (Sf b id) = "Sf[" <> showQualBnd b <> "]" <> maybe nullBox (\a -> "<" <> text (show a) <> ">") id
+    showSym (Env e) = "Env[" <> text (show e) <> "]"
 
-showSymbol :: ResolvedSymbol -> String
-showSymbol (Local l) = show l
-showSymbol (Sf s i)   = "Sf[" ++ show s ++ "]" ++ maybe "" (\(FnId a) -> "<" ++ show a ++ ">") i
-showSymbol (Env e)   = show e
+    showAssign (Direct b)       = showBnd b
+    showAssign (Destructure bs) = "[" <> punctuateH left ", " (map showBnd bs) <> "]"
+
+    showBnd = text . toString . unBinding
+
+    showQualBnd = text . show

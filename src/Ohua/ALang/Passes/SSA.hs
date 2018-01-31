@@ -16,14 +16,15 @@ import           Control.Arrow
 import           Control.Monad.Except
 import           Control.Monad.Reader
 import           Control.Monad.State
-import qualified Data.HashMap.Strict  as HM
-import qualified Data.HashSet         as HS
-import           Data.Maybe           (fromMaybe)
+import           Data.Functor.Foldable
+import qualified Data.HashMap.Strict   as HM
+import qualified Data.HashSet          as HS
+import           Data.Maybe            (fromMaybe)
 import           Data.Monoid
 import           Ohua.ALang.Lang
 import           Ohua.Monad
 import           Ohua.Types
-import qualified Ohua.Util.Str        as Str
+import qualified Ohua.Util.Str         as Str
 
 
 type LocalScope = HM.HashMap Binding Binding
@@ -40,10 +41,15 @@ ssaResolve bnd = reader $ fromMaybe bnd <$> HM.lookup bnd
 -- because it does a lot of passing functions as arguments, however it very nicely
 -- encapsulates the scope changes which means they will never leak from where they are
 -- supposed to be applied
-ssaRename :: (MonadGenBnd m, MonadReader LocalScope m) => Binding -> m a -> m (Binding, a)
+ssaRename :: (MonadGenBnd m, MonadReader LocalScope m) => Binding -> (Binding -> m a) -> m a
 ssaRename oldBnd cont = do
     newBnd <- generateBindingWith oldBnd
-    (newBnd,) <$> local (HM.insert oldBnd newBnd) cont
+    local (HM.insert oldBnd newBnd) $ cont newBnd
+
+ssaRenameMany :: (MonadGenBnd m, MonadReader LocalScope m) => [Binding] -> ([Binding] -> m a) -> m a
+ssaRenameMany oldBnds cont = do
+    newBnds <- traverse generateBindingWith oldBnds
+    local (HM.union $ HM.fromList $ zip oldBnds newBnds) $ cont newBnds
 
 performSSA :: MonadOhua envExpr m => Expression -> m Expression
 performSSA = flip runReaderT mempty . ssa
@@ -52,44 +58,37 @@ flattenTuple :: (a, ([a], b)) -> ([a], b)
 flattenTuple (a, (as, r)) = (a:as, r)
 
 ssa :: (MonadOhua envExpr m, MonadReader LocalScope m) => Expression -> m Expression
-ssa (Var abstrBinding) = Var <$>
-    case abstrBinding of
-        Local bnd -> Local <$> ssaResolve bnd
-        other     -> return other
-ssa (Apply function argument) = Apply <$> ssa function <*> ssa argument
-ssa (Lambda argument body) = uncurry Lambda <$> handleAssignment argument (ssa body)
-ssa (Let assignment value body) = do
-    (ssaAssignment, (ssaValue, ssaBody)) <- handleAssignment assignment $ (,) <$> ssa value <*> ssa body
-    return $ Let ssaAssignment ssaValue ssaBody
+ssa = cata $ \case
+  VarF (Local bnd) -> Var . Local <$> ssaResolve bnd
+  LambdaF arguments body -> handleAssignment arguments $ \assign -> Lambda assign <$> body
+  LetF assignment value body -> handleAssignment assignment $ \assign -> Let assign <$> value <*> body
+  e -> embed <$> sequence e
 
 -- As you can see the destructuring makes writing some stuff quite difficult.
 -- I wonder if it might not be easier to represent destructuring with a builtin function
 -- instead and collapse it down at the very end ...
-handleAssignment :: (MonadOhua envExpr m, MonadReader LocalScope m) => Assignment -> m t -> m (Assignment, t)
-handleAssignment (Direct d) = fmap (first Direct) . ssaRename d
-handleAssignment (Recursive d) = fmap (first Recursive) . ssaRename d
-handleAssignment (Destructure ds) = fmap (first Destructure) . foldl (\f bnd -> f . fmap flattenTuple . ssaRename bnd) id ds . fmap ([],)
+handleAssignment :: (MonadOhua envExpr m, MonadReader LocalScope m) => Assignment -> (Assignment -> m t) -> m t
+handleAssignment (Direct d)       = ssaRename d . (. Direct)
+handleAssignment (Recursive d)    = ssaRename d . (. Recursive)
+handleAssignment (Destructure ds) = ssaRenameMany ds . (. Destructure)
 
 
 -- Check if an expression is in ssa form.
 -- Returns @Nothing@ if it is SSA
 -- Returns @Just aBinding@ where @aBinding@ is a binding which was defined (at least) twice
 isSSA :: Expression -> Maybe Binding
-isSSA = either Just (const Nothing) . flip evalState mempty . runExceptT . go
+isSSA = either Just (const Nothing) . flip evalState mempty . runExceptT . cata go
   where
     failOrInsert bnd = do
-        isDefined <- gets (HS.member bnd)
-        when isDefined $ throwError bnd
-        modify (HS.insert bnd)
-    go (Let assignment expr1 expr2) = do
-        mapM_ failOrInsert $ flattenAssign assignment
-        go expr1
-        go expr2
-    go (Apply expr1 expr2) = go expr1 >> go expr2
-    go (Lambda assignment body) = do
-        mapM_ failOrInsert $ flattenAssign assignment
-        go body
-    go (Var _) = return ()
+      isDefined <- gets (HS.member bnd)
+      when isDefined $ throwError bnd
+      modify (HS.insert bnd)
+    go e = do
+      case e of
+        LetF assign _ _  -> mapM_ failOrInsert $ flattenAssign assign
+        LambdaF assign _ -> mapM_ failOrInsert $ flattenAssign assign
+        _                -> pure ()
+      sequence_ e
 
 
 checkSSA :: MonadOhua envExpr m => Expression -> m ()

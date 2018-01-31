@@ -1,9 +1,11 @@
 module Ohua.ALang.Passes.TailRec where
 
-import qualified Data.HashSet    as HS
+import qualified Data.HashSet          as HS
 import           Ohua.ALang.Lang
 import           Ohua.Types
 
+import           Control.Monad.Writer
+import           Data.Functor.Foldable
 import           Debug.Trace
 --
 -- This must run before algos are being inlined!
@@ -16,6 +18,26 @@ import           Debug.Trace
 -- the call is (recur algoRef args)
 findTailRecs :: Expression -> Expression
 findTailRecs  = snd . flip findRecCall HS.empty
+
+
+markRecursiveBindings :: Expression -> Expression
+markRecursiveBindings = fst . runWriter . cata go
+  where
+    go (LetF assign e b) =
+      -- We censor here as this binding would shadow bindings from outside
+      shadowAssign assign $ do
+        (e', isUsed) <- listens (not . null . HS.intersection (HS.fromList (flattenAssign assign))) e
+        if isUsed
+          then case assign of
+                 Direct bnd -> Let (Recursive bnd) e' <$> b
+                 _ -> error "Cannot use destrutured binding recursively"
+          else Let assign e' <$> b
+    go e@(VarF val@(Local bnd)) = tell (HS.singleton bnd) >> pure (Var val)
+    go e@(LambdaF assign body) = shadowAssign assign $ embed <$> sequence e
+    go e = embed <$> sequence e
+
+    shadowAssign (Direct b) = censor (HS.delete b)
+    shadowAssign (Destructure bnds) = censor (`HS.difference` HS.fromList bnds)
 
 findRecCall :: Expression -> HS.HashSet Binding -> (HS.HashSet Binding, Expression)
 findRecCall (Let (Direct a) expr inExpr) algosInScope =

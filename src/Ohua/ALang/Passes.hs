@@ -19,8 +19,10 @@ import           Control.Monad.RWS.Lazy
 import           Control.Monad.State
 import           Control.Monad.Writer
 import           Data.Bifunctor
+import           Data.Functor.Foldable
 import qualified Data.HashMap.Strict    as HM
 import qualified Data.HashSet           as HS
+import           Data.Maybe             (fromMaybe)
 import           Ohua.ALang.Lang
 import           Ohua.ALang.Util
 import           Ohua.Monad
@@ -32,50 +34,49 @@ import           Ohua.Util.Str          as Str
 -- | Inline all references to lambdas.
 -- Aka `let f = (\a -> E) in f N` -> `(\a -> E) N`
 inlineLambdaRefs :: MonadOhua envExpr m => Expression -> m Expression
-inlineLambdaRefs (Let assignment l@(Lambda _ _) body) =
-    case assignment of
-        Direct bnd  -> inlineLambdaRefs $ substitute bnd l body
-        Recursive _ -> return $ Let assignment l body
-        _           -> failWith "invariant broken, cannot destructure lambda"
-inlineLambdaRefs (Let assignment value body) = Let assignment <$> inlineLambdaRefs value <*> inlineLambdaRefs body
-inlineLambdaRefs (Apply body argument) = liftM2 Apply (inlineLambdaRefs body) (inlineLambdaRefs argument)
-inlineLambdaRefs (Lambda argument body) = Lambda argument <$> inlineLambdaRefs body
-inlineLambdaRefs e = return e
+inlineLambdaRefs = flip runReaderT mempty . para go
+  where
+    go (LetF assignment (Lambda _ _,l) (_, body)) =
+      case assignment of
+        Direct bnd  -> l >>= \l' -> local (HM.insert bnd l') body
+        Recursive _ -> Let assignment <$> l <*> body
+        Destructure _ -> failWith "invariant broken, cannot destructure lambda"
+    go (VarF val@(Local bnd)) = asks (fromMaybe (Var val) .  HM.lookup bnd)
+    go e = embed <$> traverse snd e
 
 
 -- | Reduce lambdas by simulating application
 -- Aka `(\a -> E) N` -> `let a = N in E`
 -- Assumes lambda refs have been inlined
 inlineLambda :: Expression -> Expression
-inlineLambda e@(Var _) = e
-inlineLambda (Apply (Lambda assignment body) argument) = Let assignment argument $ inlineLambda body
-inlineLambda (Apply v@(Var _) argument) = Apply v (inlineLambda argument)
-inlineLambda (Apply v@(Apply _ _) argument) = reduceLetCWith f (inlineLambda v)
-  where
-    f (Lambda assignment body) = Let assignment inlinedArg body
-    f v0                       = Apply v0 inlinedArg
-    inlinedArg = inlineLambda argument
-inlineLambda v@(Apply _ _) = reduceLetCWith inlineLambda v
-inlineLambda (Let name value body) = Let name (inlineLambda value) (inlineLambda body)
-inlineLambda (Lambda param body) = Lambda param $ inlineLambda body
+inlineLambda = cata $ \case
+  ApplyF (Lambda assignment body) argument -> Let assignment argument body
+  ApplyF v@(Apply _ _) argument -> reduceLetCWith f v
+    where
+      f (Lambda assignment body) = Let assignment argument body
+      f v0                       = Apply v0 argument
+  e -> embed e
 
 -- recursively performs the substitution
 --
 -- let x = (let y = M in A) in E[x] -> let y = M in let x = A in E[x]
 reduceLetA :: Expression -> Expression
-reduceLetA (Let assign (Let assign2 val expr3) expr) = Let assign2 val $ reduceLetA $ Let assign expr3 expr
-reduceLetA e = e
+reduceLetA = \case
+  Let assign (Let assign2 val expr3) expr -> Let assign2 val $ reduceLetA $ Let assign expr3 expr
+  e -> e
 
 reduceLetCWith :: (Expression -> Expression) -> Expression -> Expression
-reduceLetCWith f (Apply (Let assign val expr) argument) = Let assign val $ reduceLetCWith f $ Apply expr argument
-reduceLetCWith f e = f e
+reduceLetCWith f = \case
+  Apply (Let assign val expr) argument -> Let assign val $ reduceLetCWith f $ Apply expr argument
+  e -> f e
 
 reduceLetC :: Expression -> Expression
 reduceLetC = reduceLetCWith id
 
 reduceAppArgument :: Expression -> Expression
-reduceAppArgument (Apply function (Let assign val expr)) = Let assign val $ reduceApplication $ Apply function expr
-reduceAppArgument e = e
+reduceAppArgument = \case
+  Apply function (Let assign val expr) -> Let assign val $ reduceApplication $ Apply function expr
+  e -> e
 
 -- recursively performs the substitution
 --
@@ -92,10 +93,12 @@ reduceApplication = reduceLetCWith reduceAppArgument
 -- Aka `let x = let y = E in N in M` -> `let y = E in let x = N in M`
 -- and `(let x = E in F) a` -> `let x = E in F a`
 letLift :: Expression -> Expression
-letLift (Let assign expr expr2) = reduceLetA $ Let assign (letLift expr) (letLift expr2)
-letLift (Apply function argument) = reduceApplication $ Apply (letLift function) (letLift argument)
-letLift (Lambda bnd body) = Lambda bnd (letLift body)
-letLift v = v
+letLift = cata $ \e ->
+  let f = case e of
+            e@(LetF _ _ _) -> reduceLetA
+            e@(ApplyF _ _) -> reduceApplication
+            _              -> id
+  in f $ embed e
 
 
 idName :: QualifiedBinding
@@ -104,15 +107,16 @@ idName = QualifiedBinding (nsRefFromList ["ohua", "lang"]) "id"
 -- | Inline all direct reassignments.
 -- Aka `let x = E in let y = x in y` -> `let x = E in x`
 inlineReassignments :: Expression -> Expression
-inlineReassignments (Let assign val@(Var _) body) =
-    case assign of
-        Direct bnd2 -> inlineReassignments $ substitute bnd2 val body
-        Destructure _ -> Let assign (Apply (Var (Sf idName Nothing)) val) $ inlineReassignments body
-        Recursive _ -> error "TODO implement inlining reassignments for recursive bindings"
-inlineReassignments (Let assign val body) = Let assign (inlineReassignments val) $ inlineReassignments body
-inlineReassignments (Apply e1 e2) = Apply (inlineReassignments e1) (inlineReassignments e2)
-inlineReassignments (Lambda assign e) = Lambda assign $ inlineReassignments e
-inlineReassignments v@(Var _) = v
+inlineReassignments = flip runReader mempty . cata go
+  where
+    go (LetF assign val body) = val >>= \case
+      v@(Var _) -> case assign of
+                     Direct bnd -> local (HM.insert bnd v) body
+                     Destructure _ -> Let assign (Apply (Var (Sf idName Nothing)) v) <$> body
+                     Recursive _ -> error "TODO implement inlining reassignments for recursive bindings"
+      v -> Let assign v <$> body
+    go (VarF val@(Local bnd)) = asks (fromMaybe (Var val) . HM.lookup bnd)
+    go e = embed <$> sequence e
 
 
 -- | Transforms the final expression into a let expression with the result variable as body.
@@ -133,21 +137,23 @@ ensureFinalLet' a = do
 
 
 ensureFinalLetInLambdas :: MonadOhua envExpr m => Expression -> m Expression
-ensureFinalLetInLambdas = lrPostwalkExprM $ \case
-    Lambda bnd body -> Lambda bnd <$> ensureFinalLet' body
-    a -> return a
+ensureFinalLetInLambdas = cata $ \case
+    LambdaF bnd body -> Lambda bnd <$> (ensureFinalLet' =<< body)
+    a -> embed <$> sequence a
 
 
-ensureAtLeastOneCall :: MonadOhua envExpr m => Expression -> m Expression
+ensureAtLeastOneCall :: (Monad m, MonadGenBnd m) => Expression -> m Expression
 ensureAtLeastOneCall e@(Var _) = do
-    newBnd <- generateBinding
-    pure $ Let (Direct newBnd) (Var (Sf idName Nothing) `Apply` e) $ Var (Local newBnd)
-ensureAtLeastOneCall e = lrPostwalkExprM f e
+  newBnd <- generateBinding
+  pure $ Let (Direct newBnd) (Var (Sf idName Nothing) `Apply` e) $ Var (Local newBnd)
+ensureAtLeastOneCall e = cata f e
   where
-    f expr@(Lambda bnd (Var _)) = do
+    f expr@(LambdaF bnd body) = body >>= \case
+      v@(Var _) -> do
         newBnd <- generateBinding
-        pure $ Lambda bnd $ Let (Direct newBnd) (Var (Sf idName Nothing) `Apply` expr) $ Var (Local newBnd)
-    f other = pure other
+        pure $ Lambda bnd $ Let (Direct newBnd) (Var (Sf idName Nothing) `Apply` v) $ Var (Local newBnd)
+      e -> pure $ Lambda bnd e
+    f e = embed <$> sequence e
 
 
 -- | Removes bindings that are never used.
@@ -155,19 +161,18 @@ ensureAtLeastOneCall e = lrPostwalkExprM f e
 -- and therefore cannot be removed.
 -- Assumes ssa for simplicity
 removeUnusedBindings :: Expression -> Expression
-removeUnusedBindings = fst . runWriter . go
+removeUnusedBindings = fst . runWriter . cata go
   where
-    go :: MonadWriter (HS.HashSet Binding) m => Expression -> m Expression
-    go v@(Var (Local b)) = tell (HS.singleton b) >> return v
-    go v@(Var _) = return v
-    go (Lambda bnd body) = Lambda bnd <$> go body
-    go (Apply e1 e2) = Apply <$> go e1 <*> go e2
-    go (Let bnds val body) = do
-        (inner, used) <- listen $ go body
-        if not $ any (`HS.member` used) $ flattenAssign bnds then
+    go (VarF val@(Local b)) = tell (HS.singleton b) >> return (Var v)
+    go (LetF bnds val body) = do
+        (inner, used) <- listen body
+        if not $ any (`HS.member` used) $ flattenAssign bnds
+          then
             return inner
-        else
-            Let bnds <$> go val <*> pure inner
+          else do
+            val' <- val
+            pure $ embed $ Let bnds val' inner
+    go e = embed <$> sequence e
 
 
 -- | Reduce curried expressions.
@@ -180,26 +185,23 @@ removeUnusedBindings = fst . runWriter . go
 -- If an undefined binding is left behind which indicates the source expression
 -- was not fulfilling all its invariants.
 removeCurrying :: MonadOhua envExpr m => Expression -> m Expression
-removeCurrying e = fst <$> evalRWST (inlinePartials e) mempty ()
+removeCurrying e = fst <$> evalRWST (para inlinePartials e) mempty ()
   where
-    inlinePartials (Let assign@(Direct bnd) val body) = do
-        val' <- inlinePartials val
-        (body', touched) <- listen $ local (HM.insert bnd val') $ inlinePartials body
+    inlinePartials (LetF assign@(Direct bnd) (_, val) (_, body)) = do
+        val' <- val
+        (body', touched) <- listen $ local (HM.insert bnd val') body
         return $
             if bnd `HS.member` touched then
                 body'
             else
                 Let assign val' body'
-    inlinePartials (Apply (Var (Local bnd)) arg) = do
+    inlinePartials (ApplyF (Var (Local bnd), _) (_, arg)) = do
         tell $ HS.singleton bnd
         val <- asks (HM.lookup bnd)
-        inlinePartials =<< Apply
-            <$> maybe (failWith $ "No suitable value found for binding " <> Str.showS bnd) return val
-            <*> inlinePartials arg
-    inlinePartials (Apply function arg) = Apply <$> inlinePartials function <*> inlinePartials arg
-    inlinePartials (Let assign val body) = Let assign <$> inlinePartials val <*> inlinePartials body
-    inlinePartials (Lambda a body) = Lambda a <$> inlinePartials body
-    inlinePartials expr = return expr
+        Apply
+          (fromMaybe (failWith $ "No suitable value found for binding " <> Str.showS bnd) val)
+          <$> arg
+    inlinePartials e = embed <$> traverse snd e
 
 
 -- | Ensures the expression is a sequence of let statements terminated with a local variable.
@@ -211,25 +213,23 @@ hasFinalLet _               = failWith "Final value is not a var"
 
 
 -- | Ensures all of the optionally provided stateful function ids are unique.
-noDuplicateIds :: MonadOhua envExpr m => Expression -> m ()
-noDuplicateIds = void . flip runStateT mempty . lrPrewalkExprM go
+noDuplicateIds :: MonadError Error m => Expression -> m ()
+noDuplicateIds = flip evalStateT mempty . cata go
   where
-    go e@(Var (Sf _ (Just funid))) = do
-        isMember <- gets (HS.member funid)
-        when isMember $ failWith $ "Duplicate id " <> Str.showS funid
-        modify (HS.insert funid)
-        return e
-    go e = return e
+    go e@(VarF (Sf _ (Just funid))) = do
+      isMember <- gets (HS.member funid)
+      when isMember $ failWith $ "Duplicate id " <> Str.showS funid
+      modify (HS.insert funid)
+    go e = sequence_ e
 
 
 -- | Checks that no apply to a local variable is performed.
 -- This is a simple check and it will pass on complex expressions even if they would reduce
 -- to an apply to a local variable.
 applyToSf :: MonadOhua envExpr m => Expression -> m ()
-applyToSf = foldlExprM (const . go) ()
-  where
-    go (Apply (Var (Local bnd)) _) = failWith $ "Illegal Apply to local var " <> Str.showS bnd
-    go _ = return ()
+applyToSf = para $ \case
+  ApplyF (Var (Local bnd),_) _ -> failWith $ "Illegal Apply to local var " <> Str.showS bnd
+  e -> sequence_ $ fmap snd e
 
 -- FIXME this function is never called. was it supposed to be part of the below validity check?
 lamdasAreInputToHigherOrderFunctions :: MonadOhua envExpr m => Expression -> m ()
@@ -241,15 +241,15 @@ lamdasAreInputToHigherOrderFunctions _                         = return ()
 -- Scoped. Aka bindings are only visible in their respective scopes.
 -- Hence the expression does not need to be in SSA form.
 noUndefinedBindings :: MonadOhua envExpr m => Expression -> m ()
-noUndefinedBindings = flip runReaderT mempty . go
+noUndefinedBindings = flip runReaderT mempty . cata go
   where
-    go (Let assign val body) = go val >> local (HS.union $ HS.fromList $ flattenAssign assign) (go body)
-    go (Var (Local bnd)) = do
+    go (LetF (Recursive r) val body) = local (HS.insert r) $ val >> body
+    go (LetF assign val body) = val >> local (HS.union $ HS.fromList $ flattenAssign assign) body
+    go (VarF (Local bnd)) = do
         isDefined <- asks (HS.member bnd)
         unless isDefined $ failWith $ "Not in scope " <> Str.showS bnd
-    go (Apply function arg) = go function >> go arg
-    go (Lambda assign body) = local (HS.union $ HS.fromList $ flattenAssign assign) $ go body
-    go (Var _) = return ()
+    go (LambdaF assign body) = local (HS.union $ HS.fromList $ flattenAssign assign) body
+    go e = sequence_ e
 
 
 checkProgramValidity :: MonadOhua envExpr m => Expression -> m ()
@@ -263,10 +263,10 @@ checkProgramValidity e = do
 -- | Lifts something like @if (f x) a b@ to @let x0 = f x in if x0 a b@
 liftApplyToApply :: MonadOhua envExpr m => Expression -> m Expression
 liftApplyToApply = lrPrewalkExprM $ \case
-    Apply fn arg@(Apply _ _) -> do
-        bnd <- generateBinding
-        return $ Let (Direct bnd) arg $ Apply fn (Var (Local bnd))
-    a -> return a
+  Apply fn arg@(Apply _ _) -> do
+    bnd <- generateBinding
+    return $ Let (Direct bnd) arg $ Apply fn (Var (Local bnd))
+  a -> return a
 
 
 -- The canonical composition of the above transformations to create a program with the invariants we expect.

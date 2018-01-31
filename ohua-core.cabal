@@ -69,6 +69,7 @@ library
                , aeson
                , vector
                , bifunctors
+               , recursion-schemes
                , boxes
                , data-default
                , transformers-base
