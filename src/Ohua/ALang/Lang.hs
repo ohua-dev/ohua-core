@@ -316,8 +316,12 @@ mapBnds f = cata $ embed . \case
   ApplyF a b -> ApplyF a b
 
 
--- lrMapRefs :: (refT -> refT') -> AExpr bndT refT -> AExpr bndT refT'
--- lrMapRefs = bimap id
+mapRefs :: (refT -> refT') -> AExpr bndT refT -> AExpr bndT refT'
+mapRefs f = cata $ embed . \case
+  VarF ref -> VarF $ f ref
+  LetF assign a b -> LetF assign a b
+  LambdaF assign b -> LambdaF assign b
+  ApplyF a b -> ApplyF a b
 
 
 removeTyAnns :: TyAnnExpr a -> Expr a

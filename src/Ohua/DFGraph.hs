@@ -44,6 +44,7 @@ data Source envExpr
 data AbstractOutGraph envExpr = OutGraph
     { operators :: [Operator]
     , arcs      :: [Arc envExpr]
+    , returnArc :: Target
     } deriving (Eq, Generic, Show)
 
 type OutGraph = AbstractOutGraph HostExpr
@@ -55,7 +56,7 @@ instance Functor Source where
 instance Functor Arc where
     fmap f (Arc t s) = Arc t (fmap f s)
 instance Functor AbstractOutGraph where
-    fmap f (OutGraph ops grArcs) = OutGraph ops (fmap (fmap f) grArcs)
+    fmap f (OutGraph ops grArcs r) = OutGraph ops (fmap (fmap f) grArcs) r
 
 
 instance NFData Operator
@@ -66,7 +67,7 @@ instance NFData a => NFData (AbstractOutGraph a)
 
 
 toGraph :: DFExpr -> OutGraph
-toGraph (DFExpr lets _) = OutGraph ops grArcs
+toGraph (DFExpr lets r) = OutGraph ops grArcs (getSource r)
   where
     ops = map toOp $ toList lets
     toOp e = Operator (callSiteId e) (deRef e)
@@ -86,10 +87,12 @@ toGraph (DFExpr lets _) = OutGraph ops grArcs
 
     grArcs = concatMap toArc (toList lets)
 
+    getSource v = fromMaybe (error $ "Undefined Binding: DFVar " ++ show v ++ " defined vars: " ++ show sources) $ HM.lookup v sources
+
     toArc l =
         [ Arc t $
             case arg of
-                DFVar v -> LocalSource $ fromMaybe (error $ "Undefined Binding: DFVar " ++ show v ++ " defined vars: " ++ show sources) $ HM.lookup v sources
+                DFVar v          -> LocalSource $ getSource v
                 DFEnvVar envExpr -> EnvSource envExpr
         | (arg, idx) <- maybe id ((:) . (,-1) . DFVar) (contextArg l)
                           -- prepend (ctxBinding, -1) if there is a context arc

@@ -7,8 +7,9 @@ import           Ohua.Types             (unFnId)
 import           Text.PrettyPrint.Boxes
 
 
+-- | TODO show return arc
 asTable :: OutGraph -> T.Text
-asTable (OutGraph ops arcs) = T.pack $ render $ vsep 1 left
+asTable (OutGraph ops arcs _) = T.pack $ render $ vsep 1 left
     [ text "Operators"
     , hsep 4 top [idList, typeList ]
     , text "Arcs"

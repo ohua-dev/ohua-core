@@ -18,7 +18,7 @@ instance Arbitrary Operator where
 instance Arbitrary Target where arbitrary = liftM2 Target arbitrary arbitrary
 instance Arbitrary a => Arbitrary (Arc a) where arbitrary = liftM2 Arc arbitrary arbitrary
 instance Arbitrary a => Arbitrary (Source a) where arbitrary = oneof [LocalSource <$> arbitrary, EnvSource <$> arbitrary]
-instance Arbitrary a => Arbitrary (AbstractOutGraph a) where arbitrary = liftM2 OutGraph arbitrary arbitrary
+instance Arbitrary a => Arbitrary (AbstractOutGraph a) where arbitrary = liftM3 OutGraph arbitrary arbitrary arbitrary
 
 
 instance Arbitrary Binding where arbitrary = Binding <$> arbitrary
