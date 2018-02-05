@@ -22,6 +22,7 @@ import           Data.Bifoldable
 import           Data.Bifunctor
 import           Data.Bitraversable
 import           Data.Functor.Classes
+import           Data.Functor.Compose
 import           Data.Functor.Foldable
 import           Data.Functor.Identity
 import           Data.Hashable
@@ -185,10 +186,27 @@ instance (NFData a, NFData b) => NFData (AExpr a b) where
 type Expr refType = AExpr Binding refType
 
 -- | An Alang expression with optionally type annotated bindings (let bindings and lambda arguments)
-type OptTyAnnExpr = AExpr (Annotated (Maybe DefaultTyExpr) Binding)
+newtype AnnExpr ann bndType refType = AnnExpr { unAnnExpr :: Annotated ann (AExprF bndType refType (AnnExpr ann bndType refType)) }
+  deriving Eq
 
--- | An Alang expression with only type annotated bindings (let bindings and lambda arguments)
-type TyAnnExpr = AExpr (Annotated DefaultTyExpr Binding)
+pattern AnnVar ann v = AnnExpr (Annotated ann (VarF v))
+pattern AnnLet ann assign val body = AnnExpr (Annotated ann (LetF assign val body))
+pattern AnnApply ann f a = AnnExpr (Annotated ann (ApplyF f a))
+pattern AnnLambda ann assign body = AnnExpr (Annotated ann (LambdaF assign body))
+
+type instance Base (AnnExpr ann bndType refType) = Compose (Annotated ann) (AExprF bndType refType)
+
+pattern AnnVarF ann v = Compose (Annotated ann (VarF v))
+pattern AnnLetF ann assign val body = Compose (Annotated ann (LetF assign val body))
+pattern AnnApplyF ann f a = Compose (Annotated ann (ApplyF f a))
+pattern AnnLambdaF ann assign body = Compose (Annotated ann (LambdaF assign body))
+
+instance Recursive (AnnExpr ann bndType refType) where project = Compose . unAnnExpr
+instance Corecursive (AnnExpr ann bndType refType) where embed (Compose v) = AnnExpr v
+
+type OptTyAnnExpr = AnnExpr (Maybe DefaultTyExpr) Binding
+
+type TyAnnExpr = AnnExpr DefaultTyExpr Binding
 
 -- | Backward compatibility alias
 type Expression = Expr ResolvedSymbol
@@ -325,4 +343,4 @@ mapRefs f = cata $ embed . \case
 
 
 removeTyAnns :: TyAnnExpr a -> Expr a
-removeTyAnns = mapBnds (^. value)
+removeTyAnns = cata $ embed . (^. value) . getCompose

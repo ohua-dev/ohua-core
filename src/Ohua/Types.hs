@@ -8,9 +8,13 @@
 -- Portability : portable
 
 -- This source code is licensed under the terms described in the associated LICENSE.TXT file
+{-# LANGUAGE DeriveFoldable             #-}
+{-# LANGUAGE DeriveFunctor              #-}
 {-# LANGUAGE DeriveGeneric              #-}
+{-# LANGUAGE DeriveTraversable          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiWayIf                 #-}
+{-# LANGUAGE PatternSynonyms            #-}
 module Ohua.Types where
 
 import           Control.Comonad
@@ -19,17 +23,19 @@ import           Data.Bifoldable
 import           Data.Bifunctor
 import           Data.Bitraversable
 import           Data.Default
-import           Data.Functor.Classes (Show1 (liftShowsPrec))
+import           Data.Functor.Classes  (Show1 (liftShowsPrec))
+import           Data.Functor.Compose
+import           Data.Functor.Foldable
 import           Data.Hashable
-import qualified Data.HashSet         as HS
+import qualified Data.HashSet          as HS
 import           Data.String
-import qualified Data.Vector          as V
+import qualified Data.Vector           as V
 import           GHC.Exts
 import           GHC.Generics
 import           Lens.Micro
 import           Ohua.LensClasses
 import           Ohua.Util
-import qualified Ohua.Util.Str        as Str
+import qualified Ohua.Util.Str         as Str
 
 
 -- | The numeric id of a function call site
@@ -290,10 +296,28 @@ instance Comonad (Annotated ann) where
     extend f a@(Annotated ann _) = Annotated ann (f a)
 
 -- | A type expression
-data TyExpr binding
-    = TyRef binding -- ^ A primitive referece to a type
-    | TyApp (TyExpr binding) (TyExpr binding) -- ^ A type application
-    deriving (Show, Eq)
+data TyExprF binding a
+    = TyRefF binding -- ^ A primitive referece to a type
+    | TyAppF a a -- ^ A type application
+    deriving (Show, Eq, Functor, Traversable, Foldable)
+
+newtype TyExpr binding = TyExpr (TyExprF binding (TyExpr binding))
+  deriving (Eq)
+
+pattern TyRef b = TyExpr (TyRefF b)
+pattern TyApp f v = TyExpr (TyAppF f v)
+
+type instance Base (TyExpr binding) = TyExprF binding
+
+instance Recursive (TyExpr binding) where project (TyExpr e) = e
+instance Corecursive (TyExpr binding) where embed = TyExpr
+
+instance (NFData binding, NFData a) => NFData (TyExprF binding a) where
+  rnf (TyRefF v)   = rnf v
+  rnf (TyAppF f v) = f `deepseq` rnf v
+
+instance NFData binding => NFData (TyExpr binding) where
+  rnf (TyExpr e) = rnf e
 
 instance Functor TyExpr where
     fmap f (TyRef r) = TyRef $ f r
@@ -315,6 +339,10 @@ data TyVar tyConRef tyVarRef
     | TyVar tyVarRef
     deriving (Show, Eq)
 
+instance (NFData tyConRef, NFData tyVarRef) => NFData (TyVar tyConRef tyVarRef) where
+  rnf (TyCon c) = rnf c
+  rnf (TyVar v) = rnf v
+
 instance Bifunctor TyVar where
     bimap f _ (TyCon c) = TyCon (f c)
     bimap _ g (TyVar v) = TyVar (g v)
@@ -326,7 +354,3 @@ type SomeTyVar = TyVar SomeBinding SomeBinding
 
 -- | Typical instantiation of a @TyExpr@
 type DefaultTyExpr = TyExpr SomeTyVar
-
-instance NFData binding => NFData (TyExpr binding) where
-    rnf (TyRef bnd) = rnf bnd
-    rnf (TyApp a b) = a `deepseq` rnf b
