@@ -302,7 +302,7 @@ data TyExprF binding a
     deriving (Show, Eq, Functor, Traversable, Foldable)
 
 newtype TyExpr binding = TyExpr (TyExprF binding (TyExpr binding))
-  deriving (Eq)
+  deriving (Eq, Show)
 
 pattern TyRef b = TyExpr (TyRefF b)
 pattern TyApp f v = TyExpr (TyAppF f v)

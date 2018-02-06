@@ -8,7 +8,7 @@ import           Ohua.Types
 data FunAnn binding = FunAnn
   { argTypes :: [TyExpr binding]
   , retType  :: TyExpr binding
-  }
+  } deriving (Show, Eq)
 
 -- | A namespace as defined by the ohua API. It has a name, a list of dependencies and aliasings,
 -- defined expressions (currently constrained to lambdas/algos) and optionally ends with an executable expression.
