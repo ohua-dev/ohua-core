@@ -1,8 +1,15 @@
-module Ohua.ALang.NS where
+module Ohua.ALang.NS
+  ( FunAnn(..)
+  , Imports
+  , Namespace(Namespace)
+  , HasName(name), algoImports, sfImports, HasDecls(decls)
+  ) where
 
 
 import qualified Data.HashMap.Strict as HM
+import           Lens.Micro
 import           Ohua.ALang.Lang
+import           Ohua.LensClasses
 import           Ohua.Types
 
 data FunAnn binding = FunAnn
@@ -10,11 +17,25 @@ data FunAnn binding = FunAnn
   , retType  :: TyExpr binding
   } deriving (Show, Eq)
 
+type Imports = [(NSRef, [Binding])]
+
 -- | A namespace as defined by the ohua API. It has a name, a list of dependencies and aliasings,
 -- defined expressions (currently constrained to lambdas/algos) and optionally ends with an executable expression.
-data Namespace decl = Namespace
-    { nsName        :: NSRef
-    , nsAlgoImports :: [(NSRef, [Binding])]
-    , nsSfImports   :: [(NSRef, [Binding])]
-    , nsDecls       :: HM.HashMap Binding decl
-    }
+data Namespace decl =
+  Namespace
+    NSRef -- name
+    Imports -- algo imports
+    Imports -- sf imports
+    (HM.HashMap Binding decl) -- declarations
+
+instance HasName (Namespace decls) NSRef where
+  name f (Namespace a b c d) = (\a' -> Namespace a' b c d) <$> f a
+
+algoImports :: Lens' (Namespace decls) Imports
+algoImports f (Namespace a b c d) = (\b' -> Namespace a b' c d) <$> f b
+
+sfImports :: Lens' (Namespace decls) Imports
+sfImports f (Namespace a b c d) = (\c' -> Namespace a b c' d) <$> f c
+
+instance HasDecls (Namespace decls) (HM.HashMap Binding decls) where
+  decls f (Namespace a b c d) = Namespace a b c <$> f d
