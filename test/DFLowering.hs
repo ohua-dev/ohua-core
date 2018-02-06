@@ -57,7 +57,7 @@ instance Num Expression where fromInteger = Var . fromInteger
 -- To handle env args i generate one new node which is source for all env args.
 -- The source index is the env arc number
 toFGLGraph :: OutGraph -> OhuaGrGraph
-toFGLGraph (OutGraph ops arcs) = OhuaGrGraph $ mkGraph nodes edges
+toFGLGraph (OutGraph ops arcs _) = OhuaGrGraph $ mkGraph nodes edges
   where
     regularNodes = map (\(Operator id type_) -> (unFnId id, type_)) ops
 

@@ -45,6 +45,7 @@ strClassProps toStr = do
     -- TODO add "unlines" test once semantics are decided
     -- prop "unlines" $ \strs -> P.unlines strs == toString (Str.unlines (P.map toStr strs))
   where
+    fromPartial :: Eq a => (s -> Maybe a) -> (String -> a) -> String -> Bool
     fromPartial f1 f2 []  = f1 (toStr "") == Nothing
     fromPartial f1 f2 str = f1 (toStr str) == Just (f2 str)
 
