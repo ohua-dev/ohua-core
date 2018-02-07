@@ -1,3 +1,6 @@
+{-# LANGUAGE DeriveFoldable    #-}
+{-# LANGUAGE DeriveFunctor     #-}
+{-# LANGUAGE DeriveTraversable #-}
 module Ohua.ALang.NS
   ( FunAnn(..)
   , Imports
@@ -12,10 +15,10 @@ import           Ohua.ALang.Lang
 import           Ohua.LensClasses
 import           Ohua.Types
 
-data FunAnn binding = FunAnn
-  { argTypes :: [TyExpr binding]
-  , retType  :: TyExpr binding
-  } deriving (Show, Eq)
+data FunAnn tyExpr = FunAnn
+  { argTypes :: [tyExpr]
+  , retType  :: tyExpr
+  } deriving (Show, Eq, Functor, Foldable, Traversable)
 
 type Imports = [(NSRef, [Binding])]
 
