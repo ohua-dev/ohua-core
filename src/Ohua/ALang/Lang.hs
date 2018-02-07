@@ -25,10 +25,11 @@ import           Data.Functor.Classes
 import           Data.Functor.Compose
 import           Data.Functor.Foldable
 import           Data.Functor.Identity
+import           Data.Generics.Uniplate.Direct
 import           Data.Hashable
 import           Data.String
 import           GHC.Generics
-import           Lens.Micro            ((^.))
+import           Lens.Micro                    ((^.))
 import           Ohua.LensClasses
 import           Ohua.Types
 import           Ohua.Util
@@ -182,6 +183,27 @@ instance (NFData a, NFData b) => NFData (AExpr a b) where
       ApplyF a b -> a `deepseq` rnf b
       LambdaF assign b -> assign `deepseq` rnf b
 
+instance Uniplate (AExpr bndType refType) where
+  uniplate (Var v)               = plate Var |- v
+  uniplate (Let assign val body) = plate Let |- assign |* val |* body
+  uniplate (Apply f v)           = plate Apply |* f |* v
+  uniplate (Lambda assign body)  = plate Lambda |- assign |* body
+
+instance Biplate (AExpr bndType refType) (AExpr bndType refType) where
+  biplate = plateSelf
+
+-- instance Uniplate refType => Biplate (AExpr bndType refType) refTyp where
+--   biplate (Var v)               = plate Var |* v
+--   biplate (Let assign val body) = plate Let |- assign |- val |- body
+--   biplate (Apply f v)           = plate Apply |- f |- v
+--   biplate (Lambda assign body)  = plate Lambda |- assign |- body
+
+-- instance Biplate (AExpr bndType refType) (AbstractAssignment bndType) where
+--   biplate (Var v)               = plate Var |- v
+--   biplate (Let assign val body) = plate Let |* assign |- val |- body
+--   biplate (Apply f v)           = plate Apply |- f |- v
+--   biplate (Lambda assign body)  = plate Lambda |* assign |- body
+
 -- | Backward compatible alias
 type Expr refType = AExpr Binding refType
 
@@ -203,6 +225,14 @@ pattern AnnLambdaF ann assign body = Compose (Annotated ann (LambdaF assign body
 
 instance Recursive (AnnExpr ann bndType refType) where project = Compose . unAnnExpr
 instance Corecursive (AnnExpr ann bndType refType) where embed (Compose v) = AnnExpr v
+
+instance Uniplate (AnnExpr ann bndType refType) where
+  uniplate (AnnVar ann v)               = plate AnnVar |- ann |- v
+  uniplate (AnnLet ann assign val body) = plate AnnLet |- ann |- assign |* val |* body
+  uniplate (AnnApply ann f v)           = plate AnnApply |- ann |* f |* v
+  uniplate (AnnLambda ann assign body)  = plate AnnLambda |- ann |- assign |* body
+
+instance Biplate (AnnExpr ann bndType refType) (AnnExpr ann bndType refType) where biplate = plateSelf
 
 type OptTyAnnExpr = AnnExpr (Maybe DefaultTyExpr) Binding
 
