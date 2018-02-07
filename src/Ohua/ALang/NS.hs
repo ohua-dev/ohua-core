@@ -37,5 +37,5 @@ algoImports f (Namespace a b c d) = (\b' -> Namespace a b' c d) <$> f b
 sfImports :: Lens' (Namespace decls) Imports
 sfImports f (Namespace a b c d) = (\c' -> Namespace a b c' d) <$> f c
 
-instance HasDecls (Namespace decls) (HM.HashMap Binding decls) where
+instance HasDecls (Namespace decls) (Namespace decls') (HM.HashMap Binding decls) (HM.HashMap Binding decls') where
   decls f (Namespace a b c d) = Namespace a b c <$> f d

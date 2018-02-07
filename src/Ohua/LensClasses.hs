@@ -26,4 +26,4 @@ class HasOther s a | s -> a where other :: Lens' s a
 class HasNamespace s a | s -> a where namespace :: Lens' s a
 class HasValue s a | s -> a where value :: Lens' s a
 class HasAnnotation s a | s -> a where annotation :: Lens' s a
-class HasDecls s a | s -> a where decls :: Lens' s a
+class HasDecls s t a b | s -> a, t -> b, s b -> t where decls :: Lens s t a b
