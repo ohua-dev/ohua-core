@@ -215,21 +215,8 @@ instance Default Options where
             Nothing
             False -- for no we always disable this option
 
--- | State of the ohua compiler monad.
-data State envExpr = State !NameGenerator !FnId !(V.Vector envExpr)
-
 -- | The read only compiler environment
 newtype Environment = Environment Options
-
-nameGenerator :: Lens' (State envExpr) NameGenerator
-nameGenerator f (State gen counter envExprs) =
-    f gen <&> \ng -> State ng counter envExprs
-
-idCounter :: Lens' (State envExpr) FnId
-idCounter f (State gen counter envExprs) = f counter <&> \c -> State gen c envExprs
-
-envExpressions :: Lens (State envExpr) (State envExpr') (V.Vector envExpr)  (V.Vector envExpr')
-envExpressions f (State gen counter envExprs) = State gen counter <$> f envExprs
 
 -- | Stateful name generator
 data NameGenerator = NameGenerator !(HS.HashSet Binding) [Binding]

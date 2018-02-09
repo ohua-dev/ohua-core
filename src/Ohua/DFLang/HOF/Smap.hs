@@ -13,14 +13,14 @@
 module Ohua.DFLang.HOF.Smap where
 
 
-import           Control.Monad.Except
-import           Control.Monad.State
-import qualified Data.Sequence        as S
+import           Control.Monad.Freer.Error
+import           Control.Monad.Freer.State
+import qualified Data.Sequence             as S
 import           Ohua.DFLang.HOF
 import           Ohua.DFLang.Lang
-import qualified Ohua.DFLang.Refs     as Refs
+import qualified Ohua.DFLang.Refs          as Refs
 import           Ohua.Monad
-import           Ohua.Types
+import           Ohua.Types                as Ty
 
 
 data SmapFn = SmapFn
@@ -34,7 +34,7 @@ instance HigherOrderFunction SmapFn where
     name = "ohua.lang/smap"
 
     parseCallAndInitState [LamArg lam, Variable v] = return $ SmapFn v lam (error "size uninitialized")
-    parseCallAndInitState _ = throwError "Unexpected number/type of arguments to smap"
+    parseCallAndInitState _ = throwError ("Unexpected number/type of arguments to smap" :: Ty.Error)
 
     createContextEntry = do
         f <- get

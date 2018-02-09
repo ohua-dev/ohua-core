@@ -8,13 +8,22 @@
 -- Portability : portable
 
 -- This source code is licensed under the terms described in the associated LICENSE.TXT file
-{-# LANGUAGE CPP             #-}
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE CPP                       #-}
+{-# LANGUAGE DataKinds                 #-}
+{-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE ExplicitForAll            #-}
+{-# LANGUAGE Rank2Types                #-}
+{-# LANGUAGE RecordWildCards           #-}
+{-# LANGUAGE ScopedTypeVariables       #-}
+{-# LANGUAGE TypeApplications          #-}
+{-# LANGUAGE TypeOperators             #-}
+{-# OPTIONS_GHC -fconstraint-solver-iterations=10 #-}
 module Ohua.Compile where
 
 
 import           Control.DeepSeq
-import           Control.Monad.Except
+import           Control.Monad
+import           Control.Monad.Freer
 import           Data.Default
 import           Data.Functor.Identity
 import qualified Data.HashMap.Strict       as HM
@@ -36,9 +45,12 @@ import           Ohua.Types
 import           Ohua.Util
 import qualified Ohua.Util.Str             as Str
 
+import           Control.Monad.Freer.State
+import qualified Data.Vector               as V
+
 
 data CustomPasses env = CustomPasses
-  { passAfterDFLowering :: DFExpr -> OhuaM env DFExpr
+  { passAfterDFLowering :: forall effs . (Ohua effs, Members '[RecordEnvExpr env, ReadEnvExpr env] effs ) => DFExpr -> Eff effs DFExpr
   }
 
 noCustomPasses :: CustomPasses env
@@ -48,12 +60,12 @@ instance Default (CustomPasses env) where
   def = noCustomPasses
 
 
-forceLog :: (MonadLogger m, NFData a) => Text -> a -> m ()
+forceLog :: (Member Logger effs, NFData a) => Text -> a -> Eff effs ()
 forceLog msg a = a `deepseq` logDebugN msg
 
 
 -- | The canonical order of transformations and lowerings performed in a full compilation.
-pipeline :: CustomPasses env -> Expression -> OhuaM env OutGraph
+pipeline :: (Ohua effs, Members '[ReadEnvExpr env, RecordEnvExpr env] effs) => CustomPasses env -> Expression -> Eff effs OutGraph
 pipeline CustomPasses{..} e = do
     ssaE <- performSSA e
     normalizedE <- normalize ssaE
@@ -77,7 +89,7 @@ pipeline CustomPasses{..} e = do
     Ohua.DFLang.Passes.checkSSAExpr dfE
 #endif
 
-    dfAfterCustom <- passAfterDFLowering dfE
+    dfAfterCustom <-  passAfterDFLowering dfE
 
     optimizedDfE <- Ohua.DFLang.Optimizations.runOptimizations dfAfterCustom
 
@@ -90,14 +102,12 @@ pipeline CustomPasses{..} e = do
 
 
 -- | Run the pipeline in an arbitrary monad that supports error reporting.
-compile :: (MonadError Error m, MonadIO m, MonadLoggerIO m) => Options -> CustomPasses env -> Expression -> m OutGraph
-compile opts passes exprs = do
-    logFn <- askLoggerIO
-    either throwError pure =<< liftIO (runLoggingT (runFromExpr opts (pipeline passes) exprs) logFn)
+compile :: forall effs env . (Members '[OhuaErr, IO, Logger] effs) => Options -> CustomPasses env -> Expression -> Eff effs OutGraph
+compile opts passes = runFromExpr @effs @env opts (pipeline passes)
 
 
 -- | Verify that only higher order fucntions have lambdas as arguments
-checkHigherOrderFunctionSupport :: MonadOhua envExpr m => Expression -> m ()
+checkHigherOrderFunctionSupport :: Ohua effs => Expression -> Eff effs ()
 checkHigherOrderFunctionSupport (Let _ e rest) = do
     checkNestedExpr e
     checkHigherOrderFunctionSupport rest

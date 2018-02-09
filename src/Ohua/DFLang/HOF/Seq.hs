@@ -11,11 +11,11 @@
 {-# LANGUAGE OverloadedLists #-}
 module Ohua.DFLang.HOF.Seq where
 
-import           Control.Monad.State
-import           Data.Sequence       as S
+import           Control.Monad.Freer.State
+import           Data.Sequence             as S
 import           Ohua.DFLang.HOF
 import           Ohua.DFLang.Lang
-import qualified Ohua.DFLang.Refs    as Refs
+import qualified Ohua.DFLang.Refs          as Refs
 import           Ohua.Monad
 import           Ohua.Types
 

@@ -1,26 +1,29 @@
+{-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeOperators       #-}
 module Ohua.DFLang.TailRec where
 
 import           Ohua.ALang.Lang
-import           Ohua.ALang.Refs      as ALangRefs
+import           Ohua.ALang.Refs            as ALangRefs
 import           Ohua.DFLang.Lang
-import qualified Ohua.DFLang.Refs     as Refs
+import qualified Ohua.DFLang.Refs           as Refs
 import           Ohua.DFLang.Util
-import           Ohua.Monad
-import           Ohua.Types
+import           Ohua.Monad                 as M
+import           Ohua.Types                 as Ty
 
 import           Control.Exception
-import           Control.Monad.Except
-import           Control.Monad.Writer
+import           Control.Monad.Freer.Writer
 
+import           Control.Monad
 import           Data.Foldable
-import qualified Data.HashMap.Strict  as HM
-import qualified Data.HashSet         as HS
+import qualified Data.HashMap.Strict        as HM
+import qualified Data.HashSet               as HS
 import           Data.Maybe
-import           Data.Sequence        (Seq, (<|), (|>))
-import qualified Data.Sequence        as S
+import           Data.Monoid
+import           Data.Sequence              (Seq, (<|), (|>))
+import qualified Data.Sequence              as S
 import           Ohua.Util
-import qualified Ohua.Util.Str        as Str
+import qualified Ohua.Util.Str              as Str
 
 
 -- the call in ALang is still (recur algoRef args).
@@ -33,16 +36,16 @@ data RecursiveLambdaSpec = RecursiveLambdaSpec
     } deriving Show
 
 -- | Executed to generate the recursive lambda expression.
-recursionLowering :: (MonadError Error m, MonadGenId m, MonadGenBnd m) => [Binding] -> DFExpr -> m RecursiveLambdaSpec
+recursionLowering :: Members '[M.Error Ty.Error, GenId, GenBnd] effs => [Binding] -> DFExpr -> Eff effs RecursiveLambdaSpec
 --recursionLowering binding = (transformRecursiveTailCall
 recursionLowering lambdaFormals dfExpr0 = do
     result <- transformRecursiveTailCall lambdaFormals $ trace ("Lambda expression:\n" ++ show dfExpr0) dfExpr0
     return $ trace ("-----\ngenerated tailrec transformation:\n" ++ show result) result
 
-transformRecursiveTailCall :: (MonadError Error m, MonadGenId m, MonadGenBnd m) => [Binding] -> DFExpr -> m RecursiveLambdaSpec
+transformRecursiveTailCall :: Members '[M.Error Ty.Error, GenId, GenBnd] effs => [Binding] -> DFExpr -> Eff effs RecursiveLambdaSpec
 transformRecursiveTailCall lambdaFormals exprs = handleRecursiveTailCall lambdaFormals exprs $ traceShowId $ findExpr Refs.recur $ letExprs exprs
 
-handleRecursiveTailCall :: (MonadError Error m, MonadGenBnd m, MonadGenId m) => [Binding] -> DFExpr -> Maybe LetExpr -> m RecursiveLambdaSpec
+handleRecursiveTailCall :: Members '[M.Error Ty.Error, GenBnd, GenId] effs => [Binding] -> DFExpr -> Maybe LetExpr -> Eff effs RecursiveLambdaSpec
 handleRecursiveTailCall _ dfExpr0 Nothing = failWith $ "could not find recur in DFExpr:\n" <> Str.showS dfExpr0
 handleRecursiveTailCall lambdaFormals dfExpr0 (Just recurFn) = do
     let dfExprs = letExprs dfExpr0
@@ -97,11 +100,11 @@ handleRecursiveTailCall lambdaFormals dfExpr0 (Just recurFn) = do
 
 
 -- | Executed whenever an initial call to a recursive algorithm is detected during the lowering.
-lowerRecAlgoCall :: (MonadWriter (Seq LetExpr) m, MonadGenId m)
-                 => (QualifiedBinding -> FnId -> Assignment -> [Expression] -> m (Seq LetExpr))
+lowerRecAlgoCall :: Members '[Writer (Seq LetExpr), GenId] effs
+                 => (QualifiedBinding -> FnId -> Assignment -> [Expression] -> Eff effs (Seq LetExpr))
                  -> [Expression]
                  -> RecursiveLambdaSpec
-                 -> m (QualifiedBinding, FnId, [Expression])
+                 -> Eff effs (QualifiedBinding, FnId, [Expression])
 lowerRecAlgoCall lowerDefault actuals (RecursiveLambdaSpec formalInputs lambdaFormalsToAlgoIn dfExpr) = do
         -- input side
 

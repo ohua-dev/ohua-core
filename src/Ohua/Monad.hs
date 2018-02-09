@@ -1,36 +1,30 @@
 {-# LANGUAGE Rank2Types #-}
 module Ohua.Monad
-    ( OhuaM, runFromExpr, runFromBindings
-    , MonadGenId(generateId, resetIdCounter)
-    , MonadGenBnd(generateBinding, generateBindingWith)
-    , HasEnvExpr(EnvExpr)
-    , MonadReadEnvExpr(lookupEnvExpr), getEnvExpr
-    , MonadRecordEnvExpr(addEnvExpression)
-    , MonadReadEnvironment(getEnvironment), fromEnv
-    , MonadIO(liftIO)
-    , MonadError(throwError, catchError), failWith
-    , MonadLogger, LoggingT, runStderrLoggingT, runHandleLoggingT, runSilentLoggingT, runLoggingT, filterLogger
-    , MonadLoggerIO(askLoggerIO)
+  ( Ohua, OhuaEffList, Eff, Member, Members, runFromExpr, runFromBindings
+    , GenId, generateId, resetIdCounter
+    , GenBnd, generateBinding, generateBindingWith
+    , ReadEnvExpr, lookupEnvExpr, getEnvExpr
+    , RecordEnvExpr, addEnvExpression
+    , Reader, ask
+    , E.Error, OhuaErr, throwError, catchError, failWith
+    , Logger, runStderrLogger, runHandleLogger, runSilentLogger, runLogger, filterLogger
     , LogLevel(..), LogSource, logDebugN, logInfoN
     , logWarnN, logErrorN, logOtherN
-    , MonadOhua
-    -- ** Helper functions for building instances of 'MonadGenBnd'
-    , generateBindingIn, generateBindingWithIn
-    , generateBindingFromGenerator, generateBindingFromGeneratorWith
-    , initNameGen
     ) where
 
-import           Control.Monad.Except
+import           Control.Monad.Freer
+import           Control.Monad.Freer.Error  as E
+import           Control.Monad.Freer.Reader
 import           Lens.Micro
 import           Ohua.Internal.Logging
 import           Ohua.Internal.Monad
-import           Ohua.Types
+import           Ohua.Types                 as Ty
 
 
 -- | Alias for backwards compatibility with old `MonadOhua` interface
-failWith :: MonadError Error m => Error -> m a
+failWith :: Member (E.Error Ty.Error) effs => Ty.Error -> Eff effs a
 failWith = throwError
 
 
-fromEnv :: (MonadReadEnvironment m, Functor m) => Lens' Environment a -> m a
-fromEnv l = (^. l) <$> getEnvironment
+fromEnv :: Member (Reader Environment) effs => Lens' Environment a -> Eff effs a
+fromEnv l = (^. l) <$> ask

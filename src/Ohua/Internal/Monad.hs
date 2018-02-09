@@ -9,27 +9,33 @@
 
 -- This source code is licensed under the terms described in the associated LICENSE.TXT file
 {-# LANGUAGE ConstraintKinds            #-}
+{-# LANGUAGE DataKinds                  #-}
 {-# LANGUAGE DefaultSignatures          #-}
+{-# LANGUAGE ExplicitForAll             #-}
+{-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE LambdaCase                 #-}
 {-# LANGUAGE Rank2Types                 #-}
+{-# LANGUAGE ScopedTypeVariables        #-}
+{-# LANGUAGE TypeOperators              #-}
 module Ohua.Internal.Monad where
 
 
-import           Control.Monad.Except
-import           Control.Monad.Reader
-import qualified Control.Monad.RWS.Lazy
-import           Control.Monad.RWS.Strict   hiding (fail)
-import qualified Control.Monad.State.Lazy
-import qualified Control.Monad.State.Strict
-import           Control.Monad.Writer
+import           Control.Monad
+import           Control.Monad.Freer
+import           Control.Monad.Freer.Error  as E
+import           Control.Monad.Freer.Reader
+import           Control.Monad.Freer.State
+import           Control.Monad.Freer.Writer
+import           Control.Natural
 import qualified Data.HashSet               as HS
+import           Data.Monoid
 import qualified Data.Vector                as V
 import           Lens.Micro.Platform
 import           Ohua.ALang.Lang
 import           Ohua.Internal.Logging
 import           Ohua.Types                 as Ty
 import qualified Ohua.Util.Str              as Str
-
 
 import           Control.DeepSeq
 
@@ -39,183 +45,129 @@ import           Control.DeepSeq
 -- In development this collects errors via a MonadWriter, in production this collection will
 -- be turned off and be replaced by an exception, as such errors should technically not occur
 -- there
-newtype OhuaM env a = OhuaM
-  { runOhuaM :: RWST Environment () (Ty.State env) (ExceptT Error (LoggingT IO)) a
-  } deriving ( Functor
-             , Applicative
-             , Monad
-             , MonadIO
-             , MonadError Error
-             , MonadLogger
-             , MonadLoggerIO
-             )
 
-class MonadGenBnd m where
-    generateBinding :: m Binding
-    default generateBinding :: (MonadGenBnd n, MonadTrans t, Monad n, t n ~ m) => m Binding
-    generateBinding = lift generateBinding
-    generateBindingWith :: Binding -> m Binding
-    default generateBindingWith :: (MonadGenBnd n, MonadTrans t, Monad n, t n ~ m) => Binding -> m Binding
-    generateBindingWith = lift . generateBindingWith
+data GenBnd r where
+  GenerateBinding :: GenBnd Binding
+  GenerateBindingWith :: Binding -> GenBnd Binding
+
+generateBinding :: Member GenBnd effs => Eff effs Binding
+generateBinding = send GenerateBinding
+
+generateBindingWith :: Member GenBnd effs => Binding -> Eff effs Binding
+generateBindingWith = send . GenerateBindingWith
 
 deepseqM :: (Monad m, NFData a) => a -> m ()
 deepseqM a = a `deepseq` pure ()
 
-instance MonadGenBnd (OhuaM env) where
-    generateBinding = OhuaM $ generateBindingIn nameGenerator
-    generateBindingWith = OhuaM . generateBindingWithIn nameGenerator
-
-generateBindingFromGenerator :: NameGenerator -> (Binding, NameGenerator)
-generateBindingFromGenerator g = (h, g')
+runGenBnd :: NameGenerator -> Eff (GenBnd ': effs) ~> Eff effs
+runGenBnd initS = evalState initS . genToState
   where
-    taken = g ^. takenNames
-    (h:t) = dropWhile (`HS.member` taken) (g ^. simpleNameList)
-    g' = g & simpleNameList .~ t
-           & takenNames %~ HS.insert h
+    genToState :: Eff (GenBnd ': effs) ~> Eff (State NameGenerator ': effs)
+    genToState = reinterpret $ \case
+      GenerateBinding -> do
+        g <- get
+        let taken = g ^. takenNames
+            (h:t) = dropWhile (`HS.member` taken) (g ^. simpleNameList)
+            g' = g & simpleNameList .~ t
+                   & takenNames %~ HS.insert h
+        put g'
+        pure h
+      GenerateBindingWith (Binding prefix) -> do
+        g <- get
+        let taken = g ^. takenNames
+            prefix' = prefix <> "_"
+            (h:_) = dropWhile (`HS.member` taken) $ map (Binding . (prefix' <>) . Str.showS) ([0..] :: [Int])
+            g' = g & takenNames %~ HS.insert h
+        put g'
+        pure h
 
-generateBindingFromGeneratorWith :: Binding -> NameGenerator -> (Binding, NameGenerator)
-generateBindingFromGeneratorWith (Binding prefix) g = (h, g')
+data GenId r where
+    GenerateId :: GenId FnId
+    -- | Unsafe. Only use this if you know what you are doing!!
+    ResetIdCounter :: FnId -> GenId ()
+
+generateId :: Member GenId effs => Eff effs FnId
+generateId = send GenerateId
+
+resetIdCounter :: Member GenId effs => FnId -> Eff effs ()
+resetIdCounter = send . ResetIdCounter
+
+runGenId :: FnId -> Eff (GenId ': effs) ~> Eff effs
+runGenId i = evalState i . genToState
   where
-    taken = g ^. takenNames
-    prefix' = prefix <> "_"
-    (h:_) = dropWhile (`HS.member` taken) $ map (Binding . (prefix' <>) . Str.showS) ([0..] :: [Int])
-    g' = g & takenNames %~ HS.insert h
-
-generateBindingIn :: MonadState s m => Lens' s NameGenerator -> m Binding
-generateBindingIn accessor = do
-  (bnd, gen') <- generateBindingFromGenerator <$> use accessor
-  accessor .= gen'
-  pure bnd
-
-generateBindingWithIn :: MonadState s m => Lens' s NameGenerator -> Binding -> m Binding
-generateBindingWithIn accessor prefix = do
-  (bnd, gen') <- generateBindingFromGeneratorWith prefix <$> use accessor
-  accessor .= gen'
-  pure bnd
-
-instance (MonadGenBnd m, Monad m) => MonadGenBnd (ReaderT e m)
-instance (MonadGenBnd m, Monad m, Monoid w) => MonadGenBnd (WriterT w m)
-instance (MonadGenBnd m, Monad m) => MonadGenBnd (Control.Monad.State.Strict.StateT s m)
-instance (MonadGenBnd m, Monad m) => MonadGenBnd (Control.Monad.State.Lazy.StateT s m)
-instance (MonadGenBnd m, Monad m, Monoid w) => MonadGenBnd (Control.Monad.RWS.Strict.RWST e w s m)
-instance (MonadGenBnd m, Monad m, Monoid w) => MonadGenBnd (Control.Monad.RWS.Lazy.RWST e w s m)
-
-class MonadGenId m where
-    generateId :: m FnId
-    default generateId :: (MonadGenId n, Monad n, MonadTrans t, t n ~ m) => m FnId
-    generateId = lift generateId
-    -- | Unsafe. Only use this if yoy know what you are doing!!
-    resetIdCounter :: FnId -> m ()
-    default resetIdCounter :: (MonadGenId n, Monad n, MonadTrans t, t n ~ m) => FnId -> m ()
-    resetIdCounter = lift . resetIdCounter
+    genToState :: Eff (GenId ': effs) ~> Eff (State FnId ': effs)
+    genToState = reinterpret $ \case
+      GenerateId -> modify (succ :: FnId -> FnId) >> get
+      ResetIdCounter val -> put val
 
 
-instance MonadGenId (OhuaM env) where
-  generateId = OhuaM $ do
-    idCounter %= succ
-    use idCounter
-  resetIdCounter val = OhuaM $ idCounter .= val
+data ReadEnvExpr expr r where
+    LookupEnvExpr :: HostExpr -> ReadEnvExpr expr (Maybe expr)
 
-instance (MonadGenId m, Monad m) => MonadGenId (ReaderT e m)
-instance (MonadGenId m, Monad m, Monoid w) => MonadGenId (WriterT w m)
-instance (MonadGenId m, Monad m) => MonadGenId (Control.Monad.State.Strict.StateT s m)
-instance (MonadGenId m, Monad m) => MonadGenId (Control.Monad.State.Lazy.StateT s m)
-instance (MonadGenId m, Monad m, Monoid w) => MonadGenId (Control.Monad.RWS.Lazy.RWST e w s m)
-instance (MonadGenId m, Monad m, Monoid w) => MonadGenId (Control.Monad.RWS.Strict.RWST e w s m)
+lookupEnvExpr :: Member (ReadEnvExpr expr) effs => HostExpr -> Eff effs (Maybe expr)
+lookupEnvExpr = send . LookupEnvExpr
 
-class HasEnvExpr (m :: * -> *) where
-    type EnvExpr m
+runReadEnvExpr :: forall effs expr . Member (State (V.Vector expr)) effs
+               => Eff (ReadEnvExpr expr ': effs) ~> Eff effs
+runReadEnvExpr = interpret $ \case
+  LookupEnvExpr (HostExpr i) -> (^? ix i) <$> (get :: Eff effs (V.Vector expr))
 
-instance HasEnvExpr (OhuaM e) where
-    type EnvExpr (OhuaM e) = e
+getEnvExpr :: Members '[E.Error Ty.Error, ReadEnvExpr expr] effs => HostExpr -> Eff effs expr
+getEnvExpr = maybe (throwError msg) pure <=< lookupEnvExpr
+  where msg = "Invariant violated, host expression was not defined." :: Ty.Error
 
-instance HasEnvExpr (ReaderT e m) where
-    type EnvExpr (ReaderT e m) = EnvExpr m
-instance HasEnvExpr (WriterT w m) where
-    type EnvExpr (WriterT w m) = EnvExpr m
-instance HasEnvExpr (Control.Monad.State.Strict.StateT s m) where
-    type EnvExpr (Control.Monad.State.Strict.StateT s m) = EnvExpr m
-instance HasEnvExpr (Control.Monad.State.Lazy.StateT s m) where
-    type EnvExpr (Control.Monad.State.Lazy.StateT s m) = EnvExpr m
-instance HasEnvExpr (Control.Monad.RWS.Lazy.RWST e w s m) where
-    type EnvExpr (Control.Monad.RWS.Lazy.RWST e w s m) = EnvExpr m
-instance HasEnvExpr (Control.Monad.RWS.Strict.RWST e w s m) where
-    type EnvExpr (Control.Monad.RWS.Strict.RWST e w s m) = EnvExpr m
+data RecordEnvExpr expr r where
+  AddEnvExpression :: expr -> RecordEnvExpr expr HostExpr
 
-class HasEnvExpr m => MonadReadEnvExpr m where
-    lookupEnvExpr :: HostExpr -> m (Maybe (EnvExpr m))
-    default lookupEnvExpr :: (MonadReadEnvExpr n, MonadTrans t, Monad n, m ~ t n, EnvExpr m ~ EnvExpr n) => HostExpr -> m (Maybe (EnvExpr m))
-    lookupEnvExpr = lift . lookupEnvExpr
+addEnvExpression :: Member (RecordEnvExpr expr) effs => expr -> Eff effs HostExpr
+addEnvExpression = send . AddEnvExpression
 
-instance MonadReadEnvExpr (OhuaM env) where
-    lookupEnvExpr (HostExpr i) = OhuaM $ preuse (envExpressions . ix i)
+runRecordEnvExpr :: forall effs expr . Member (State (V.Vector expr)) effs
+                 => Eff (RecordEnvExpr expr ': effs) ~> Eff effs
+runRecordEnvExpr = interpret $ \case
+  AddEnvExpression e -> do
+    modify (`V.snoc` e)
+    HostExpr . (V.length :: V.Vector expr -> Int) <$> get
 
-instance (MonadReadEnvExpr m, Monad m) => MonadReadEnvExpr (ReaderT e m)
-instance (MonadReadEnvExpr m, Monad m, Monoid w) => MonadReadEnvExpr (WriterT w m)
-instance (MonadReadEnvExpr m, Monad m) => MonadReadEnvExpr (Control.Monad.State.Strict.StateT s m)
-instance (MonadReadEnvExpr m, Monad m) => MonadReadEnvExpr (Control.Monad.State.Lazy.StateT s m)
-instance (MonadReadEnvExpr m, Monad m, Monoid w) => MonadReadEnvExpr (Control.Monad.RWS.Lazy.RWST e w s m)
-instance (MonadReadEnvExpr m, Monad m, Monoid w) => MonadReadEnvExpr (Control.Monad.RWS.Strict.RWST e w s m)
+type Ohua effs = Members OhuaEffList effs
 
-getEnvExpr :: (MonadError Error m, MonadReadEnvExpr m) => HostExpr -> m (EnvExpr m)
-getEnvExpr =  maybe (throwError msg) pure <=< lookupEnvExpr
-  where msg = "Invariant violated, host expression was not defined."
+type OhuaErr = E.Error Ty.Error
 
-class HasEnvExpr m => MonadRecordEnvExpr m where
-    addEnvExpression :: EnvExpr m -> m HostExpr
-    default addEnvExpression :: (MonadTrans t, Monad n, MonadRecordEnvExpr n, t n ~ m, EnvExpr m ~ EnvExpr n) => EnvExpr m -> m HostExpr
-    addEnvExpression = lift . addEnvExpression
+type OhuaEffList = '[ GenId
+                    , GenBnd
+                    , OhuaErr
+                    , IO
+                    , Reader Environment
+                    , Logger
+                    ]
 
-instance MonadRecordEnvExpr (OhuaM env) where
-    addEnvExpression expr = OhuaM $ do
-        envExpressions %= (`V.snoc` expr)
-        HostExpr . V.length <$> use envExpressions
-
-
-instance (MonadRecordEnvExpr m, Monad m) => MonadRecordEnvExpr (ReaderT e m)
-instance (MonadRecordEnvExpr m, Monad m, Monoid w) => MonadRecordEnvExpr (WriterT w m)
-instance (MonadRecordEnvExpr m, Monad m) => MonadRecordEnvExpr (Control.Monad.State.Strict.StateT s m)
-instance (MonadRecordEnvExpr m, Monad m) => MonadRecordEnvExpr (Control.Monad.State.Lazy.StateT s m)
-instance (MonadRecordEnvExpr m, Monad m, Monoid w) => MonadRecordEnvExpr (Control.Monad.RWS.Strict.RWST e w s m)
-instance (MonadRecordEnvExpr m, Monad m, Monoid w) => MonadRecordEnvExpr (Control.Monad.RWS.Lazy.RWST e w s m)
-
-class MonadReadEnvironment m where
-    getEnvironment :: m Environment
-    default getEnvironment :: (MonadTrans t, Monad n, MonadReadEnvironment n, t n ~ m) => m Environment
-    getEnvironment = lift getEnvironment
-
-instance MonadReadEnvironment (OhuaM env) where
-    getEnvironment = OhuaM ask
-
-instance (MonadReadEnvironment m, Monad m) => MonadReadEnvironment (ReaderT e m)
-instance (MonadReadEnvironment m, Monad m) => MonadReadEnvironment (Control.Monad.State.Lazy.StateT s m)
-instance (MonadReadEnvironment m, Monad m) => MonadReadEnvironment (Control.Monad.State.Strict.StateT s m)
-instance (MonadReadEnvironment m, Monad m, Monoid w) => MonadReadEnvironment (WriterT w m)
-instance (MonadReadEnvironment m, Monad m, Monoid w) => MonadReadEnvironment (Control.Monad.RWS.Lazy.RWST e w s m)
-instance (MonadReadEnvironment m, Monad m, Monoid w) => MonadReadEnvironment (Control.Monad.RWS.Strict.RWST e w s m)
-
-type MonadOhua env m = ( MonadGenId m
-                       , MonadGenBnd m
-                       , MonadReadEnvExpr m
-                       , MonadRecordEnvExpr m
-                       , MonadError Error m
-                       , MonadIO m
-                       , MonadReadEnvironment m
-                       , EnvExpr m ~ env
-                       , MonadLogger m
-                       )
+type OhuaEffs expr effs = GenBnd ': GenId ': ReadEnvExpr expr ': RecordEnvExpr expr ': Reader Environment ': State (V.Vector expr) ': effs
 
 -- | Run a compiler
 -- Creates the state from the tree being passed in
 -- If there are any errors during the compilation they are reported together at the end
-runFromExpr :: Options -> (Expression -> OhuaM env result) -> Expression -> LoggingT IO (Either Error result)
+runFromExpr :: Members '[Logger, IO, E.Error Ty.Error] effs
+            => Options
+            -> (Expression -> Eff (OhuaEffs env effs) result)
+            -> Expression
+            -> Eff effs result
 runFromExpr opts f tree = runFromBindings opts (f tree) $ HS.fromList $ extractBindings tree
 
-runFromBindings :: Options -> OhuaM env result -> HS.HashSet Binding -> LoggingT IO (Either Error result)
-runFromBindings opts f taken = runExceptT $ fst <$> evalRWST (runOhuaM f) env s0
+runFromBindings :: forall env effs result . Members '[Logger, IO, E.Error Ty.Error] effs
+                => Options
+                -> Eff (OhuaEffs env effs) result
+                -> HS.HashSet Binding
+                -> Eff effs result
+runFromBindings opts f taken
+  = evalState (mempty :: V.Vector env)
+  $ runReader env
+  $ runRecordEnvExpr
+  $ runReadEnvExpr
+  $ runGenId 0
+  $ runGenBnd nameGen
+  $ f
   where
     nameGen = initNameGen taken
-    s0 = State nameGen 0 mempty
     env = Environment opts
 
 

@@ -8,33 +8,37 @@
 -- Portability : portable
 
 -- This source code is licensed under the terms described in the associated LICENSE.TXT file
+{-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE ExplicitForAll      #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeOperators       #-}
 module Ohua.ALang.Passes where
 
 
 import           Control.Applicative
-import           Control.Monad.Reader
-import           Control.Monad.RWS.Lazy
-import           Control.Monad.State
-import           Control.Monad.Writer
+import           Control.Monad
+import           Control.Monad.Freer
+import           Control.Monad.Freer.Reader
+import           Control.Monad.Freer.State
+import           Control.Monad.Freer.Writer
+import qualified Control.Monad.RWS          as Mtl
+import qualified Control.Monad.Writer       as Mtl
 import           Data.Bifunctor
 import           Data.Functor.Foldable
-import qualified Data.HashMap.Strict    as HM
-import qualified Data.HashSet           as HS
-import           Data.Maybe             (fromMaybe)
+import qualified Data.HashMap.Strict        as HM
+import qualified Data.HashSet               as HS
+import           Data.Maybe                 (fromMaybe)
 import           Ohua.ALang.Lang
 import           Ohua.ALang.Util
 import           Ohua.Monad
-import           Ohua.Types
-import           Ohua.Util.Str          as Str
-
+import           Ohua.Types                 as Ty
+import           Ohua.Util.Str              as Str
 
 
 -- | Inline all references to lambdas.
 -- Aka `let f = (\a -> E) in f N` -> `(\a -> E) N`
-inlineLambdaRefs :: MonadOhua envExpr m => Expression -> m Expression
-inlineLambdaRefs = flip runReaderT mempty . para go
+inlineLambdaRefs :: Member OhuaErr effs => Expression -> Eff effs Expression
+inlineLambdaRefs = runReader (mempty :: HM.HashMap Binding Expression) . para go
   where
     go (LetF assignment (Lambda _ _,l) (_, body)) =
       case assignment of
@@ -107,7 +111,7 @@ idName = QualifiedBinding (nsRefFromList ["ohua", "lang"]) "id"
 -- | Inline all direct reassignments.
 -- Aka `let x = E in let y = x in y` -> `let x = E in x`
 inlineReassignments :: Expression -> Expression
-inlineReassignments = flip runReader mempty . cata go
+inlineReassignments = run . runReader (mempty :: HM.HashMap Binding Expression) . cata go
   where
     go (LetF assign val body) = val >>= \case
       v@(Var _) -> case assign of
@@ -123,12 +127,12 @@ inlineReassignments = flip runReader mempty . cata go
 -- Aka `let x = E in some/sf a` -> `let x = E in let y = some/sf a in y`
 --
 -- EDIT: Now also does the same for any residual lambdas
-ensureFinalLet :: MonadOhua envExpr m => Expression -> m Expression
+ensureFinalLet :: Member GenBnd effs => Expression -> Eff effs Expression
 ensureFinalLet = ensureFinalLetInLambdas >=> ensureFinalLet'
 
 
 -- | Transforms the final expression into a let expression with the result variable as body.
-ensureFinalLet' :: MonadOhua envExpr m => Expression -> m Expression
+ensureFinalLet' :: Member GenBnd effs => Expression -> Eff effs Expression
 ensureFinalLet' (Let a e b) = Let a e <$> ensureFinalLet' b
 ensureFinalLet' v@(Var _) = return v
 ensureFinalLet' a = do
@@ -136,13 +140,13 @@ ensureFinalLet' a = do
     return $ Let (Direct newBnd) a (Var (Local newBnd))
 
 
-ensureFinalLetInLambdas :: MonadOhua envExpr m => Expression -> m Expression
+ensureFinalLetInLambdas :: Member GenBnd effs => Expression -> Eff effs Expression
 ensureFinalLetInLambdas = cata $ \case
     LambdaF bnd body -> Lambda bnd <$> (ensureFinalLet' =<< body)
     a -> embed <$> sequence a
 
 
-ensureAtLeastOneCall :: (Monad m, MonadGenBnd m) => Expression -> m Expression
+ensureAtLeastOneCall :: Member GenBnd effs => Expression -> Eff effs Expression
 ensureAtLeastOneCall e@(Var _) = do
   newBnd <- generateBinding
   pure $ Let (Direct newBnd) (Var (Sf idName Nothing) `Apply` e) $ Var (Local newBnd)
@@ -161,11 +165,11 @@ ensureAtLeastOneCall e = cata f e
 -- and therefore cannot be removed.
 -- Assumes ssa for simplicity
 removeUnusedBindings :: Expression -> Expression
-removeUnusedBindings = fst . runWriter . cata go
+removeUnusedBindings = fst . Mtl.runWriter . cata go
   where
-    go (VarF val@(Local b)) = tell (HS.singleton b) >> return (Var val)
+    go (VarF val@(Local b)) = Mtl.tell (HS.singleton b) >> return (Var val)
     go (LetF bnds val body) = do
-        (inner, used) <- listen body
+        (inner, used) <- Mtl.listen body
         if not $ any (`HS.member` used) $ flattenAssign bnds
           then
             return inner
@@ -184,28 +188,28 @@ removeUnusedBindings = fst . runWriter . cata go
 -- It is recommended therefore to check this with 'noUndefinedBindings'.
 -- If an undefined binding is left behind which indicates the source expression
 -- was not fulfilling all its invariants.
-removeCurrying :: forall m. MonadError Error m => Expression -> m Expression
-removeCurrying e = fst <$> evalRWST (para inlinePartials e) mempty ()
+removeCurrying :: Member OhuaErr effs => Expression -> Eff effs Expression
+removeCurrying e = fst <$> Mtl.evalRWST (para inlinePartials e) mempty ()
   where
     inlinePartials (LetF assign@(Direct bnd) (_, val) (_, body)) = do
         val' <- val
-        (body', touched) <- listen $ local (HM.insert bnd val') body
+        (body', touched) <- Mtl.listen $ Mtl.local (HM.insert bnd val') body
         pure $
             if bnd `HS.member` touched then
                 body'
             else
                 Let assign val' body'
     inlinePartials (ApplyF (Var (Local bnd), _) (_, arg)) = do
-        tell $ HS.singleton bnd
-        val <- asks (HM.lookup bnd)
+        Mtl.tell $ HS.singleton bnd
+        val <- Mtl.asks (HM.lookup bnd)
         Apply
-          <$> (maybe (failWith $ "No suitable value found for binding " <> Str.showS bnd) pure val)
+          <$> (maybe (Mtl.lift $ failWith $ "No suitable value found for binding " <> Str.showS bnd) pure val)
           <*> arg
     inlinePartials e = embed <$> traverse snd e
 
 
 -- | Ensures the expression is a sequence of let statements terminated with a local variable.
-hasFinalLet :: MonadOhua envExpr m => Expression -> m ()
+hasFinalLet :: Member OhuaErr effs => Expression -> Eff effs ()
 hasFinalLet (Let _ _ body)  = hasFinalLet body
 hasFinalLet (Var (Local _)) = return ()
 hasFinalLet (Var _)         = failWith "Non-local final var"
@@ -213,12 +217,12 @@ hasFinalLet _               = failWith "Final value is not a var"
 
 
 -- | Ensures all of the optionally provided stateful function ids are unique.
-noDuplicateIds :: MonadError Error m => Expression -> m ()
-noDuplicateIds = flip evalStateT mempty . cata go
+noDuplicateIds :: Member OhuaErr effs => Expression -> Eff effs ()
+noDuplicateIds = evalState (mempty :: HS.HashSet FnId) . cata go
   where
     go e@(VarF (Sf _ (Just funid))) = do
       isMember <- gets (HS.member funid)
-      when isMember $ failWith $ "Duplicate id " <> Str.showS funid
+      when isMember $ failWith ("Duplicate id " <> Str.showS funid :: Ty.Error)
       modify (HS.insert funid)
     go e = sequence_ e
 
@@ -226,22 +230,22 @@ noDuplicateIds = flip evalStateT mempty . cata go
 -- | Checks that no apply to a local variable is performed.
 -- This is a simple check and it will pass on complex expressions even if they would reduce
 -- to an apply to a local variable.
-applyToSf :: MonadOhua envExpr m => Expression -> m ()
+applyToSf :: Member OhuaErr effs => Expression -> Eff effs ()
 applyToSf = para $ \case
   ApplyF (Var (Local bnd),_) _ -> failWith $ "Illegal Apply to local var " <> Str.showS bnd
   e -> sequence_ $ fmap snd e
 
 -- FIXME this function is never called. was it supposed to be part of the below validity check?
-lamdasAreInputToHigherOrderFunctions :: MonadOhua envExpr m => Expression -> m ()
-lamdasAreInputToHigherOrderFunctions _                         = return ()
+lamdasAreInputToHigherOrderFunctions :: Monad m => Expression -> m ()
+lamdasAreInputToHigherOrderFunctions _ = return ()
 -- lamdasAreInputToHigherOrderFunctions (Apply v (Lambda _ body)) = undefined
 
 
 -- | Checks that all local bindings are defined before use.
 -- Scoped. Aka bindings are only visible in their respective scopes.
 -- Hence the expression does not need to be in SSA form.
-noUndefinedBindings :: MonadOhua envExpr m => Expression -> m ()
-noUndefinedBindings = flip runReaderT mempty . cata go
+noUndefinedBindings :: Member OhuaErr effs => Expression -> Eff effs ()
+noUndefinedBindings = runReader (mempty :: HS.HashSet Binding) . cata go
   where
     go (LetF (Recursive r) val body) = local (HS.insert r) $ val >> body
     go (LetF assign val body) = val >> local (HS.union $ HS.fromList $ flattenAssign assign) body
@@ -252,7 +256,7 @@ noUndefinedBindings = flip runReaderT mempty . cata go
     go e = sequence_ e
 
 
-checkProgramValidity :: MonadOhua envExpr m => Expression -> m ()
+checkProgramValidity :: Member OhuaErr effs => Expression -> Eff effs ()
 checkProgramValidity e = do
     hasFinalLet e
     noDuplicateIds e
@@ -261,7 +265,7 @@ checkProgramValidity e = do
 
 
 -- | Lifts something like @if (f x) a b@ to @let x0 = f x in if x0 a b@
-liftApplyToApply :: MonadOhua envExpr m => Expression -> m Expression
+liftApplyToApply :: Member GenBnd effs => Expression -> Eff effs Expression
 liftApplyToApply = lrPrewalkExprM $ \case
   Apply fn arg@(Apply _ _) -> do
     bnd <- generateBinding
@@ -270,7 +274,7 @@ liftApplyToApply = lrPrewalkExprM $ \case
 
 
 -- The canonical composition of the above transformations to create a program with the invariants we expect.
-normalize :: MonadOhua envExpr m => Expression -> m Expression
+normalize :: Ohua effs => Expression -> Eff effs Expression
 normalize e =
         reduceLambdas (letLift e)
     >>= removeCurrying
@@ -316,7 +320,7 @@ environment expression.
 The idea is that you can use this to create a custom pass by supplying a
 domain specific compression function.
 -}
-compressEnvExpressions :: forall env m. MonadOhua env m
+compressEnvExpressions :: forall env m effs. (Members '[ReadEnvExpr env, RecordEnvExpr env] effs, m ~ Eff effs)
                        => (EnvOnlyExpr -> m env) -> Expression -> m Expression
 compressEnvExpressions compress = either pure compress' <=< go
   where

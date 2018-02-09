@@ -13,7 +13,9 @@
 module PassesSpec (passesSpec) where
 
 import           Control.DeepSeq
-import           Control.Monad.Except
+import           Control.Monad
+import           Control.Monad.Freer
+import           Control.Monad.Freer.Error
 import           Data.Default
 import           Data.Either
 import           Data.Functor.Identity
@@ -25,7 +27,7 @@ import           Ohua.ALang.Passes.TailRec
 import qualified Ohua.ALang.Refs           as ALangRefs
 import           Ohua.ALang.Show
 import           Ohua.Monad
-import           Ohua.Types
+import           Ohua.Types                as Ty
 import           Test.Hspec
 import           Test.Hspec.QuickCheck
 import           Test.QuickCheck
@@ -47,14 +49,21 @@ smapName = "ohua.lang/smap"
 instance Num ResolvedSymbol where fromInteger = Env . fromInteger
 instance Num Expression where fromInteger = Var . fromInteger
 
-runPasses expr = runSilentLoggingT $ flip (runFromExpr def) expr $ performSSA >=> (normalize >=> \e -> checkProgramValidity e >> return e)
+
+runPasses :: Expression -> IO (Either Ty.Error Expression)
+runPasses expr
+  = runM
+  $ runError
+  $ runSilentLogger
+  $ flip (runFromExpr def) expr
+  $ performSSA >=> (normalize >=> \e -> checkProgramValidity e >> return e)
 
 type ALangCheck = Either String
 
 
 everyLetBindsCall :: Expression -> ALangCheck ()
 everyLetBindsCall (Let _ (Apply _ _) body) = everyLetBindsCall body
-everyLetBindsCall (Let _ _ _)              = throwError "Let without call"
+everyLetBindsCall (Let _ _ _)              = Left "Let without call"
 everyLetBindsCall _                        = return ()
 
 
@@ -64,7 +73,7 @@ noNestedLets _                  = return ()
 
 
 noLets :: Expression -> ALangCheck ()
-noLets (Let _ _ _)         = throwError "Found a let"
+noLets (Let _ _ _)         = Left "Found a let"
 noLets (Apply expr1 expr2) = noLets expr1 >> noLets expr2
 noLets (Lambda _ expr)     = noLets expr
 noLets _                   = return ()
@@ -74,7 +83,7 @@ checkInvariants :: Expression -> ALangCheck ()
 checkInvariants expr = do
     noNestedLets expr
     everyLetBindsCall expr
-    maybe (return ()) (throwError . show) $ isSSA expr
+    maybe (return ()) (Left . show) $ isSSA expr
 
 prop_passes :: Expression -> Property
 prop_passes input = ioProperty $ do
@@ -126,7 +135,8 @@ passesSpec = do
         it "Reduces lambdas as far as possible but does not remove them when argument" $
             runPasses lambda_with_app_as_arg `shouldSatisfyRet` either (const False) lambdaStaysInput
 
-        let normalize' = runSilentLoggingT . runFromExpr def normalize
+        let normalize' :: Expression -> IO (Either Ty.Error Expression)
+            normalize' = runM . runError . runSilentLogger . runFromExpr def normalize
             e = Let "f" (Lambda "x" ("some/fn" `Apply` "x")) $
                 Let "g" ("f" `Apply` "a")
                 "g" `Apply` "b" :: Expression
@@ -148,7 +158,8 @@ passesSpec = do
 
 
     describe "remove currying pass" $ do
-        let removeCurrying = runSilentLoggingT . flip (runFromBindings def) mempty . Ohua.ALang.Passes.removeCurrying
+        let removeCurrying ::  Expression -> IO (Either Ty.Error Expression)
+            removeCurrying = runM . runError . runSilentLogger . flip (runFromBindings def) mempty . Ohua.ALang.Passes.removeCurrying
         it "inlines curring" $
             removeCurrying (Let "a" ("mod/fun" `Apply` "b") ("a" `Apply` "c"))
             `shouldReturn`

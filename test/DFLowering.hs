@@ -7,6 +7,8 @@ module DFLowering where
 
 import           Control.Arrow
 import           Control.Monad
+import           Control.Monad.Freer
+import           Control.Monad.Freer.Error
 import           Data.Default
 import           Data.Foldable
 import           Data.Function
@@ -82,7 +84,7 @@ traceGr g = trace (prettify $ unGr g) g
 
 
 runLowering :: Expression -> IO DFExpr
-runLowering = fmap (either (error . Str.toString) id) . runSilentLoggingT . runFromExpr def lowerALang
+runLowering = fmap (either (error . (Str.toString :: Str.Str -> String)) id) . runM . runError  . runSilentLogger . runFromExpr def lowerALang
 
 
 -- | IMPORTANT: Both source and target expression must be in SSA form
