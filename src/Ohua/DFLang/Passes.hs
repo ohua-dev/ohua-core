@@ -59,9 +59,9 @@ type Pass m = QualifiedBinding -> FnId -> Assignment -> [Expression] -> m (Seq L
 --data AlgoSpec m = AlgoSpec { formalInputVars :: [Binding],
 --                             dfExpr :: m DFExpr }
 
-newtype LetRec m = LetRec { unLetRec :: HM.HashMap Binding (m RecursiveLambdaSpec) }
+newtype LetRec = LetRec { unLetRec :: HM.HashMap Binding (Assignment, Expression, Binding) }
 
-type LetRecT m a = ReaderT (LetRec m) m a
+type LetRecT m a = ReaderT LetRec m a
 
 traceState :: (MonadOhua env m, MonadWriter (Seq LetExpr) m)
            => LetRecT m a -> LetRecT m a
@@ -132,10 +132,8 @@ handleDefinitionalExpr assign l@(Lambda arg expr) cont = do
                     Direct b -> pure b
                     x -> failWith $ "Invariant broken. Assignment should be a 'Direct' but was: " <> Str.showS x
 
-    let continuation = recursionLowering [singleArg] =<< lowerLambdaExpr assign expr
-
     -- execute the rest of the traversal (the continuation) in the new LetRecT environment
-    local (LetRec . HM.insert b continuation . unLetRec) cont
+    local (LetRec . HM.insert b (assign, expr, singleArg) . unLetRec) cont
 handleDefinitionalExpr assign l@(Apply _ _) cont = do
     (fn, fnId, args) <- handleApplyExpr l
     case HM.lookup fn hofNames of
@@ -159,8 +157,10 @@ handleApplyExpr l@(Apply fn arg) = ask >>= go l [] . unLetRec
         case v of
             Sf fn id -> (fn, , args) <$> maybe generateId return id
             Local bnd
-                | Just algo <- HM.lookup bnd recAlgos ->
-                    lowerRecAlgoCall lowerDefault args =<< lift algo
+                | Just (assign, expr, singleArg) <- HM.lookup bnd recAlgos ->
+                  lowerLambdaExpr assign expr
+                  >>= recursionLowering [singleArg]
+                  >>= lowerRecAlgoCall lowerDefault args
                 | otherwise ->
                     fromEnv (options . callLocalFunction) >>= \case
                         Nothing -> failWith "Calling local functions is not supported in this adapter"
