@@ -16,7 +16,7 @@ dependencies:
 - base >=4.8 && <5
 - text
 - mtl
-- aeson
+- aeson >= 1.0.0.0
 - microlens
 - microlens-platform
 - microlens-mtl
@@ -29,12 +29,15 @@ default-extensions:
 - MultiParamTypeClasses
 - FunctionalDependencies
 - TypeFamilies
+- GADTs
 - FlexibleContexts
 - FlexibleInstances
 - TypeSynonymInstances
 - LambdaCase
 - TupleSections
 - BangPatterns
+- ExplicitForAll
+- ScopedTypeVariables
 ghc-options:
 - -Wall
 - -Wcompat
