@@ -14,22 +14,25 @@
 -- @Data.Aeson@.
 
 -- This source code is licensed under the terms described in the associated LICENSE.TXT file
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 module Ohua.Serialize.JSON (encode, eitherDecode) where
 
 
 import           Data.Aeson
-import           Data.Aeson.Types
 import           Data.List
 import           Data.Maybe
 import           Ohua.ALang.Lang
 import           Ohua.DFGraph
-import           Ohua.Types
-import qualified Ohua.Util.Str    as Str
+import           Ohua.Types      hiding (Options)
+import qualified Ohua.Util.Str   as Str
 
+baseOptions :: Options
 baseOptions = defaultOptions
     { unwrapUnaryRecords = True
     , fieldLabelModifier = camelTo2 '_'
     }
+
+sourceOptions :: Options
 sourceOptions = baseOptions
     { constructorTagModifier = \case
         "LocalSource" -> "local"
@@ -38,11 +41,13 @@ sourceOptions = baseOptions
     , sumEncoding = TaggedObject "type" "val"
     }
 
+operatorOptions :: Options
 operatorOptions = baseOptions
     { fieldLabelModifier =
         fieldLabelModifier baseOptions . fromMaybe (error "no prefix") . stripPrefix "operator"
     }
 
+qualBindOptions :: Options
 qualBindOptions = baseOptions
     { fieldLabelModifier =
         fieldLabelModifier baseOptions . fromMaybe (error "no prefix") . stripPrefix "qb"

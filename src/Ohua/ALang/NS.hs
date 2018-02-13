@@ -11,7 +11,6 @@ module Ohua.ALang.NS
 
 import qualified Data.HashMap.Strict as HM
 import           Lens.Micro
-import           Ohua.ALang.Lang
 import           Ohua.LensClasses
 import           Ohua.Types
 

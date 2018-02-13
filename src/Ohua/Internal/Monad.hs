@@ -69,7 +69,9 @@ generateBindingFromGenerator :: NameGenerator -> (Binding, NameGenerator)
 generateBindingFromGenerator g = (h, g')
   where
     taken = g ^. takenNames
-    (h:t) = dropWhile (`HS.member` taken) (g ^. simpleNameList)
+    (h,t) = case dropWhile (`HS.member` taken) (g ^. simpleNameList) of
+              (x:xs) -> (x, xs)
+              [] -> error "Simple names is empty, this should be impossible"
     g' = g & simpleNameList .~ t
            & takenNames %~ HS.insert h
 
@@ -78,7 +80,7 @@ generateBindingFromGeneratorWith (Binding prefix) g = (h, g')
   where
     taken = g ^. takenNames
     prefix' = prefix <> "_"
-    (h:_) = dropWhile (`HS.member` taken) $ map (Binding . (prefix' <>) . Str.showS) ([0..] :: [Int])
+    h = head $ dropWhile (`HS.member` taken) $ map (Binding . (prefix' <>) . Str.showS) ([0..] :: [Int])
     g' = g & takenNames %~ HS.insert h
 
 generateBindingIn :: MonadState s m => Lens' s NameGenerator -> m Binding

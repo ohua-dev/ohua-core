@@ -12,7 +12,6 @@
 {-# LANGUAGE TupleSections              #-}
 module Ohua.ALang.Passes.SSA where
 
-import           Control.Arrow
 import           Control.Monad.Except
 import           Control.Monad.Reader
 import           Control.Monad.State

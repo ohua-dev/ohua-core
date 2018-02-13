@@ -18,10 +18,6 @@ module Ohua.ALang.Lang where
 
 
 import           Control.DeepSeq
-import           Data.Bifoldable
-import           Data.Bifunctor
-import           Data.Bitraversable
-import           Data.Functor.Classes
 import           Data.Functor.Compose
 import           Data.Functor.Foldable
 import           Data.Functor.Identity
@@ -160,10 +156,26 @@ instance Recursive (AExpr bndType refType) where
 instance Corecursive (AExpr bndType refType) where
   embed = AExpr
 
+pattern Var :: refType -> AExpr bndType refType
 pattern Var v = AExpr (VarF v)
+
+pattern Let :: AbstractAssignment bndType
+            -> AExpr bndType refType
+            -> AExpr bndType refType
+            -> AExpr bndType refType
 pattern Let a b c = AExpr (LetF a b c)
+
+pattern Apply :: AExpr bndType refType
+              -> AExpr bndType refType
+              -> AExpr bndType refType
 pattern Apply a b = AExpr (ApplyF a b)
+
+pattern Lambda :: AbstractAssignment bndType
+               -> AExpr bndType refType
+               -> AExpr bndType refType
 pattern Lambda a b = AExpr (LambdaF a b)
+
+{-# COMPLETE Var, Let, Apply, Lambda #-}
 
 instance IsString b => IsString (AExpr a b) where
     fromString = Var . fromString
@@ -208,20 +220,53 @@ instance Biplate (AExpr bndType refType) (AExpr bndType refType) where
 type Expr refType = AExpr Binding refType
 
 -- | An Alang expression with optionally type annotated bindings (let bindings and lambda arguments)
-newtype AnnExpr ann bndType refType = AnnExpr { unAnnExpr :: Annotated ann (AExprF bndType refType (AnnExpr ann bndType refType)) }
+newtype AnnExpr ann bndType refType
+  = AnnExpr { unAnnExpr :: Annotated ann (AExprF bndType refType (AnnExpr ann bndType refType)) }
   deriving Eq
 
+pattern AnnVar :: ann -> refType -> AnnExpr ann bndType refType
 pattern AnnVar ann v = AnnExpr (Annotated ann (VarF v))
+
+pattern AnnLet :: ann
+               -> AbstractAssignment bndType
+               -> AnnExpr ann bndType refType
+               -> AnnExpr ann bndType refType
+               -> AnnExpr ann bndType refType
 pattern AnnLet ann assign val body = AnnExpr (Annotated ann (LetF assign val body))
+
+pattern AnnApply :: ann
+                 -> AnnExpr ann bndType refType
+                 -> AnnExpr ann bndType refType
+                 -> AnnExpr ann bndType refType
 pattern AnnApply ann f a = AnnExpr (Annotated ann (ApplyF f a))
+
+pattern AnnLambda :: ann
+                  -> AbstractAssignment bndType
+                  -> AnnExpr ann bndType refType
+                  -> AnnExpr ann bndType refType
 pattern AnnLambda ann assign body = AnnExpr (Annotated ann (LambdaF assign body))
 
-type instance Base (AnnExpr ann bndType refType) = Compose (Annotated ann) (AExprF bndType refType)
+{-# COMPLETE AnnVar, AnnLet, AnnApply, AnnLambda #-}
 
+type AnnExprF ann bndType refType = Compose (Annotated ann) (AExprF bndType refType)
+
+type instance Base (AnnExpr ann bndType refType) = AnnExprF ann bndType refType
+
+pattern AnnVarF :: ann -> refType -> AnnExprF ann bndType refType a
 pattern AnnVarF ann v = Compose (Annotated ann (VarF v))
+
+pattern AnnLetF :: ann -> AbstractAssignment bndType -> a -> a
+                -> AnnExprF ann bndType refType a
 pattern AnnLetF ann assign val body = Compose (Annotated ann (LetF assign val body))
+
+pattern AnnApplyF :: ann -> a -> a -> AnnExprF ann bndType refType a
 pattern AnnApplyF ann f a = Compose (Annotated ann (ApplyF f a))
+
+pattern AnnLambdaF :: ann -> AbstractAssignment bndType -> a
+                   -> AnnExprF ann bndType refType a
 pattern AnnLambdaF ann assign body = Compose (Annotated ann (LambdaF assign body))
+
+{-# COMPLETE AnnVarF, AnnLetF, AnnApplyF, AnnLambdaF #-}
 
 instance Recursive (AnnExpr ann bndType refType) where project = Compose . unAnnExpr
 instance Corecursive (AnnExpr ann bndType refType) where embed (Compose v) = AnnExpr v

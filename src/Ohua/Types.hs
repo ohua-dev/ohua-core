@@ -8,6 +8,7 @@
 -- Portability : portable
 
 -- This source code is licensed under the terms described in the associated LICENSE.TXT file
+{-# LANGUAGE CPP                        #-}
 {-# LANGUAGE DeriveFoldable             #-}
 {-# LANGUAGE DeriveFunctor              #-}
 {-# LANGUAGE DeriveGeneric              #-}
@@ -22,9 +23,8 @@ import           Control.DeepSeq
 import           Data.Bifoldable
 import           Data.Bifunctor
 import           Data.Bitraversable
-import           Data.Default
+import           Data.Default.Class
 import           Data.Functor.Classes  (Show1 (liftShowsPrec))
-import           Data.Functor.Compose
 import           Data.Functor.Foldable
 import           Data.Hashable
 import qualified Data.HashSet          as HS
@@ -37,6 +37,10 @@ import           Ohua.LensClasses
 import           Ohua.Util
 import qualified Ohua.Util.Str         as Str
 
+#if __GLASGOW_HASKELL__ >= 800
+import qualified Data.Semigroup        as SG
+#endif
+
 
 -- | The numeric id of a function call site
 newtype FnId = FnId { unFnId :: Int } deriving (Eq, Ord, Generic, Enum, Num, NFData, Hashable)
@@ -46,7 +50,16 @@ instance Show FnId where
 
 -- | A binding name
 newtype Binding = Binding { unBinding :: Str.Str }
-    deriving (Eq, Hashable, Generic, Ord, Monoid, NFData)
+    deriving ( Eq
+             , Hashable
+             , Generic
+             , Ord
+             , Monoid
+             , NFData
+#if __GLASGOW_HASKELL__ >= 800
+             , SG.Semigroup
+#endif
+             )
 
 instance Show Binding where show = show . unBinding
 
@@ -304,8 +317,13 @@ data TyExprF binding a
 newtype TyExpr binding = TyExpr (TyExprF binding (TyExpr binding))
   deriving (Eq, Show)
 
+pattern TyRef :: binding -> TyExpr binding
 pattern TyRef b = TyExpr (TyRefF b)
+
+pattern TyApp :: TyExpr binding -> TyExpr binding -> TyExpr binding
 pattern TyApp f v = TyExpr (TyAppF f v)
+
+{-# COMPLETE TyRef, TyApp #-}
 
 type instance Base (TyExpr binding) = TyExprF binding
 

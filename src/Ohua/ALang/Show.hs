@@ -35,11 +35,12 @@ renderExpr = fst . cata worker
     worker (LambdaF assign body) = needParens $ "λ" <+> showAssign assign <+> "→" <+> fst body
 
     showSym (Local b) = text $ show (b :: Binding)
-    showSym (Sf b id) = "Sf[" <> showQualBnd b <> "]" <> maybe nullBox (\a -> "<" <> text (show a) <> ">") id
+    showSym (Sf b fnId) = "Sf[" <> showQualBnd b <> "]" <> maybe nullBox (\a -> "<" <> text (show a) <> ">") fnId
     showSym (Env e) = "Env[" <> text (show e) <> "]"
 
     showAssign (Direct b)       = showBnd b
     showAssign (Destructure bs) = "[" <> punctuateH left ", " (map showBnd bs) <> "]"
+    showAssign (Recursive _) = error "implement show for recursive bindings"
 
     showBnd = text . toString . unBinding
 

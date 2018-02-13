@@ -9,7 +9,7 @@ import           Text.PrettyPrint.Boxes
 
 -- | TODO show return arc
 asTable :: OutGraph -> T.Text
-asTable (OutGraph ops arcs _) = T.pack $ render $ vsep 1 left
+asTable (OutGraph ops arcs' _) = T.pack $ render $ vsep 1 left
     [ text "Operators"
     , hsep 4 top [idList, typeList ]
     , text "Arcs"
@@ -18,9 +18,9 @@ asTable (OutGraph ops arcs _) = T.pack $ render $ vsep 1 left
   where
     idList = vcat right $ text "ids" : map (text . show . unFnId . operatorId) ops
     typeList = vcat left $ text "types" : map (text . show . operatorType) ops
-    sourceList = vcat left $ (text "source" :) $ (`map` map source arcs ) $ \case
+    sourceList = vcat left $ (text "source" :) $ (`map` map source arcs') $ \case
         EnvSource i -> text $ show (unwrapHostExpr i)
         LocalSource t -> targetToBox t
-    targetList = vcat left $ (text "target" :) $ (targetToBox . target) `map` arcs
+    targetList = vcat left $ (text "target" :) $ (targetToBox . target) `map` arcs'
 
     targetToBox (Target op idx) = text $ show (unFnId op) ++ " @ " ++ show idx

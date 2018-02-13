@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP                        #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE UnboxedTuples              #-}
 module Ohua.Util.Str
@@ -27,6 +28,11 @@ import qualified Prelude                as P
 import           System.IO              (Handle, stdout)
 import qualified System.IO              as SysIO
 
+#if __GLASGOW_HASKELL__ >= 800
+
+import qualified Data.Semigroup         as SG
+
+#endif
 
 -- | This interface describes the basic capabilities of a string.
 -- It is intentionally large so as to allow people to specify
@@ -247,7 +253,16 @@ class (Monoid s, P.Eq s, P.Ord s, Hashable s, NFData s) => IsString s where
 
 -- | An opaque string type to make refactoring against different string libraries easier
 newtype Str = Str { unStr :: P.String }
-    deriving (Monoid, Eq, Ord, S.IsString, Hashable, NFData)
+    deriving ( Monoid
+#if __GLASGOW_HASKELL__ >= 800
+             , SG.Semigroup
+#endif
+             , Eq
+             , Ord
+             , S.IsString
+             , Hashable
+             , NFData
+             )
 
 instance P.Show Str where
     show = P.show . unStr

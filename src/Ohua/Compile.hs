@@ -15,7 +15,7 @@ module Ohua.Compile where
 
 import           Control.DeepSeq
 import           Control.Monad.Except
-import           Data.Default
+import           Data.Default.Class
 import           Data.Functor.Identity
 import qualified Data.HashMap.Strict       as HM
 import           Data.Monoid               ((<>))

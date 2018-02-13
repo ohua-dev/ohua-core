@@ -1,3 +1,4 @@
+{-# LANGUAGE NamedFieldPuns      #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 module Ohua.DFLang.TailRec where
 
@@ -55,7 +56,7 @@ handleRecursiveTailCall lambdaFormals dfExpr0 (Just recurFn) = do
 
     -- get the condition result
     let usages = findUsages (unAssignment "recur" (returnAssignment recurFn)) dfExprs
-    let switchFn = unMaybe "switch does not use recur output" $ find ((== Refs.switch) . functionRef) usages
+    let switchFn = unMaybe "switch does not use recur output" $ find ((== Refs.select) . functionRef) usages
     -- let conditionOutput :: DFVar
     let conditionOutput = case switchFn of
                                (LetExpr _ _ _ (c:_) _) -> c
@@ -77,7 +78,9 @@ handleRecursiveTailCall lambdaFormals dfExpr0 (Just recurFn) = do
     -- FIXME this should not be necessary once we implemented lambda lifting on ALang!
     let lambdaInVars = HS.toList $ findFreeVars rewiredTOutExps
     lambdaInToRecurInVars <- foldM (\x y -> do s <- generateBindingWith y; return $ HM.insert y s x;) HM.empty lambdaInVars -- TODO beware to pertain the ordering here!
-    let updatedRecurExpr = renameWith lambdaInToRecurInVars rewiredTOutExps
+
+    -- The following expression is unused. What is its purpose?
+    --let updatedRecurExpr = renameWith lambdaInToRecurInVars rewiredTOutExps
 
     let recurInVars = callArguments recurFn
 --    let recursionInVars = map (unMaybe "input into recur not found" . flip HM.lookup algoInToRecurInVars) $ trace ("algoInToRecurVars: " ++ show algoInToRecurInVars) algoInVars
@@ -102,12 +105,12 @@ lowerRecAlgoCall :: (MonadWriter (Seq LetExpr) m, MonadGenId m)
                  -> [Expression]
                  -> RecursiveLambdaSpec
                  -> m (QualifiedBinding, FnId, [Expression])
-lowerRecAlgoCall lowerDefault actuals (RecursiveLambdaSpec formalInputs lambdaFormalsToAlgoIn dfExpr) = do
+lowerRecAlgoCall lowerDefault actuals RecursiveLambdaSpec{lambdaFormalsToAlgoIn, formalInputs, dfExpr} = do
         -- input side
 
         mapM_ (\(x, y) -> do
-                id <- generateId
-                (tell. traceShowId) =<< mkIdFn id x y)
+                newId <- generateId
+                (tell. traceShowId) =<< mkIdFn newId x y)
             $ zip actuals
             $ map Direct
             $ trace ("input formals: " ++ show algoInInputFormals) algoInInputFormals
@@ -116,12 +119,12 @@ lowerRecAlgoCall lowerDefault actuals (RecursiveLambdaSpec formalInputs lambdaFo
         tell $ letExprs dfExpr
 
         -- output side
-        id <- generateId
+        newId <- generateId
         return
             $ trace ("output side: " ++ show (returnVar dfExpr))
-            $ (ALangRefs.id, id, [Var $ Local $ returnVar dfExpr])
+            $ (ALangRefs.id, newId, [Var $ Local $ returnVar dfExpr])
   where
-    mkIdFn id i o = lowerDefault ALangRefs.id id o [i]
+    mkIdFn fnId i o = lowerDefault ALangRefs.id fnId o [i]
     algoInInputFormals =
         map (fromMaybe (error "Invariant broken")
         . flip HM.lookup lambdaFormalsToAlgoIn) formalInputs

@@ -31,14 +31,10 @@ import           Data.Either
 import           Data.Foldable
 import qualified Data.HashMap.Strict  as HM
 import qualified Data.HashSet         as HS
-import           Data.Maybe
 import           Data.Proxy
-import           Data.Sequence        (Seq, (><), (|>))
-import qualified Data.Sequence        as S
-import           Data.Text            (pack)
+import           Data.Sequence        (Seq)
 import           Lens.Micro
 import           Ohua.ALang.Lang
-import qualified Ohua.ALang.Refs      as ALangRefs
 import           Ohua.DFLang.HOF      as HOF
 import           Ohua.DFLang.HOF.If
 import           Ohua.DFLang.HOF.Seq
@@ -46,8 +42,7 @@ import           Ohua.DFLang.HOF.Smap
 import           Ohua.DFLang.Lang     (DFExpr (..), DFFnRef (..), DFVar (..),
                                        LetExpr (..))
 import qualified Ohua.DFLang.Refs     as Refs
-import           Ohua.DFLang.TailRec  (RecursiveLambdaSpec, lowerRecAlgoCall,
-                                       recursionLowering)
+import           Ohua.DFLang.TailRec  (lowerRecAlgoCall, recursionLowering)
 import           Ohua.DFLang.Util
 import           Ohua.Monad
 import           Ohua.Types
@@ -63,7 +58,7 @@ newtype LetRec = LetRec { unLetRec :: HM.HashMap Binding (Assignment, Expression
 
 type LetRecT m a = ReaderT LetRec m a
 
-traceState :: (MonadOhua env m, MonadWriter (Seq LetExpr) m)
+traceState :: (MonadOhua env m)
            => LetRecT m a -> LetRecT m a
 traceState cont = (flip trace cont . ("State: " ++) . show . HM.keys . unLetRec) =<< ask
 
@@ -120,16 +115,16 @@ lowerToDF g = failWith $ "Expected `let` or binding: " <> Str.showS g
 
 handleDefinitionalExpr :: (MonadOhua env m, MonadWriter (Seq LetExpr) m) =>
                           Assignment -> Expression -> LetRecT m Binding -> LetRecT m Binding
-handleDefinitionalExpr assign l@(Lambda arg expr) cont = do
+handleDefinitionalExpr assign (Lambda arg expr) cont = do
     -- TODO handle lambdas with multiple arguments -> this requires some ALang transformation to always get the form Lambda a Lambda b ...
     handleTailRec <- fromEnv (options . transformRecursiveFunctions)
     unless handleTailRec $
         failWith "Handling recursive functions is not enabled, if you want to enable this experimental feature set `transformRecursiveFunctions` to true in the options passed to the compiler."
     b <- case assign of
-            Recursive b -> pure b
+            Recursive b' -> pure b'
             x -> failWith $ "Invariant broken. Assignment should be a 'letrec' but was: " <> Str.showS x
     singleArg <- case arg of
-                    Direct b -> pure b
+                    Direct b' -> pure b'
                     x -> failWith $ "Invariant broken. Assignment should be a 'Direct' but was: " <> Str.showS x
 
     -- execute the rest of the traversal (the continuation) in the new LetRecT environment
@@ -151,11 +146,11 @@ lowerDefault fn fnId assign args = mapM expectVar args <&> \args' -> [LetExpr fn
 -- Also generates a new function id for the inner function should it not have one yet.
 handleApplyExpr :: (MonadOhua env m, MonadWriter (Seq LetExpr) m)
                 => Expression -> LetRecT m (QualifiedBinding, FnId, [Expression])
-handleApplyExpr l@(Apply fn arg) = ask >>= go l [] . unLetRec
+handleApplyExpr l@(Apply _ _) = ask >>= go l [] . unLetRec
   where
     go ve@(Var v) args recAlgos =
         case v of
-            Sf fn id -> (fn, , args) <$> maybe generateId return id
+            Sf fn fnId -> (fn, , args) <$> maybe generateId return fnId
             Local bnd
                 | Just (assign, expr, singleArg) <- HM.lookup bnd recAlgos ->
                   lowerLambdaExpr assign expr
@@ -172,13 +167,13 @@ handleApplyExpr l@(Apply fn arg) = ask >>= go l [] . unLetRec
     go (Apply fn arg) args recAlgos = go fn (arg:args) recAlgos
     go x _ _ = failWith $ "Expected Apply or Var but got: " <> Str.showS x
 
-handleApplyExpr (Var (Sf fn id)) = (fn, , []) <$> maybe generateId return id -- what is this?
+handleApplyExpr (Var (Sf fn fnId)) = (fn, , []) <$> maybe generateId return fnId -- what is this?
 handleApplyExpr g                = failWith $ "Expected apply but got: " <> Str.showS g
 
 
 -- | Analyze a lambda expression. Since we perform lambda inlining, this can only be a letrec.
 lowerLambdaExpr :: MonadOhua env m => Assignment -> Expression -> m DFExpr
-lowerLambdaExpr (Recursive binding) expr = lowerALang expr
+lowerLambdaExpr (Recursive _) expr = lowerALang expr
 lowerLambdaExpr a _ = failWith $ "Expression was not inlined but assignment is not a 'letrec': " <> Str.showS a
 
 
@@ -235,9 +230,9 @@ lowerHOF _ assign args = do
   where
     handleArg (Var (Local v)) = return $ Left $ DFVar v
     handleArg (Var (Env e)) = return $ Left $ DFEnvVar e
-    handleArg (Lambda assign body) = do
+    handleArg (Lambda assign' body) = do
         DFExpr lets bnd <- lowerALang body
-        return $ Right (Lam assign bnd, lets)
+        return $ Right (Lam assign' bnd, lets)
     handleArg a = failWith $ "unexpected type of argument, expected var or lambda, got " <> Str.showS a
 
 

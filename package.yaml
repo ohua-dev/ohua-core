@@ -1,0 +1,120 @@
+name: ohua-core
+version: '0.7.2'
+synopsis: Ohua - An EDSL for implicit parallel programming of stateful computations
+  that execute on a dataflow runtime system.
+category: Concurrency
+author:
+- Sebastian Ertel
+- Justus Adam
+maintainer: dev@justus.science
+license: OtherLicense
+license-file: LICENSE.txt
+homepage: https://bitbucket.org/sertel/ohua
+extra-source-files:
+- README.md
+dependencies:
+- base >=4.8 && <5
+- text
+- mtl
+- aeson
+- microlens
+- microlens-platform
+- microlens-mtl
+- containers
+- bytestring
+- deepseq
+- data-default-class
+default-extensions:
+- OverloadedStrings
+- MultiParamTypeClasses
+- FunctionalDependencies
+- TypeFamilies
+- FlexibleContexts
+- FlexibleInstances
+- TypeSynonymInstances
+- LambdaCase
+- TupleSections
+- BangPatterns
+ghc-options:
+- -Wall
+- -Wcompat
+- -Wincomplete-record-updates
+- -Wincomplete-uni-patterns
+- -Wredundant-constraints
+library:
+  source-dirs: src
+  exposed-modules:
+  - Ohua.Compile
+  - Ohua.Types
+  - Ohua.LensClasses
+  - Ohua.Monad
+  - Ohua.ParseTools.Refs
+  - Ohua.ALang.Lang
+  - Ohua.ALang.Refs
+  - Ohua.ALang.NS
+  - Ohua.ALang.Show
+  - Ohua.ALang.Passes
+  - Ohua.ALang.Passes.SSA
+  - Ohua.ALang.Passes.TailRec
+  - Ohua.ALang.Optimizations
+  - Ohua.ALang.Util
+  - Ohua.DFLang.Lang
+  - Ohua.DFLang.Refs
+  - Ohua.DFLang.Util
+  - Ohua.DFLang.HOF
+  - Ohua.DFLang.HOF.Smap
+  - Ohua.DFLang.HOF.If
+  - Ohua.DFLang.HOF.Seq
+  - Ohua.DFLang.Passes
+  - Ohua.DFLang.TailRec
+  - Ohua.DFLang.Optimizations
+  - Ohua.DFGraph
+  - Ohua.DFGraph.Show
+  - Ohua.Serialize.JSON
+  - Ohua.Util
+  - Ohua.Util.Str
+  - Ohua.Unit
+  dependencies:
+  - transformers
+  - unordered-containers
+  - hashable
+  - monad-loops
+  - vector
+  - bifunctors
+  - recursion-schemes
+  - boxes
+  - transformers-base
+  - monad-control
+  - comonad
+  - uniplate
+  when:
+  - condition: flag(debug)
+    cpp-options: -DDEBUG=1
+executables:
+  ohua-test-exec:
+    main: Main.hs
+    source-dirs: ./.
+    dependencies:
+    - ohua-core
+  test-graph-gen:
+    main: GenJSONGraph.hs
+    source-dirs:
+    - test
+    - ./.
+    dependencies:
+    - ohua-core
+    - QuickCheck
+tests:
+  ohua-tests:
+    main: Spec.hs
+    source-dirs: test
+    dependencies:
+    - ohua-core
+    - hspec
+    - QuickCheck
+    - fgl
+flags:
+  debug:
+    description: null
+    manual: false
+    default: false

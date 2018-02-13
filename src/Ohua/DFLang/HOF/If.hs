@@ -43,8 +43,12 @@ instance HigherOrderFunction IfFn where
     createContextEntry = do
         f <- get
         ifId <- generateId
-        let Direct thenBnd = beginAssignment $ thenBranch f
-            Direct elseBnd = beginAssignment $ elseBranch f
+        let thenBnd = case beginAssignment $ thenBranch f of
+                        Direct b -> b
+                        _ -> error "if HOF transform expects one direct assignment for `then` branch"
+            elseBnd = case beginAssignment $ elseBranch f of
+                        Direct b -> b
+                        _ -> error "if HOF transform expects one direct assignment for `else` branch"
         modify $ \s -> s { ifRet = thenBnd }
         pure [ LetExpr ifId (Destructure [thenBnd, elseBnd]) Refs.bool [conditionVariable f] Nothing ]
 
@@ -52,13 +56,15 @@ instance HigherOrderFunction IfFn where
         switchId <- generateId
         IfFn {..} <- get
         pure
-            [ LetExpr switchId assignment Refs.switch [DFVar ifRet, DFVar $ resultBinding thenBranch, DFVar $ resultBinding elseBranch] Nothing
+            [ LetExpr switchId assignment Refs.select [DFVar ifRet, DFVar $ resultBinding thenBranch, DFVar $ resultBinding elseBranch] Nothing
             ]
 
     scopeFreeVariables lam freeVars = do
         selected <- mapM generateBindingWith freeVars
         selectorId <- generateId
-        let Direct sourceVar = beginAssignment lam
+        let sourceVar = case beginAssignment lam of
+                          Direct v -> v
+                          _ -> error "if HOF transform expects direct assignment in all branches"
         pure
             (   [ LetExpr selectorId (Destructure selected) Refs.scope (map DFVar freeVars) (Just sourceVar)
                 ]

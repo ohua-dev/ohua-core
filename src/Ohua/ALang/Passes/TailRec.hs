@@ -32,12 +32,13 @@ markRecursiveBindings = fst . runWriter . cata go
                  Direct bnd -> Let (Recursive bnd) e' <$> b
                  _ -> error "Cannot use destrutured binding recursively"
           else Let assign e' <$> b
-    go e@(VarF val@(Local bnd)) = tell (HS.singleton bnd) >> pure (Var val)
-    go e@(LambdaF assign body) = shadowAssign assign $ embed <$> sequence e
+    go (VarF val@(Local bnd)) = tell (HS.singleton bnd) >> pure (Var val)
+    go e@(LambdaF assign _) = shadowAssign assign $ embed <$> sequence e
     go e = embed <$> sequence e
 
     shadowAssign (Direct b) = censor (HS.delete b)
     shadowAssign (Destructure bnds) = censor (`HS.difference` HS.fromList bnds)
+    shadowAssign (Recursive _) = error "TODO implement `shadowAssign` for `Recursive`"
 
 findRecCall :: Expression -> HS.HashSet Binding -> (HS.HashSet Binding, Expression)
 findRecCall (Let (Direct a) expr inExpr) algosInScope =

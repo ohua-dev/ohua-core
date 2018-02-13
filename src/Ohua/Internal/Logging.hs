@@ -1,6 +1,7 @@
 -- This is a temporary module which contains code from the @monad-logger@ library.
 -- It is intended to be dropped for a direct dependency on @monad-logger@ when it becomes compatible
 -- with eta.
+{-# LANGUAGE CPP                  #-}
 {-# LANGUAGE DefaultSignatures    #-}
 {-# LANGUAGE UndecidableInstances #-}
 module Ohua.Internal.Logging where
@@ -30,6 +31,12 @@ import qualified Data.Text.Encoding          as T
 import qualified Data.Text.Lazy              as TL
 import qualified Data.Text.Lazy.Encoding     as TL
 import           System.IO                   (Handle, stderr)
+
+#if __GLASGOW_HASKELL__ >= 800
+
+import qualified Data.Semigroup              as SG
+
+#endif
 
 
 class Monad m => MonadLogger m where
@@ -208,8 +215,19 @@ runSilentLoggingT = flip runLoggingT $ \_ _ _ _ -> pure ()
 data LogStr = LogStr !Int Builder
 
 instance Monoid LogStr where
-    mempty = LogStr 0 (toBuilder BS.empty)
+  mempty = LogStr 0 (toBuilder BS.empty)
+
+#if __GLASGOW_HASKELL__ >= 800
+
+  mappend = (SG.<>)
+
+instance SG.Semigroup LogStr where
+    LogStr s1 b1 <> LogStr s2 b2 = LogStr (s1 + s2) (b1 <> b2)
+
+#else
     LogStr s1 b1 `mappend` LogStr s2 b2 = LogStr (s1 + s2) (b1 <> b2)
+#endif
+
 
 instance IsString LogStr where
     fromString = toLogStr . TL.pack
