@@ -10,10 +10,9 @@ import           Ohua.Types
 import           Ohua.Types.Arbitrary  ()
 import           Test.Hspec
 import           Test.Hspec.QuickCheck
-import           Test.QuickCheck
 
 
-testConvert :: (ToJSON a, FromJSON a, Arbitrary a, Show a, Eq a) => a -> Bool
+testConvert :: (ToJSON a, FromJSON a, Eq a) => a -> Bool
 testConvert thing =
     Just thing == decode (encode thing) -- this uses and tests toEncoding
     && parse parseJSON (toJSON thing) == A.Success thing -- this uses and tests toJSON

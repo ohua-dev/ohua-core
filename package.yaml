@@ -46,6 +46,8 @@ when:
       - -Wincomplete-record-updates
       - -Wincomplete-uni-patterns
       - -Wredundant-constraints
+      # This is added because there's a bug in GHC 8.2.2 that means the COMPLETE pragma does not work :'-(
+      - -fno-warn-incomplete-patterns
 library:
   source-dirs: src
   exposed-modules:
@@ -98,11 +100,13 @@ library:
 executables:
   ohua-test-exec:
     main: Main.hs
-    source-dirs: ./.
     dependencies:
     - ohua-core
   test-graph-gen:
     main: GenJSONGraph.hs
+    exposed-modules: []
+    other-modules:
+      - Ohua.Types.Arbitrary
     source-dirs:
     - test
     - ./.

@@ -19,7 +19,8 @@ utilsSpec = do
         it "substitutes a single var" $
             substitute' "v" "testval" "v" `shouldBe` "testval"
         it "substitutes a complicated expression" $
-            let toSub@(Var (Local toSubBinding)) = "h"
+            let toSubBinding = "h"
+                toSub = Var $ Local toSubBinding
                 subVal = "result" `Apply` "e"
                 e =
                     Let "x" toSub $

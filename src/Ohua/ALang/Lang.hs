@@ -176,7 +176,7 @@ pattern Lambda :: AbstractAssignment bndType
                -> AExpr bndType refType
 pattern Lambda a b = AExpr (LambdaF a b)
 
-{-# COMPLETE Var, Let, Apply, Lambda #-}
+--{-# COMPLETE Var, Let, Apply, Lambda #-}
 
 instance IsString b => IsString (AExpr a b) where
     fromString = Var . fromString
@@ -247,7 +247,7 @@ pattern AnnLambda :: ann
                   -> AnnExpr ann bndType refType
 pattern AnnLambda ann assign body = AnnExpr (Annotated ann (LambdaF assign body))
 
-{-# Complete, AnnLet, AnnApply, AnnLambda #-}
+--{-# COMPLETE AnnVar, AnnLet, AnnApply, AnnLambda #-}
 
 type AnnExprF ann bndType refType = Compose (Annotated ann) (AExprF bndType refType)
 
@@ -267,7 +267,7 @@ pattern AnnLambdaF :: ann -> AbstractAssignment bndType -> a
                    -> AnnExprF ann bndType refType a
 pattern AnnLambdaF ann assign body = Compose (Annotated ann (LambdaF assign body))
 
-{-# COMPLETE AnnVarF, AnnLetF, AnnApplyF, AnnLambdaF #-}
+--{-# COMPLETE AnnVarF, AnnLetF, AnnApplyF, AnnLambdaF #-}
 
 instance Recursive (AnnExpr ann bndType refType) where project = Compose . unAnnExpr
 instance Corecursive (AnnExpr ann bndType refType) where embed (Compose v) = AnnExpr v
