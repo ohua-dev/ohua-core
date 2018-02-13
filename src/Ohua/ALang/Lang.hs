@@ -176,7 +176,9 @@ pattern Lambda :: AbstractAssignment bndType
                -> AExpr bndType refType
 pattern Lambda a b = AExpr (LambdaF a b)
 
---{-# COMPLETE Var, Let, Apply, Lambda #-}
+#if __GLASGOW_HASKELL__ >= 804
+{-# COMPLETE Var, Let, Apply, Lambda #-}
+#endif
 
 instance IsString b => IsString (AExpr a b) where
     fromString = Var . fromString
@@ -247,7 +249,9 @@ pattern AnnLambda :: ann
                   -> AnnExpr ann bndType refType
 pattern AnnLambda ann assign body = AnnExpr (Annotated ann (LambdaF assign body))
 
---{-# COMPLETE AnnVar, AnnLet, AnnApply, AnnLambda #-}
+#if __GLASGOW_HASKELL__ >= 804
+{-# COMPLETE AnnVar, AnnLet, AnnApply, AnnLambda #-}
+#endif
 
 type AnnExprF ann bndType refType = Compose (Annotated ann) (AExprF bndType refType)
 
@@ -267,7 +271,9 @@ pattern AnnLambdaF :: ann -> AbstractAssignment bndType -> a
                    -> AnnExprF ann bndType refType a
 pattern AnnLambdaF ann assign body = Compose (Annotated ann (LambdaF assign body))
 
---{-# COMPLETE AnnVarF, AnnLetF, AnnApplyF, AnnLambdaF #-}
+#if __GLASGOW_HASKELL__ >= 804
+{-# COMPLETE AnnVarF, AnnLetF, AnnApplyF, AnnLambdaF #-}
+#endif
 
 instance Recursive (AnnExpr ann bndType refType) where project = Compose . unAnnExpr
 instance Corecursive (AnnExpr ann bndType refType) where embed (Compose v) = AnnExpr v

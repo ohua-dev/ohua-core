@@ -104,7 +104,6 @@ executables:
     - ohua-core
   test-graph-gen:
     main: GenJSONGraph.hs
-    exposed-modules: []
     other-modules:
       - Ohua.Types.Arbitrary
     source-dirs:

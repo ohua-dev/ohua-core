@@ -222,10 +222,10 @@ instance Monoid LogStr where
   mappend = (SG.<>)
 
 instance SG.Semigroup LogStr where
-    LogStr s1 b1 <> LogStr s2 b2 = LogStr (s1 + s2) (b1 <> b2)
+  LogStr s1 b1 <> LogStr s2 b2 = LogStr (s1 + s2) (b1 <> b2)
 
 #else
-    LogStr s1 b1 `mappend` LogStr s2 b2 = LogStr (s1 + s2) (b1 <> b2)
+  LogStr s1 b1 `mappend` LogStr s2 b2 = LogStr (s1 + s2) (b1 <> b2)
 #endif
 
 

@@ -323,7 +323,9 @@ pattern TyRef b = TyExpr (TyRefF b)
 pattern TyApp :: TyExpr binding -> TyExpr binding -> TyExpr binding
 pattern TyApp f v = TyExpr (TyAppF f v)
 
+#if __GLASGOW_HASKELL__ >= 804
 {-# COMPLETE TyRef, TyApp #-}
+#endif
 
 type instance Base (TyExpr binding) = TyExprF binding
 
