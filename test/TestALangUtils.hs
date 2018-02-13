@@ -38,4 +38,5 @@ utilsSpec = do
             substitute' "h" "h" "h" `shouldBe` "h"
 
 
+spec :: Spec
 spec = utilsSpec

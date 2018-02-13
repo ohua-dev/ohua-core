@@ -1,18 +1,10 @@
 module ALangVerify where
 
-import           Control.Arrow
-import           Control.Monad.Except
-import           Data.Default
-import           Data.Function
-import           Data.Functor.Identity
-import qualified Data.Map.Strict       as Map
-import           Data.Maybe
-import           Debug.Trace
+import           Data.Default.Class
 import           Ohua.ALang.Lang
 import           Ohua.ALang.Passes
 import           Ohua.Monad
-import           Ohua.Types
-import qualified Ohua.Util.Str         as Str
+import qualified Ohua.Util.Str      as Str
 import           Test.Hspec
 
 -- OhuaT Expr (Either [Char] Expression)

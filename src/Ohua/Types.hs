@@ -323,9 +323,7 @@ pattern TyRef b = TyExpr (TyRefF b)
 pattern TyApp :: TyExpr binding -> TyExpr binding -> TyExpr binding
 pattern TyApp f v = TyExpr (TyAppF f v)
 
-#if __GLASGOW_HASKELL__ >= 802
 {-# COMPLETE TyRef, TyApp #-}
-#endif
 
 type instance Base (TyExpr binding) = TyExprF binding
 
@@ -343,24 +341,15 @@ instance Functor TyExpr where
     fmap f (TyRef r) = TyRef $ f r
     fmap f (TyApp e1 e2) = recur e1 `TyApp` recur e2
       where recur = fmap f
-#if __GLASGOW_HASKELL__ < 802
-    fmap _ _ = undefined
-#endif
 
 instance Foldable TyExpr where
     foldr f c (TyRef r) = f r c
     foldr f c (TyApp e1 e2) = recur e1 $ recur e2 c
       where recur = flip (foldr f)
-#if __GLASGOW_HASKELL__ < 802
-    foldr _ _ _ = undefined
-#endif
 
 instance Traversable TyExpr where
     traverse f (TyRef r)     = TyRef <$> f r
     traverse f (TyApp e1 e2) = TyApp <$> traverse f e1 <*> traverse f e2
-#if __GLASGOW_HASKELL__ < 802
-    traverse _ _             = undefined
-#endif
 
 -- | Default primitive type references (type variables and constructors)
 data TyVar tyConRef tyVarRef

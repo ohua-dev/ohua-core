@@ -10,28 +10,27 @@
 -- This source code is licensed under the terms described in the associated LICENSE.TXT file
 {-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# OPTIONS_GHC -fno-warn-orphans -fno-warn-missing-methods -fno-warn-unused-top-binds #-}
 module PassesSpec (passesSpec) where
 
 import           Control.DeepSeq
 import           Control.Monad.Except
-import           Data.Default
+import           Data.Default.Class
 import           Data.Either
-import           Data.Functor.Identity
-import           Debug.Trace
+import           GHC.Stack
 import           Ohua.ALang.Lang
 import           Ohua.ALang.Passes
 import           Ohua.ALang.Passes.SSA
 import           Ohua.ALang.Passes.TailRec
 import qualified Ohua.ALang.Refs           as ALangRefs
-import           Ohua.ALang.Show
 import           Ohua.Monad
 import           Ohua.Types
 import           Test.Hspec
-import           Test.Hspec.QuickCheck
+--import           Test.Hspec.QuickCheck
 import           Test.QuickCheck
 import           Test.QuickCheck.Property  as P
 
-import           Ohua.Types.Arbitrary
+import           Ohua.Types.Arbitrary      ()
 
 
 smapName :: QualifiedBinding
@@ -47,14 +46,18 @@ smapName = "ohua.lang/smap"
 instance Num ResolvedSymbol where fromInteger = Env . fromInteger
 instance Num Expression where fromInteger = Var . fromInteger
 
+runPasses :: Expression -> IO (Either Error Expression)
 runPasses expr = runSilentLoggingT $ flip (runFromExpr def) expr $ performSSA >=> (normalize >=> \e -> checkProgramValidity e >> return e)
 
 type ALangCheck = Either String
 
 
+throwErrorS :: (HasCallStack, MonadError String m) => String -> m ()
+throwErrorS str = throwError $ str ++ " at " ++ prettyCallStack callStack
+
 everyLetBindsCall :: Expression -> ALangCheck ()
 everyLetBindsCall (Let _ (Apply _ _) body) = everyLetBindsCall body
-everyLetBindsCall (Let _ _ _)              = throwError "Let without call"
+everyLetBindsCall (Let _ _ _)              = throwErrorS "Let without call"
 everyLetBindsCall _                        = return ()
 
 
@@ -64,9 +67,9 @@ noNestedLets _                  = return ()
 
 
 noLets :: Expression -> ALangCheck ()
-noLets (Let _ _ _)         = throwError "Found a let"
+noLets e@(Let _ _ _)       = throwErrorS $ "Found a let " ++ show e
 noLets (Apply expr1 expr2) = noLets expr1 >> noLets expr2
-noLets (Lambda _ expr)     = noLets expr
+noLets (Lambda _ expr)     = noNestedLets expr
 noLets _                   = return ()
 
 
@@ -74,7 +77,7 @@ checkInvariants :: Expression -> ALangCheck ()
 checkInvariants expr = do
     noNestedLets expr
     everyLetBindsCall expr
-    maybe (return ()) (throwError . show) $ isSSA expr
+    maybe (return ()) (throwErrorS . show) $ isSSA expr
 
 prop_passes :: Expression -> Property
 prop_passes input = ioProperty $ do
@@ -83,7 +86,7 @@ prop_passes input = ioProperty $ do
     return $ case transformed of
         Right program ->
             case checkInvariants program of
-                Left err -> failed { P.reason = err }
+                Left err -> failed { P.reason = unlines [err, "Input:", show input, "Result:", show program] }
                 Right _  -> succeeded
         _ -> succeeded { abort = True }
 
@@ -91,23 +94,29 @@ prop_passes input = ioProperty $ do
 shouldSatisfyRet :: Show a => IO a -> (a -> Bool) -> Expectation
 shouldSatisfyRet action predicate = action >>= (`shouldSatisfy` predicate)
 
-rejects :: Expression -> Expectation
-rejects e = runPasses e `shouldSatisfyRet` isLeft
+-- rejects :: Expression -> Expectation
+-- rejects e = runPasses e `shouldSatisfyRet` isLeft
 
 doesn't_reject :: Expression -> Expectation
 doesn't_reject e = runPasses e `shouldSatisfyRet` isRight
 
+lambda_as_argument :: Expression
 lambda_as_argument = Apply (Var (Sf smapName Nothing)) (Lambda "a" "a")
 
+bound_lambda_as_argument :: Expression
 bound_lambda_as_argument = Let "f" (Lambda "a" "a") (Apply "some/function" "f")
 
+calculated_lambda_as_argument :: Expression
 calculated_lambda_as_argument = Let "f" (Lambda "a" "a") $ Let "z" (Lambda "a" "a") $ Let "g" (Apply "f" "z") $ (Apply "some/function" "g")
 
+lambda_with_app_as_arg :: Expression
 lambda_with_app_as_arg = Apply "some/func" $ Apply (Lambda "a" (Lambda "b" "a")) $ Var $ Env 10
 
+passesSpec :: Spec
 passesSpec = do
     describe "normalization" $ do
-        prop "creates ir with the right invariants" prop_passes
+        -- Add these tests back once we have a good generation for random programs
+        -- prop "creates ir with the right invariants" prop_passes
         it "does not reject a program with lambda as input to smap" $
             doesn't_reject lambda_as_argument
 
@@ -117,11 +126,11 @@ passesSpec = do
         it "doesn't reject a program where calculated lambda is input" $
             doesn't_reject calculated_lambda_as_argument
 
-        let lambdaStaysInput e@(Apply _ (Lambda _ (Lambda _ _))) = False
-            lambdaStaysInput e@(Apply (Var (Sf _ _)) (Lambda _ _)) = True
+        let lambdaStaysInput (Apply _ (Lambda _ (Lambda _ _))) = False
+            lambdaStaysInput (Apply (Var (Sf _ _)) (Lambda _ _)) = True
             lambdaStaysInput (Let _ expr _) = lambdaStaysInput expr
             lambdaStaysInput (Apply _ body) = lambdaStaysInput body
-            lambdaStaysInput e = False
+            lambdaStaysInput _ = False
 
         it "Reduces lambdas as far as possible but does not remove them when argument" $
             runPasses lambda_with_app_as_arg `shouldSatisfyRet` either (const False) lambdaStaysInput
@@ -148,21 +157,21 @@ passesSpec = do
 
 
     describe "remove currying pass" $ do
-        let removeCurrying = runSilentLoggingT . flip (runFromBindings def) mempty . Ohua.ALang.Passes.removeCurrying
+        let runRemoveCurrying = runSilentLoggingT . flip (runFromBindings def) mempty . Ohua.ALang.Passes.removeCurrying
         it "inlines curring" $
-            removeCurrying (Let "a" ("mod/fun" `Apply` "b") ("a" `Apply` "c"))
+            runRemoveCurrying (Let "a" ("mod/fun" `Apply` "b") ("a" `Apply` "c"))
             `shouldReturn`
             Right ("mod/fun" `Apply` "b" `Apply` "c")
         it "inlines curring 2" $
-            removeCurrying (Let "a" ("mod/fun" `Apply` "b") $ Let "x" ("a" `Apply` "c") "x")
+            runRemoveCurrying (Let "a" ("mod/fun" `Apply` "b") $ Let "x" ("a" `Apply` "c") "x")
             `shouldReturn`
             Right (Let "x" ("mod/fun" `Apply` "b" `Apply` "c") "x")
         it "removes currying even for redefintions" $
-            removeCurrying (Let "a" "some/sf" $ Let "b" "a" $ "b" `Apply` "c")
+            runRemoveCurrying (Let "a" "some/sf" $ Let "b" "a" $ "b" `Apply` "c")
             `shouldReturn`
             Right ("some/sf" `Apply` "c")
         it "inlines multiple layers of currying" $
-            removeCurrying
+            runRemoveCurrying
                 (Let "f" (Apply "some-ns/fn-with-3-args" "a") $
                 Let "f'" (Apply "f" "b") $
                 Let "x" (Apply "f'" "c")

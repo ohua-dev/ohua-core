@@ -70,6 +70,3 @@ findRecCall (Lambda a e) algosInScope =
       if HS.size eFound == 0 then (eFound, Lambda a eExpr)
                               -- TODO would I need to lift that lambda here?
                              else (eFound, Lambda a eExpr)
-#if __GLASGOW_HASKELL__ < 802
-findRecCall _ _ = undefined
-#endif

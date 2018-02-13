@@ -10,6 +10,7 @@ import qualified TestALangUtils
 
 
 
+main :: IO ()
 main = hspec $ do
     passesSpec
     StrTest.strTest

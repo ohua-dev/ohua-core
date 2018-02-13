@@ -188,13 +188,14 @@ removeCurrying :: forall m. MonadError Error m => Expression -> m Expression
 removeCurrying e = fst <$> evalRWST (para inlinePartials e) mempty ()
   where
     inlinePartials (LetF assign@(Direct bnd) (_, val) (_, body)) = do
-        val' <- val
+        val' <- val >>= \case
+          v@(Var (Local bnd')) -> asks (HM.lookup bnd') >>= maybe (pure v) (\e' -> tell (HS.singleton bnd') >> pure e')
+          other -> pure other
         (body', touched) <- listen $ local (HM.insert bnd val') body
         pure $
-            if bnd `HS.member` touched then
-                body'
-            else
-                Let assign val' body'
+            if bnd `HS.member` touched
+            then body'
+            else Let assign val' body'
     inlinePartials (ApplyF (Var (Local bnd), _) (_, arg)) = do
         tell $ HS.singleton bnd
         val <- asks (HM.lookup bnd)
@@ -339,9 +340,6 @@ compressEnvExpressions compress = either pure compress' <=< go
             Right a -> pure $ Right a
             Left _ -> Left <$> liftA2 (Let assign) (mcompress val') (mcompress body')
     go (Lambda assign body) = bimap (Lambda assign) (Lambda assign) <$> go body
-#if __GLASGOW_HASKELL__ < 802
-    go _ = undefined
-#endif
 
     mcompress :: Either Expression EnvOnlyExpr -> m Expression
     mcompress = either pure compress'

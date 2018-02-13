@@ -7,7 +7,7 @@ import           Ohua.ALang.Lang
 import           Ohua.DFGraph
 import           Ohua.Serialize.JSON   ()
 import           Ohua.Types
-import           Ohua.Types.Arbitrary
+import           Ohua.Types.Arbitrary  ()
 import           Test.Hspec
 import           Test.Hspec.QuickCheck
 import           Test.QuickCheck

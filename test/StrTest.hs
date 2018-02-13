@@ -10,7 +10,6 @@ import           Ohua.Util.Str         as Str
 import           Prelude               as P
 import           Test.Hspec
 import           Test.Hspec.QuickCheck
-import           Test.QuickCheck
 
 
 strClassProps :: forall s . IsString s => (String -> s) -> Spec
@@ -46,9 +45,11 @@ strClassProps toStr = do
     -- prop "unlines" $ \strs -> P.unlines strs == toString (Str.unlines (P.map toStr strs))
   where
     fromPartial :: Eq a => (s -> Maybe a) -> (String -> a) -> String -> Bool
-    fromPartial f1 f2 []  = f1 (toStr "") == Nothing
-    fromPartial f1 f2 str = f1 (toStr str) == Just (f2 str)
+    fromPartial f1 f2 = \case
+      [] -> f1 (toStr "") == Nothing
+      str -> f1 (toStr str) == Just (f2 str)
 
 
+strTest :: Spec
 strTest = describe "Equivalence of Str and String" $
     strClassProps (fromString :: String -> Str)
