@@ -16,24 +16,19 @@ module Ohua.Compile where
 import           Control.DeepSeq
 import           Control.Monad.Except
 import           Data.Default.Class
-import           Data.Functor.Identity
 import qualified Data.HashMap.Strict       as HM
 import           Data.Monoid               ((<>))
 import           Data.Text                 (Text, pack)
-import           Debug.Trace
-import           Lens.Micro
 import           Ohua.ALang.Lang
 import           Ohua.ALang.Optimizations
 import           Ohua.ALang.Passes
 import           Ohua.ALang.Passes.SSA
-import           Ohua.ALang.Show
 import           Ohua.DFGraph
 import           Ohua.DFLang.Lang
 import           Ohua.DFLang.Optimizations
 import           Ohua.DFLang.Passes
 import           Ohua.Monad
 import           Ohua.Types
-import           Ohua.Util
 import qualified Ohua.Util.Str             as Str
 
 
@@ -90,7 +85,7 @@ pipeline CustomPasses{..} e = do
 
 
 -- | Run the pipeline in an arbitrary monad that supports error reporting.
-compile :: (MonadError Error m, MonadIO m, MonadLoggerIO m) => Options -> CustomPasses env -> Expression -> m OutGraph
+compile :: (MonadError Error m, MonadLoggerIO m) => Options -> CustomPasses env -> Expression -> m OutGraph
 compile opts passes exprs = do
     logFn <- askLoggerIO
     either throwError pure =<< liftIO (runLoggingT (runFromExpr opts (pipeline passes) exprs) logFn)
@@ -99,7 +94,7 @@ compile opts passes exprs = do
 -- | Verify that only higher order fucntions have lambdas as arguments
 checkHigherOrderFunctionSupport :: MonadOhua envExpr m => Expression -> m ()
 checkHigherOrderFunctionSupport (Let _ e rest) = do
-    checkNestedExpr e
+    void $ checkNestedExpr e
     checkHigherOrderFunctionSupport rest
   where
     checkNestedExpr (Apply f arg) = do

@@ -1,12 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# OPTIONS_GHC -fno-warn-unused-binds #-}
 
-import           Control.Monad.Except
-import           Data.Foldable
 import           Ohua.ALang.Lang
-import           Ohua.ALang.Passes
-import           Ohua.ALang.Passes.SSA
-import           Ohua.ALang.Show
-import           Ohua.Monad
 import           Ohua.Types
 
 
@@ -54,5 +49,6 @@ expr5 =
     Apply (Lambda (Direct "c") (Var (Sf "com.ohua.lang/smap-io-fun" Nothing))) (Lambda (Direct "c") (Var (Sf  "com.ohua.lang/pcollect" Nothing)))
 
 
+main :: IO ()
 main = return ()
 

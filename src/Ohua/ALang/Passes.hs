@@ -8,6 +8,7 @@
 -- Portability : portable
 
 -- This source code is licensed under the terms described in the associated LICENSE.TXT file
+{-# LANGUAGE CPP                 #-}
 {-# LANGUAGE ExplicitForAll      #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 module Ohua.ALang.Passes where
@@ -24,7 +25,6 @@ import qualified Data.HashMap.Strict    as HM
 import qualified Data.HashSet           as HS
 import           Data.Maybe             (fromMaybe)
 import           Ohua.ALang.Lang
-import           Ohua.ALang.Util
 import           Ohua.Monad
 import           Ohua.Types
 import           Ohua.Util.Str          as Str
@@ -95,9 +95,9 @@ reduceApplication = reduceLetCWith reduceAppArgument
 letLift :: Expression -> Expression
 letLift = cata $ \e ->
   let f = case e of
-            e@(LetF _ _ _) -> reduceLetA
-            e@(ApplyF _ _) -> reduceApplication
-            _              -> id
+            LetF _ _ _ -> reduceLetA
+            ApplyF _ _ -> reduceApplication
+            _          -> id
   in f $ embed e
 
 
@@ -148,12 +148,12 @@ ensureAtLeastOneCall e@(Var _) = do
   pure $ Let (Direct newBnd) (Var (Sf idName Nothing) `Apply` e) $ Var (Local newBnd)
 ensureAtLeastOneCall e = cata f e
   where
-    f expr@(LambdaF bnd body) = body >>= \case
+    f (LambdaF bnd body) = body >>= \case
       v@(Var _) -> do
         newBnd <- generateBinding
         pure $ Lambda bnd $ Let (Direct newBnd) (Var (Sf idName Nothing) `Apply` v) $ Var (Local newBnd)
-      e -> pure $ Lambda bnd e
-    f e = embed <$> sequence e
+      eInner -> pure $ Lambda bnd eInner
+    f eInner = embed <$> sequence eInner
 
 
 -- | Removes bindings that are never used.
@@ -201,7 +201,7 @@ removeCurrying e = fst <$> evalRWST (para inlinePartials e) mempty ()
         Apply
           <$> (maybe (failWith $ "No suitable value found for binding " <> Str.showS bnd) pure val)
           <*> arg
-    inlinePartials e = embed <$> traverse snd e
+    inlinePartials innerExpr = embed <$> traverse snd innerExpr
 
 
 -- | Ensures the expression is a sequence of let statements terminated with a local variable.
@@ -216,7 +216,7 @@ hasFinalLet _               = failWith "Final value is not a var"
 noDuplicateIds :: MonadError Error m => Expression -> m ()
 noDuplicateIds = flip evalStateT mempty . cata go
   where
-    go e@(VarF (Sf _ (Just funid))) = do
+    go (VarF (Sf _ (Just funid))) = do
       isMember <- gets (HS.member funid)
       when isMember $ failWith $ "Duplicate id " <> Str.showS funid
       modify (HS.insert funid)
@@ -339,6 +339,9 @@ compressEnvExpressions compress = either pure compress' <=< go
             Right a -> pure $ Right a
             Left _ -> Left <$> liftA2 (Let assign) (mcompress val') (mcompress body')
     go (Lambda assign body) = bimap (Lambda assign) (Lambda assign) <$> go body
+#if __GLASGOW_HASKELL__ < 802
+    go _ = undefined
+#endif
 
     mcompress :: Either Expression EnvOnlyExpr -> m Expression
     mcompress = either pure compress'

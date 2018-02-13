@@ -8,6 +8,7 @@
 -- Portability : portable
 
 -- This source code is licensed under the terms described in the associated LICENSE.TXT file
+{-# LANGUAGE CPP                        #-}
 {-# LANGUAGE DeriveFoldable             #-}
 {-# LANGUAGE DeriveFunctor              #-}
 {-# LANGUAGE DeriveGeneric              #-}
@@ -175,7 +176,9 @@ pattern Lambda :: AbstractAssignment bndType
                -> AExpr bndType refType
 pattern Lambda a b = AExpr (LambdaF a b)
 
+#if __GLASGOW_HASKELL__ >= 802
 {-# COMPLETE Var, Let, Apply, Lambda #-}
+#endif
 
 instance IsString b => IsString (AExpr a b) where
     fromString = Var . fromString
@@ -200,6 +203,9 @@ instance Uniplate (AExpr bndType refType) where
   uniplate (Let assign val body) = plate Let |- assign |* val |* body
   uniplate (Apply f v)           = plate Apply |* f |* v
   uniplate (Lambda assign body)  = plate Lambda |- assign |* body
+#if __GLASGOW_HASKELL__ < 802
+  uniplate _                     = undefined
+#endif
 
 instance Biplate (AExpr bndType refType) (AExpr bndType refType) where
   biplate = plateSelf
@@ -246,7 +252,9 @@ pattern AnnLambda :: ann
                   -> AnnExpr ann bndType refType
 pattern AnnLambda ann assign body = AnnExpr (Annotated ann (LambdaF assign body))
 
+#if __GLASGOW_HASKELL__ >= 802
 {-# COMPLETE AnnVar, AnnLet, AnnApply, AnnLambda #-}
+#endif
 
 type AnnExprF ann bndType refType = Compose (Annotated ann) (AExprF bndType refType)
 
@@ -266,7 +274,9 @@ pattern AnnLambdaF :: ann -> AbstractAssignment bndType -> a
                    -> AnnExprF ann bndType refType a
 pattern AnnLambdaF ann assign body = Compose (Annotated ann (LambdaF assign body))
 
+#if __GLASGOW_HASKELL__ >= 802
 {-# COMPLETE AnnVarF, AnnLetF, AnnApplyF, AnnLambdaF #-}
+#endif
 
 instance Recursive (AnnExpr ann bndType refType) where project = Compose . unAnnExpr
 instance Corecursive (AnnExpr ann bndType refType) where embed (Compose v) = AnnExpr v
@@ -276,6 +286,9 @@ instance Uniplate (AnnExpr ann bndType refType) where
   uniplate (AnnLet ann assign val body) = plate AnnLet |- ann |- assign |* val |* body
   uniplate (AnnApply ann f v)           = plate AnnApply |- ann |* f |* v
   uniplate (AnnLambda ann assign body)  = plate AnnLambda |- ann |- assign |* body
+#if __GLASGOW_HASKELL__ < 802
+  uniplate _                            = undefined
+#endif
 
 instance Biplate (AnnExpr ann bndType refType) (AnnExpr ann bndType refType) where biplate = plateSelf
 
