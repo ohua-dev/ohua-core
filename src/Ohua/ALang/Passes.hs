@@ -50,11 +50,14 @@ inlineLambdaRefs = flip runReaderT mempty . para go
 -- Assumes lambda refs have been inlined
 inlineLambda :: Expression -> Expression
 inlineLambda = cata $ \case
-  ApplyF (Lambda assignment body) argument -> Let assignment argument body
-  ApplyF v@(Apply _ _) argument -> reduceLetCWith f v
-    where
-      f (Lambda assignment body) = Let assignment argument body
-      f v0                       = Apply v0 argument
+  e@(ApplyF func argument) ->
+    case func of
+      Lambda assignment body -> Let assignment argument body
+      Apply _ _ -> reduceLetCWith f func
+        where
+          f (Lambda assignment body) = Let assignment argument body
+          f v0                       = Apply v0 argument
+      _ -> embed e
   e -> embed e
 
 -- recursively performs the substitution
