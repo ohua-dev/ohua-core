@@ -21,7 +21,7 @@ dependencies:
 - base >=4.8 && <5
 - text
 - mtl
-- aeson >= 1.0.0.0
+- aeson # >= 1.0.0.0
 - microlens
 - microlens-platform
 - microlens-mtl
@@ -44,6 +44,11 @@ default-extensions:
 - ExplicitForAll
 - ScopedTypeVariables
 - DefaultSignatures
+- DeriveFunctor
+- DeriveFoldable
+- DeriveTraversable
+- DeriveGeneric
+- PatternSynonyms
 when:
   - condition: impl(ghc >= 8.2.0)   
     ghc-options:

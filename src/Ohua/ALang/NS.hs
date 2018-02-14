@@ -1,6 +1,3 @@
-{-# LANGUAGE DeriveFoldable    #-}
-{-# LANGUAGE DeriveFunctor     #-}
-{-# LANGUAGE DeriveTraversable #-}
 module Ohua.ALang.NS
   ( FunAnn(..)
   , Imports

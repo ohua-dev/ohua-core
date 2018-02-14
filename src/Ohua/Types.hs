@@ -9,13 +9,8 @@
 
 -- This source code is licensed under the terms described in the associated LICENSE.TXT file
 {-# LANGUAGE CPP                        #-}
-{-# LANGUAGE DeriveFoldable             #-}
-{-# LANGUAGE DeriveFunctor              #-}
-{-# LANGUAGE DeriveGeneric              #-}
-{-# LANGUAGE DeriveTraversable          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiWayIf                 #-}
-{-# LANGUAGE PatternSynonyms            #-}
 module Ohua.Types where
 
 import           Control.Comonad

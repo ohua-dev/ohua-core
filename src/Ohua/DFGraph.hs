@@ -7,7 +7,6 @@
 -- Stability   : experimental
 
 -- This source code is licensed under the terms described in the associated LICENSE.TXT file
-{-# LANGUAGE DeriveGeneric #-}
 module Ohua.DFGraph where
 
 
