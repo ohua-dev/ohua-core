@@ -14,6 +14,7 @@ maintainer: dev@justus.science
 license: OtherLicense
 license-file: LICENSE.txt
 homepage: https://bitbucket.org/sertel/ohua
+github: ohua-dev/ohua-core
 extra-source-files:
 - README.md
 dependencies:
