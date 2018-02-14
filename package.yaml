@@ -21,7 +21,7 @@ dependencies:
 - base >=4.8 && <5
 - text
 - mtl
-- aeson # >= 1.0.0.0
+- aeson >= 1.0.0.0
 - microlens
 - microlens-platform
 - microlens-mtl
