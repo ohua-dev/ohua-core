@@ -8,6 +8,7 @@
 -- Portability : portable
 
 -- This source code is licensed under the terms described in the associated LICENSE.TXT file
+{-# LANGUAGE CPP                  #-}
 {-# LANGUAGE Rank2Types           #-}
 {-# LANGUAGE UndecidableInstances #-}
 module Ohua.Util where
@@ -19,6 +20,9 @@ import qualified Data.Text            as T
 import           Lens.Micro
 import           System.IO
 import           System.IO.Unsafe
+#if __GLASGOW_HASKELL__ >= 800
+import qualified Data.Semigroup       as SG
+#endif
 
 type Prism s t a b = Traversal s t a b
 
@@ -78,3 +82,24 @@ forceTraceReport msg val = val `deepseq` trace msg (pure ())
 
 intentionally_not_implemented :: a
 intentionally_not_implemented = error "This is intentionally not implemented, don't use it!"
+
+
+
+-- | This type onlt exists to overwrite the implementation of 'Monoid' for functions.
+-- It changes 'mappend' to be '(.)'. This makes it possible to accumulate a chain of functions in a
+-- 'Control.Monad.Writer.MonadWriter'.
+newtype Mutator a = Mutator { mutAsFn :: a -> a }
+
+#if __GLASGOW_HASKELL__ >= 800
+instance SG.Semigroup (Mutator a) where
+  Mutator m1 <> Mutator m2 = Mutator $ m1 . m2
+#endif
+
+instance Monoid (Mutator a) where
+  mempty = Mutator id
+
+#if __GLASGOW_HASKELL__ >= 800
+  mappend = (SG.<>)
+#else
+  Mutator m1 `mappend` Mutator m2 = Mutator $ m1 . m2
+#endif
