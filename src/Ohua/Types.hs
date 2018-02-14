@@ -24,7 +24,6 @@ import           Data.Bifoldable
 import           Data.Bifunctor
 import           Data.Bitraversable
 import           Data.Default.Class
-import           Data.Functor.Classes  (Show1 (liftShowsPrec))
 import           Data.Functor.Foldable
 import           Data.Hashable
 import qualified Data.HashSet          as HS
@@ -267,14 +266,6 @@ options f (Environment opts) = Environment <$> f opts
 
 data Annotated annotation value = Annotated !annotation !value
     deriving (Eq, Show)
-
-instance Show annotation => Show1 (Annotated annotation) where
-    liftShowsPrec showInner _ prescedence (Annotated ann val) = showParen (prescedence > app_prec) $
-        showString "Annotated "
-        . showsPrec (succ app_prec) ann
-        . showString " "
-        . showInner (succ app_prec) val
-      where app_prec = 0
 
 instance (NFData annotation, NFData value) => NFData (Annotated annotation value) where
     rnf (Annotated ann val) = ann `deepseq` rnf val
