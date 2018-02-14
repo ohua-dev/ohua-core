@@ -178,13 +178,8 @@ pattern Lambda a b = AExpr (LambdaF a b)
 instance IsString b => IsString (AExpr a b) where
     fromString = Var . fromString
 
-instance ExtractBindings b => ExtractBindings (Expr b) where
-    extractBindings = cata $ \case
-      VarF b -> extractBindings b
-      LetF assign a b -> extractBindings assign ++ a ++ b
-      ApplyF a b -> a ++ b
-      LambdaF assign a -> extractBindings assign ++ a
-
+instance ExtractBindings ref => ExtractBindings (AExpr bnd ref) where
+    extractBindings e = [ b | Var bnds <- universe e, b <- extractBindings bnds ]
 
 instance (NFData a, NFData b) => NFData (AExpr a b) where
     rnf = cata $ \case
@@ -278,6 +273,9 @@ instance Uniplate (AnnExpr ann bndType refType) where
   uniplate (AnnLet ann assign val body) = plate AnnLet |- ann |- assign |* val |* body
   uniplate (AnnApply ann f v)           = plate AnnApply |- ann |* f |* v
   uniplate (AnnLambda ann assign body)  = plate AnnLambda |- ann |- assign |* body
+
+instance ExtractBindings ref => ExtractBindings (AnnExpr ann bnd ref) where
+  extractBindings e = [ b | AnnVar _ bnds <- universe e, b <- extractBindings bnds ]
 
 instance Biplate (AnnExpr ann bndType refType) (AnnExpr ann bndType refType) where biplate = plateSelf
 
