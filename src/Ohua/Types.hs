@@ -24,7 +24,7 @@ import           Data.Bifoldable
 import           Data.Bifunctor
 import           Data.Bitraversable
 import           Data.Default.Class
-import           Data.Functor.Foldable
+import           Data.Functor.Foldable hiding (fold)
 import           Data.Hashable
 import qualified Data.HashSet          as HS
 import           Data.String
@@ -42,7 +42,8 @@ import qualified Data.Semigroup        as SG
 
 
 -- | The numeric id of a function call site
-newtype FnId = FnId { unFnId :: Int } deriving (Eq, Ord, Generic, Enum, Num, NFData, Hashable)
+newtype FnId = FnId { unFnId :: Int }
+  deriving (Eq, Ord, Generic, Enum, Num, NFData, Hashable)
 
 instance Show FnId where
     show = show . unFnId
@@ -81,7 +82,7 @@ instance Show NSRef where
 instance IsList NSRef where
   type Item NSRef = Binding
   fromList = NSRef . fromList
-  toList = toList . unwrapNSRef
+  toList = GHC.Exts.toList . unwrapNSRef
 
 
 -- | Creates a 'NSRef' from a hierarchical sorted list of namespaces
@@ -151,32 +152,21 @@ symbolFromString s | Str.null s = Left "Symbols cannot be empty"
 
 class ExtractBindings a where
     extractBindings :: a -> [Binding]
-instance ExtractBindings a => ExtractBindings [a] where extractBindings = concatMap extractBindings
+    default extractBindings :: (Foldable f, f b ~ a, ExtractBindings b) => a -> [Binding]
+    extractBindings = foldMap extractBindings
 
+instance ExtractBindings a => ExtractBindings [a]
+
+instance ExtractBindings Binding where extractBindings = pure
 
 -- | Allowed forms for the left hand side of a let binding or in a lambda input.
 data AbstractAssignment binding
     = Direct !binding
     | Recursive !binding
     | Destructure ![binding]
-    deriving (Eq)
+    deriving (Eq, Functor, Traversable, Foldable)
 
 type Assignment = AbstractAssignment Binding
-
-instance Functor AbstractAssignment where
-    fmap f (Direct d)       = Direct $ f d
-    fmap f (Recursive d)    = Direct $ f d
-    fmap f (Destructure ds) = Destructure $ map f ds
-
-instance Foldable AbstractAssignment where
-    foldr f b (Direct bnd)       = f bnd b
-    foldr f b (Recursive bnd)    = f bnd b
-    foldr f b (Destructure bnds) = foldr f b bnds
-
-instance Traversable AbstractAssignment where
-    sequenceA (Direct a)       = Direct <$> a
-    sequenceA (Destructure as) = Destructure <$> sequenceA as
-    sequenceA (Recursive a)    = Recursive <$> a
 
 instance Show binding => Show (AbstractAssignment binding) where
     show (Direct b)      = show b
@@ -193,10 +183,7 @@ instance IsList Assignment where
     toList (Destructure l) = l
     toList _               = error "Direct return is not a list"
 
-instance ExtractBindings Assignment where
-    extractBindings (Direct bnd)       = [bnd]
-    extractBindings (Destructure bnds) = bnds
-    extractBindings (Recursive bnd)    = [bnd]
+instance ExtractBindings Assignment
 
 instance NFData binding => NFData (AbstractAssignment binding) where
     rnf (Destructure ds) = rnf ds
