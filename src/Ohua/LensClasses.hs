@@ -24,6 +24,6 @@ class HasBindingSupplier s a | s -> a where bindingSupplier :: Lens' s a
 class HasIdSupplier s a | s -> a where idSupplier :: Lens' s a
 class HasOther s a | s -> a where other :: Lens' s a
 class HasNamespace s a | s -> a where namespace :: Lens' s a
-class HasValue s a | s -> a where value :: Lens' s a
-class HasAnnotation s a | s -> a where annotation :: Lens' s a
+class HasValue s t a b | s -> a, t -> b, s b -> t where value :: Lens s t a b
+class HasAnnotation s t a b | s -> a, t -> b, s b -> t where annotation :: Lens s t a b
 class HasDecls s t a b | s -> a, t -> b, s b -> t where decls :: Lens s t a b

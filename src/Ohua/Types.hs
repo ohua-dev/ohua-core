@@ -252,10 +252,10 @@ data Annotated annotation value = Annotated !annotation !value
 instance (NFData annotation, NFData value) => NFData (Annotated annotation value) where
     rnf (Annotated ann val) = ann `deepseq` rnf val
 
-instance HasValue (Annotated annotation value) value where
+instance HasValue (Annotated annotation value) (Annotated annotation value') value value' where
     value f (Annotated ann val) = Annotated ann <$> f val
 
-instance HasAnnotation (Annotated annotation value) annotation where
+instance HasAnnotation (Annotated annotation value) (Annotated annotation' value) annotation annotation' where
     annotation f (Annotated ann val) = flip Annotated val <$> f ann
 
 instance Bifunctor Annotated where
