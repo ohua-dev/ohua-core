@@ -16,6 +16,7 @@ module Ohua.Util where
 import           Control.DeepSeq
 import           Control.Exception
 import           Control.Monad.Except
+import           Control.Monad.Writer
 import qualified Data.Text            as T
 import           Lens.Micro
 import           System.IO
@@ -103,3 +104,6 @@ instance Monoid (Mutator a) where
 #else
   Mutator m1 `mappend` Mutator m2 = Mutator $ m1 . m2
 #endif
+
+tellMut :: MonadWriter (Mutator a) m => (a -> a) -> m ()
+tellMut = tell . Mutator

@@ -96,6 +96,7 @@ library:
   - Ohua.Util
   - Ohua.Util.Str
   - Ohua.Unit
+  - Ohua.Test.DFGraph
   dependencies:
   - transformers
   - unordered-containers
@@ -109,6 +110,7 @@ library:
   - monad-control
   - comonad
   - uniplate
+  - fgl
   when:
   - condition: flag(debug)
     cpp-options: -DDEBUG=1
@@ -135,8 +137,8 @@ tests:
     - ohua-core
     - hspec
     - QuickCheck
-    - fgl
     - ghc
+    - fgl
 flags:
   debug:
     description: null
