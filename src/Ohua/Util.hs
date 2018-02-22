@@ -24,6 +24,8 @@ import           System.IO.Unsafe
 #if __GLASGOW_HASKELL__ >= 800
 import qualified Data.Semigroup       as SG
 #endif
+import           Data.String
+import           GHC.Stack
 
 type Prism s t a b = Traversal s t a b
 
@@ -107,3 +109,7 @@ instance Monoid (Mutator a) where
 
 tellMut :: MonadWriter (Mutator a) m => (a -> a) -> m ()
 tellMut = tell . Mutator
+
+
+throwErrorS :: (HasCallStack, MonadError s m, IsString s, Monoid s) => s -> m a
+throwErrorS msg = throwError $ msg <> "\n" <> fromString (prettyCallStack callStack)
