@@ -34,10 +34,11 @@ import qualified Ohua.Util.Str             as Str
 
 data CustomPasses env = CustomPasses
   { passAfterDFLowering :: DFExpr -> OhuaM env DFExpr
+  , passAfterNormalize  :: Expression -> OhuaM env Expression
   }
 
 noCustomPasses :: CustomPasses env
-noCustomPasses = CustomPasses pure
+noCustomPasses = CustomPasses pure pure
 
 instance Default (CustomPasses env) where
   def = noCustomPasses
@@ -58,7 +59,9 @@ pipeline CustomPasses{..} e = do
     Ohua.ALang.Passes.SSA.checkSSA normalizedE
 #endif
 
-    optimizedE <- Ohua.ALang.Optimizations.runOptimizations normalizedE
+    customAfterNorm <- normalize =<< passAfterNormalize normalizedE
+
+    optimizedE <- Ohua.ALang.Optimizations.runOptimizations customAfterNorm
 
 #ifdef DEBUG
     Ohua.ALang.Passes.SSA.checkSSA optimizedE
