@@ -9,8 +9,16 @@
 
 -- This source code is licensed under the terms described in the associated LICENSE.TXT file
 {-# LANGUAGE CPP                  #-}
+
+#define IMPL_SEMIGROUP __GLASGOW_HASKELL__ >= 800
+#define HAS_NEW_CALLSTACK_API MIN_VERSION_base(4,9,0)
+
+
 {-# LANGUAGE Rank2Types           #-}
 {-# LANGUAGE UndecidableInstances #-}
+#if !HAS_NEW_CALLSTACK_API
+{-# LANGUAGE ImplicitParams #-}
+#endif
 module Ohua.Util where
 
 import           Control.DeepSeq
@@ -21,7 +29,7 @@ import qualified Data.Text            as T
 import           Lens.Micro
 import           System.IO
 import           System.IO.Unsafe
-#if __GLASGOW_HASKELL__ >= 800
+#if IMPL_SEMIGROUP
 import qualified Data.Semigroup       as SG
 #endif
 import           Data.String
@@ -93,7 +101,7 @@ intentionally_not_implemented = error "This is intentionally not implemented, do
 -- 'Control.Monad.Writer.MonadWriter'.
 newtype Mutator a = Mutator { mutAsFn :: a -> a }
 
-#if __GLASGOW_HASKELL__ >= 800
+#if IMPL_SEMIGROUP
 instance SG.Semigroup (Mutator a) where
   Mutator m1 <> Mutator m2 = Mutator $ m1 . m2
 #endif
@@ -101,7 +109,7 @@ instance SG.Semigroup (Mutator a) where
 instance Monoid (Mutator a) where
   mempty = Mutator id
 
-#if __GLASGOW_HASKELL__ >= 800
+#if IMPL_SEMIGROUP
   mappend = (SG.<>)
 #else
   Mutator m1 `mappend` Mutator m2 = Mutator $ m1 . m2
@@ -109,7 +117,24 @@ instance Monoid (Mutator a) where
 
 tellMut :: MonadWriter (Mutator a) m => (a -> a) -> m ()
 tellMut = tell . Mutator
-
-
-throwErrorS :: (HasCallStack, MonadError s m, IsString s, Monoid s) => s -> m a
-throwErrorS msg = throwError $ msg <> "\n" <> fromString (prettyCallStack callStack)
+  
+throwErrorS ::
+#if HAS_NEW_CALLSTACK_API
+  ( HasCallStack
+#else
+  ( ?callStack :: CallStack
+#endif
+  , MonadError s m
+  , IsString s
+  , Monoid s
+  )
+  => s
+  -> m a
+throwErrorS msg = throwError $ msg <> "\n" <> fromString cs
+  where
+   cs =
+#if HAS_NEW_CALLSTACK_API
+     prettyCallStack callStack
+#else
+     showCallStack ?callStack
+#endif
