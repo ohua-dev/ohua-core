@@ -28,13 +28,13 @@ renderExpr = fst . cata worker
 
     worker (VarF b) = noParens $ showSym b
     worker (LetF assign val body) =
-      needParens $ vcat left [ "let" <+> showAssign assign <+> "=" <+> fst val
-                             , "in" <+> fst body
+      needParens $ vcat left [ "let" <+> showAssign assign <+> "=" <+> fst val <+> "in"
+                             , fst body
                              ]
     worker (ApplyF fun val) = needParens $ fst fun <+> parenthesize val
     worker (LambdaF assign body) = needParens $ "λ" <+> showAssign assign <+> "→" <+> fst body
 
-    showSym (Local b) = text $ show (b :: Binding)
+    showSym (Local b) = showBnd b
     showSym (Sf b fnId) = "Sf[" <> showQualBnd b <> "]" <> maybe nullBox (\a -> "<" <> text (show a) <> ">") fnId
     showSym (Env e) = "Env[" <> text (show e) <> "]"
 
