@@ -185,13 +185,25 @@ newline: native
 #
 # No language extensions are enabled by default.
 language_extensions:
-  - OverloadedStrings
-  - MultiParamTypeClasses
-  - FunctionalDependencies
-  - TypeFamilies
-  - FlexibleContexts
-  - FlexibleInstances
-  - TypeSynonymInstances
-  - LambdaCase
-  - TupleSections
-  - BangPatterns
+- OverloadedStrings
+- MultiParamTypeClasses
+- FunctionalDependencies
+- TypeFamilies
+- GADTs
+- FlexibleContexts
+- FlexibleInstances
+- TypeSynonymInstances
+- LambdaCase
+- TupleSections
+- BangPatterns
+- ExplicitForAll
+- ScopedTypeVariables
+- DefaultSignatures
+- DeriveFunctor
+- DeriveFoldable
+- DeriveTraversable
+- DeriveGeneric
+- PatternSynonyms
+- NamedFieldPuns
+- RecordWildCards
+- ConstraintKinds

@@ -31,6 +31,7 @@ dependencies:
 - data-default-class
 default-extensions:
 - OverloadedStrings
+- OverloadedLists
 - MultiParamTypeClasses
 - FunctionalDependencies
 - TypeFamilies
@@ -49,6 +50,9 @@ default-extensions:
 - DeriveTraversable
 - DeriveGeneric
 - PatternSynonyms
+- NamedFieldPuns
+- RecordWildCards
+- ConstraintKinds
 when:
   - condition: impl(ghc >= 8.2.0)   
     ghc-options:
