@@ -27,6 +27,7 @@ import           Ohua.DFGraph
 import           Ohua.DFLang.Lang
 import           Ohua.DFLang.Optimizations
 import           Ohua.DFLang.Passes
+import qualified Ohua.DFLang.Verify
 import           Ohua.Monad
 import           Ohua.Types
 import qualified Ohua.Util.Str             as Str
@@ -69,7 +70,7 @@ pipeline CustomPasses{..} e = do
 
     dfE <- lowerALang optimizedE
 
-    forceLog (pack $ Str.toString $ showDFExpr dfE) ()
+    Ohua.DFLang.Verify.verify dfE
 
 #ifdef DEBUG
     Ohua.DFLang.Passes.checkSSAExpr dfE
@@ -83,8 +84,6 @@ pipeline CustomPasses{..} e = do
     Ohua.DFLang.Passes.checkSSAExpr optimizedDfE
 #endif
     pure $ toGraph optimizedDfE
-
-
 
 
 -- | Run the pipeline in an arbitrary monad that supports error reporting.

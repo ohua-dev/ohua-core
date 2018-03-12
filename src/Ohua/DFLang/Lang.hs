@@ -50,6 +50,11 @@ data DFFnRef
     | EmbedSf !QualifiedBinding -- an generic dataflow function that wraps a stateful function call
     deriving (Eq, Show)
 
+instance Hashable DFFnRef where
+  hashWithSalt s = hashWithSalt s . \case
+    DFFunction f -> (0::Int, f)
+    EmbedSf f -> (1, f)
+
 data DFVar
     = DFEnvVar !HostExpr
     | DFVar !Binding

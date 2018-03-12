@@ -59,3 +59,7 @@ recur = DFFunction Refs.recur
 
 array :: DFFnRef
 array = EmbedSf Refs.array
+
+
+mkTuple :: DFFnRef
+mkTuple = EmbedSf Refs.mkTuple

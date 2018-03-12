@@ -101,7 +101,7 @@ data QualifiedBinding = QualifiedBinding
     } deriving (Eq, Generic, Ord)
 
 instance Show QualifiedBinding where
-    show (QualifiedBinding ns n) = show $ show ns ++ "/" ++ Str.toString (unBinding n)
+    show (QualifiedBinding ns n) = show ns ++ "/" ++ Str.toString (unBinding n)
 
 instance Hashable QualifiedBinding where
     hashWithSalt s (QualifiedBinding a b) = hashWithSalt s (a, b)
