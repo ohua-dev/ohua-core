@@ -18,7 +18,7 @@ import           Control.Monad.Except
 import           Data.Default.Class
 import qualified Data.HashMap.Strict       as HM
 import           Data.Monoid               ((<>))
-import           Data.Text                 (Text, pack)
+import           Data.Text                 (Text)
 import           Ohua.ALang.Lang
 import           Ohua.ALang.Optimizations
 import           Ohua.ALang.Passes
