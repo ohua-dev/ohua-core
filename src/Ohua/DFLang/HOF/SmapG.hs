@@ -18,7 +18,6 @@ import qualified Ohua.DFLang.Refs as Refs
 import Ohua.Monad
 import Ohua.Types
 import Ohua.Util.Str (showS)
-import Ohua.DFLang.HOF.If (scopeVars)
 import Data.Monoid
 import qualified Ohua.ALang.Refs as ARefs
 
@@ -28,6 +27,24 @@ data SmapGFn = SmapGFn
     , smapLambda :: !Lambda
     , triggerArc :: Binding
     }
+
+scopeVars ::
+       (MonadGenBnd m, MonadGenId m, Monad m)
+    => Binding
+    -> [Binding]
+    -> m (LetExpr, [(Binding, Binding)])
+scopeVars scopeSource freeVars = do
+    scopeId <- generateId
+    newVars <- mapM generateBindingWith freeVars
+    pure
+        ( LetExpr
+              scopeId
+              (Destructure newVars)
+              Refs.repeat
+              (map DFVar $ scopeSource : freeVars)
+              Nothing
+        , zip freeVars newVars)
+
 
 instance HigherOrderFunction SmapGFn where
     name = tagFnName ARefs.smapG

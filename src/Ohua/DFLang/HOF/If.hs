@@ -11,7 +11,7 @@
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE RecordWildCards #-}
 module Ohua.DFLang.HOF.If
-  (IfFn, scopeVars) where
+  (IfFn) where
 
 
 import           Control.Monad.State

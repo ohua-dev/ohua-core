@@ -70,3 +70,7 @@ smapGFun = DFFunction "ohua.lang/smapGFun"
 
 collectG :: DFFnRef
 collectG = DFFunction "ohua.lang/collectG"
+
+
+repeat :: DFFnRef
+repeat = DFFunction "ohua.lang/repeat"
