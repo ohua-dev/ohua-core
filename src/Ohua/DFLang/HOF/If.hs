@@ -31,8 +31,6 @@ data IfFn = IfFn
     }
 
 
-instance HigherOrderFunction IfFn where
-    name = "ohua.lang/if"
 scopeVars ::
        (MonadGenBnd m, MonadGenId m, Monad m)
     => Binding
@@ -51,13 +49,23 @@ scopeVars scopeSource freeVars = do
         , zip freeVars newVars)
 
 
-    parseCallAndInitState
-        [ Variable v
-        , LamArg thenBr@(Lam{beginAssignment=Direct ret})
-        , LamArg elseBr
-        ] = pure $ IfFn v thenBr elseBr ret
-    parseCallAndInitState args = failWith $ "Unexpected number or type of argument for if " <> Str.showS args
+checkAssignment ::
+       (Show a, MonadError Error m) => Str.Str -> AbstractAssignment a -> m a
+checkAssignment _ (Direct b) = pure b
+checkAssignment branch other =
+    throwError $
+    "if HOF transform expects one direct assignment for `" <> branch <>
+    "` branch, got " <>
+    Str.showS other
 
+
+instance HigherOrderFunction IfFn where
+    name = "ohua.lang/if"
+    parseCallAndInitState [Variable v, LamArg thenBr@(Lam {beginAssignment = Direct ret}), LamArg elseBr] =
+        pure $ IfFn v thenBr elseBr ret
+    parseCallAndInitState args =
+        failWith $
+        "Unexpected number or type of argument for if " <> Str.showS args
     createContextEntry = do
         f <- get
         ifId <- generateId
@@ -76,9 +84,16 @@ scopeVars scopeSource freeVars = do
         switchId <- generateId
         IfFn {..} <- get
         pure
-            [ LetExpr switchId assignment Refs.select [DFVar ifRet, DFVar $ resultBinding thenBranch, DFVar $ resultBinding elseBranch] Nothing
+            [ LetExpr
+                  switchId
+                  assignment
+                  Refs.select
+                  [ DFVar ifRet
+                  , DFVar $ resultBinding thenBranch
+                  , DFVar $ resultBinding elseBranch
+                  ]
+                  Nothing
             ]
-
     scopeFreeVariables lam freeVars = do
         sourceVar <-
             case beginAssignment lam of
@@ -89,4 +104,5 @@ scopeVars scopeSource freeVars = do
         (scopeExpr, varMap) <- scopeVars sourceVar freeVars
         pure ([scopeExpr], varMap)
     contextifyUnboundFunctions (Lam (Direct x) _) = return $ Just ([], x)
-    contextifyUnboundFunctions _ = failWith "Unexpected destructuring in begin assignment"
+    contextifyUnboundFunctions _ =
+        failWith "Unexpected destructuring in begin assignment"

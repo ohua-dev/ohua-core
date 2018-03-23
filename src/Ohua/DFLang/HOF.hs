@@ -13,29 +13,33 @@
 -- the lowering from ALang to DFLang they are treated specially.
 -- This interface defines both the dispatch and the concrete lowering strategy for a
 -- higher order function.
-
 -- This source code is licensed under the terms described in the associated LICENSE.TXT file
 --
 {-# LANGUAGE ExistentialQuantification #-}
+
 module Ohua.DFLang.HOF
     ( HigherOrderFunction(..)
-    , TaggedFnName, tagFnName, unTagFnName
-    , Lambda(..), Argument(..), Renaming
+    , TaggedFnName
+    , tagFnName
+    , unTagFnName
+    , Lambda(..)
+    , Argument(..)
+    , Renaming
     , WHOF(..)
     ) where
 
-
-import           Control.Monad.State
-import           Data.Proxy
-import           Data.Sequence
-import           Data.String
-import           Ohua.DFLang.Lang
-import           Ohua.Monad
-import           Ohua.Types
-
+import Control.Monad.State
+import Data.Proxy
+import Data.Sequence
+import Data.String
+import Ohua.DFLang.Lang
+import Ohua.Monad
+import Ohua.Types
 
 -- | A function name tagged with a higher order function instance it belongs to.
-newtype TaggedFnName f = TaggedFnName { unTagFnName :: QualifiedBinding }
+newtype TaggedFnName f = TaggedFnName
+    { unTagFnName :: QualifiedBinding
+    }
 
 instance IsString (TaggedFnName a) where
     fromString = tagFnName . fromString
@@ -43,13 +47,11 @@ instance IsString (TaggedFnName a) where
 tagFnName :: QualifiedBinding -> TaggedFnName f
 tagFnName = TaggedFnName
 
-
 -- | Description of a lambda hiding the actual contents of the function.
 data Lambda = Lam
-  { beginAssignment :: !Assignment
-  , resultBinding   :: !Binding
-  } deriving (Eq, Show)
-
+    { beginAssignment :: !Assignment
+    , resultBinding :: !Binding
+    } deriving (Eq, Show)
 
 -- | Possible shapes of arguments to higher order functions
 data Argument
@@ -57,9 +59,7 @@ data Argument
     | LamArg !Lambda
     deriving (Show, Eq)
 
-
 type Renaming = [(Binding, Binding)]
-
 
 -- | Implementation of the lowering of a higher order function.
 -- The type @f@ is dispatched based on the 'name'.
@@ -75,28 +75,35 @@ type Renaming = [(Binding, Binding)]
 --      (5) 'createContextExit' is called
 class HigherOrderFunction f where
     name :: TaggedFnName f
-
     -- | Initialize the state for a single lowering from the arguments given to the HOF call
     parseCallAndInitState :: MonadOhua envExpr m => [Argument] -> m f
-
     -- | Generate the entry node(s) for this HOF context
-    createContextEntry :: (MonadOhua envExpr m, MonadState f m) => m (Seq LetExpr)
-
+    createContextEntry ::
+           (MonadOhua envExpr m, MonadState f m) => m (Seq LetExpr)
     -- | Generate the exit node(s) for this HOF context
-    createContextExit :: (MonadOhua envExpr m, MonadState f m) => Assignment -> m (Seq LetExpr)
-
+    createContextExit ::
+           (MonadOhua envExpr m, MonadState f m)
+        => Assignment
+        -> m (Seq LetExpr)
     -- | Create scope nodes for __all__ free variables of __one of the lambdas__ that were input to 'parseCallAndInitState'.
     -- This methiod is never called with a lambda which was not in the list given to 'parseCallAndInitState'.
-    scopeFreeVariables :: (MonadOhua envExpr m, MonadState f m) => Lambda -> [Binding] -> m (Seq LetExpr, Renaming)
-
+    scopeFreeVariables ::
+           (MonadOhua envExpr m, MonadState f m)
+        => Lambda
+        -> [Binding]
+        -> m (Seq LetExpr, Renaming)
     -- | Whether the compiler should add context args for all functions in this lambda
     -- which have no local variables as input.
     -- As an invariant, since 'scopeFreeVariables' makes all free variables local ones
     -- this should only apply to functions with no inputs at all or only env arg inputs.
-    contextifyUnboundFunctions :: (MonadOhua envExpr m, MonadState f m) => Lambda -> m (Maybe (Seq LetExpr, Binding))
-
+    contextifyUnboundFunctions ::
+           (MonadOhua envExpr m, MonadState f m)
+        => Lambda
+        -> m (Maybe (Seq LetExpr, Binding))
 
 -- | _W_rapped _H_igher _O_rder _F_unction.
 -- A simple wrapper for instances of the 'HigherOrderFunction' typeclass.
 -- Utility type.
-data WHOF = forall f . HigherOrderFunction f => WHOF (Proxy f)
+data WHOF =
+    forall f. HigherOrderFunction f =>
+              WHOF (Proxy f)

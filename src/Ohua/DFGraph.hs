@@ -67,41 +67,48 @@ instance NFData a => NFData (AbstractOutGraph a)
 
 toGraph :: DFExpr -> OutGraph
 toGraph (DFExpr lets r) = OutGraph ops grArcs (getSource r)
-  where
-    ops = map toOp $ toList lets
-    toOp e = Operator (callSiteId e) (deRef e)
+ where
+  ops = map toOp $ toList lets
+  toOp e = Operator (callSiteId e) (deRef e)
 
-    deRef = (\case DFFunction n -> n; EmbedSf n -> n) . functionRef
+  deRef =
+    (\case
+        DFFunction n -> n
+        EmbedSf    n -> n
+      )
+      . functionRef
 
-    sources =
-        HM.fromList
-        $ toList lets
-            >>= \l ->
-                    [ (var, Target (callSiteId l) idx)
-                    | (var, idx) <- case returnAssignment l of
-                                        Direct v         -> [(v, -1)]
-                                        Destructure vars -> zip vars [0..]
-                                        g -> error $ "Found unsupported assignment: " ++ show g
-                    ]
+  sources = HM.fromList $ toList lets >>= \l ->
+    [ (var, Target (callSiteId l) idx)
+    | (var, idx) <- case returnAssignment l of
+      Direct      v    -> [(v, -1)]
+      Destructure vars -> zip vars [0 ..]
+      g                -> error $ "Found unsupported assignment: " ++ show g
+    ]
 
-    grArcs = concatMap toArc (toList lets)
+  grArcs = concatMap toArc (toList lets)
 
-    getSource v = fromMaybe (error $ "Undefined Binding: DFVar " ++ show v ++ " defined vars: " ++ show sources) $ HM.lookup v sources
+  getSource v =
+    fromMaybe
+        (  error
+        $  "Undefined Binding: DFVar "
+        ++ show v
+        ++ " defined vars: "
+        ++ show sources
+        )
+      $ HM.lookup v sources
 
-    toArc l =
-        [ Arc t $
-            case arg of
-                DFVar v          -> LocalSource $ getSource v
-                DFEnvVar envExpr -> EnvSource envExpr
-        | (arg, idx) <- maybe id ((:) . (,-1) . DFVar) (contextArg l)
-                          -- prepend (ctxBinding, -1) if there is a context arc
-                            $ zip (callArguments l) [0..]
-        , let t = Target (callSiteId l) idx
-        ]
+  toArc l =
+    [ Arc t $ case arg of
+        DFVar    v       -> LocalSource $ getSource v
+        DFEnvVar envExpr -> EnvSource envExpr
+    | (arg, idx) <- maybe id ((:) . (, -1) . DFVar) (contextArg l)
+                  -- prepend (ctxBinding, -1) if there is a context arc
+      $ zip (callArguments l) [0 ..]
+    , let t = Target (callSiteId l) idx
+    ]
 
 
-spliceEnv :: (Int -> a) -> OutGraph ->  AbstractOutGraph a
-spliceEnv lookupExpr = fmap f
-  where
-    f (HostExpr i) = lookupExpr i
+spliceEnv :: (Int -> a) -> OutGraph -> AbstractOutGraph a
+spliceEnv lookupExpr = fmap f where f (HostExpr i) = lookupExpr i
 
