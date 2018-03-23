@@ -6,31 +6,30 @@
 -- Maintainer  : dev@justus.science, sebastian.ertel@gmail.com
 -- Stability   : experimental
 -- Portability : portable
-
 -- This source code is licensed under the terms described in the associated LICENSE.TXT file
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE RecordWildCards #-}
+
 module Ohua.DFLang.HOF.If
-  (IfFn) where
+    ( IfFn
+    ) where
 
-
-import           Control.Monad.State
-import           Data.Monoid
-import           Ohua.DFLang.HOF
-import           Ohua.DFLang.Lang
-import qualified Ohua.DFLang.Refs    as Refs
-import           Ohua.Monad
-import           Ohua.Types
-import qualified Ohua.Util.Str       as Str
+import Control.Monad.State
+import Data.Monoid
 import qualified Ohua.ALang.Refs as ARefs
+import Ohua.DFLang.HOF
+import Ohua.DFLang.Lang
+import qualified Ohua.DFLang.Refs as Refs
+import Ohua.Monad
+import Ohua.Types
+import qualified Ohua.Util.Str as Str
 
 data IfFn = IfFn
     { conditionVariable :: !DFVar
-    , thenBranch        :: !Lambda
-    , elseBranch        :: !Lambda
-    , ifRet             :: !Binding
+    , thenBranch :: !Lambda
+    , elseBranch :: !Lambda
+    , ifRet :: !Binding
     }
-
 
 scopeVars ::
        (MonadGenBnd m, MonadGenId m, Monad m)
@@ -49,7 +48,6 @@ scopeVars scopeSource freeVars = do
               (Just scopeSource)
         , zip freeVars newVars)
 
-
 checkAssignment ::
        (Show a, MonadError Error m) => Str.Str -> AbstractAssignment a -> m a
 checkAssignment _ (Direct b) = pure b
@@ -58,7 +56,6 @@ checkAssignment branch other =
     "if HOF transform expects one direct assignment for `" <> branch <>
     "` branch, got " <>
     Str.showS other
-
 
 instance HigherOrderFunction IfFn where
     name = tagFnName ARefs.ifThenElse

@@ -31,7 +31,9 @@ import           Ohua.LensClasses
 import           Ohua.Util
 import qualified Ohua.Util.Str         as Str
 
-#if __GLASGOW_HASKELL__ >= 800
+#include "compat.h"
+
+#if BASE_HAS_SEMIGROUP
 import qualified Data.Semigroup        as SG
 #endif
 
@@ -51,7 +53,7 @@ newtype Binding = Binding { unBinding :: Str.Str }
              , Ord
              , Monoid
              , NFData
-#if __GLASGOW_HASKELL__ >= 800
+#if BASE_HAS_SEMIGROUP
              , SG.Semigroup
 #endif
              )
@@ -296,7 +298,7 @@ pattern TyRef b = TyExpr (TyRefF b)
 pattern TyApp :: TyExpr binding -> TyExpr binding -> TyExpr binding
 pattern TyApp f v = TyExpr (TyAppF f v)
 
-#if __GLASGOW_HASKELL__ >= 804
+#if COMPLETE_PRAGMA_WORKS
 {-# COMPLETE TyRef, TyApp #-}
 #endif
 

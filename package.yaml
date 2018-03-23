@@ -115,6 +115,8 @@ library:
   - comonad
   - uniplate
   - fgl
+  include-dirs:
+    cbits
   when:
   - condition: flag(debug)
     cpp-options: -DDEBUG=1

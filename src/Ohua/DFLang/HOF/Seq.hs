@@ -6,24 +6,24 @@
 -- Maintainer  : dev@justus.science, sebastian.ertel@gmail.com
 -- Stability   : experimental
 -- Portability : portable
-
 -- This source code is licensed under the terms described in the associated LICENSE.TXT file
 {-# LANGUAGE OverloadedLists #-}
+
 module Ohua.DFLang.HOF.Seq where
 
-import           Control.Monad.State
-import           Data.Sequence       as S
-import           Ohua.DFLang.HOF
-import           Ohua.DFLang.Lang
-import qualified Ohua.DFLang.Refs    as Refs
-import           Ohua.Monad
-import           Ohua.Types
+import Control.Monad.State
+import Data.Sequence as S
 import qualified Ohua.ALang.Refs as ARefs
+import Ohua.DFLang.HOF
+import Ohua.DFLang.Lang
+import qualified Ohua.DFLang.Refs as Refs
+import Ohua.Monad
+import Ohua.Types
 
-data SeqFn = SeqFn {
-  before    :: Binding,
-  afterExpr :: Lambda
-}
+data SeqFn = SeqFn
+    { before :: Binding
+    , afterExpr :: Lambda
+    }
 
 instance HigherOrderFunction SeqFn where
     name = tagFnName ARefs.seq

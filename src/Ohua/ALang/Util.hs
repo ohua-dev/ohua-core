@@ -16,9 +16,10 @@ import           Ohua.Types
 
 
 substitute :: Binding -> Expression -> Expression -> Expression
--- Postwalk avoids an infinite recursion in a case where `val` uses a `var` binding.
--- This should never happen but might if this this invariant is violated for some reason
--- and the violation is not caught.
+-- Postwalk avoids an infinite recursion in a case where `val` uses a
+-- `var` binding.  This should never happen but might if this
+-- invariant is violated for some reason and the violation is not
+-- caught.
 substitute !var val = cata f
   where
     f (VarF (Local v)) | var == v = val

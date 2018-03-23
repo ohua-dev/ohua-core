@@ -119,7 +119,9 @@ handleDefinitionalExpr ::
     -> LetRecT m Binding
     -> LetRecT m Binding
 handleDefinitionalExpr assign (Lambda arg expr) cont
-    -- TODO handle lambdas with multiple arguments -> this requires some ALang transformation to always get the form Lambda a Lambda b ...
+    -- TODO handle lambdas with multiple arguments -> this requires
+    -- some ALang transformation to always get the form Lambda a
+    -- Lambda b ...
  = do
     handleTailRec <- fromEnv (options . transformRecursiveFunctions)
     unless handleTailRec $
@@ -139,7 +141,8 @@ handleDefinitionalExpr assign (Lambda arg expr) cont
                 failWith $
                 "Invariant broken. Assignment should be a 'Direct' but was: " <>
                 Str.showS x
-    -- execute the rest of the traversal (the continuation) in the new LetRecT environment
+    -- execute the rest of the traversal (the continuation) in the new
+    -- LetRecT environment
     local (LetRec . HM.insert b (assign, expr, singleArg) . unLetRec) cont
 handleDefinitionalExpr assign l@(Apply _ _) cont = do
     (fn, fnId, args) <- handleApplyExpr l
@@ -162,8 +165,9 @@ lowerDefault fn fnId assign args =
     mapM expectVar args <&> \args' ->
         [LetExpr fnId assign (EmbedSf fn) args' Nothing]
 
--- | Analyze an apply expression, extracting the inner stateful function and the nested arguments as a list.
--- Also generates a new function id for the inner function should it not have one yet.
+-- | Analyze an apply expression, extracting the inner stateful
+-- function and the nested arguments as a list.  Also generates a new
+-- function id for the inner function should it not have one yet.
 handleApplyExpr ::
        (MonadOhua env m, MonadWriter (Seq LetExpr) m)
     => Expression
@@ -196,7 +200,8 @@ handleApplyExpr (Var (Sf fn fnId)) = (fn, , []) <$> maybe generateId return fnId
                                                                                  -- what is this?
 handleApplyExpr g = failWith $ "Expected apply but got: " <> Str.showS g
 
--- | Analyze a lambda expression. Since we perform lambda inlining, this can only be a letrec.
+-- | Analyze a lambda expression. Since we perform lambda inlining,
+-- this can only be a letrec.
 lowerLambdaExpr :: MonadOhua env m => Assignment -> Expression -> m DFExpr
 lowerLambdaExpr (Recursive _) expr = lowerALang expr
 lowerLambdaExpr a _ =
@@ -228,7 +233,8 @@ tieContext0 initExpr lets
     isLocalArc (DFVar _) = True
     isLocalArc _ = False
 
--- | Inspect an expression expecting something which can be captured in a DFVar otherwise throws appropriate errors.
+-- | Inspect an expression expecting something which can be captured
+-- in a DFVar otherwise throws appropriate errors.
 expectVar :: MonadError Error m => Expression -> m DFVar
 expectVar (Var (Local bnd)) = pure $ DFVar bnd
 expectVar (Var (Env i)) = pure $ DFEnvVar i

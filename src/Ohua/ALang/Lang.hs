@@ -6,34 +6,36 @@
 -- Maintainer  : sebastian.ertel@gmail.com, dev@justus.science
 -- Stability   : experimental
 -- Portability : portable
-
 -- This source code is licensed under the terms described in the associated LICENSE.TXT file
-{-# LANGUAGE CPP                        #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+
 module Ohua.ALang.Lang where
 
+import Control.DeepSeq
+import Data.Functor.Compose
+import Data.Functor.Foldable
+import Data.Functor.Identity
+import Data.Generics.Uniplate.Direct
+import Data.Hashable
+import Data.String
+import GHC.Generics
+import Lens.Micro ((^.))
+import Ohua.LensClasses
+import Ohua.Types
+import Ohua.Util
 
-import           Control.DeepSeq
-import           Data.Functor.Compose
-import           Data.Functor.Foldable
-import           Data.Functor.Identity
-import           Data.Generics.Uniplate.Direct
-import           Data.Hashable
-import           Data.String
-import           GHC.Generics
-import           Lens.Micro                    ((^.))
-import           Ohua.LensClasses
-import           Ohua.Types
-import           Ohua.Util
+#include "compat.h"
 
--- bindingType is the type of general bindings
--- Binding is the type for function arguments and `let`s etc which we know to always be local
-
--- I revised the proposal.
--- I got rid of `Fn`. Not because of cyclic dependencies but because I think that function application can be more general.
-
+-- bindingType is the type of general bindings Binding is the type for
+-- function arguments and `let`s etc which we know to always be local
+-- I revised the proposal. I got rid of `Fn`. Not because of cyclic
+-- dependencies but because I think that function application can be
+-- more general.
 -- | Numerical reference to a spliced expression from the host environment.
-newtype HostExpr = HostExpr { unwrapHostExpr :: Int } deriving (Eq, Ord, Generic)
+newtype HostExpr = HostExpr
+    { unwrapHostExpr :: Int
+    } deriving (Eq, Ord, Generic)
 
 instance Show HostExpr where
     show = show . unwrapHostExpr
@@ -46,55 +48,44 @@ instance Num HostExpr where
     (*) = intentionally_not_implemented
     abs = intentionally_not_implemented
     signum = intentionally_not_implemented
-instance Hashable HostExpr where hashWithSalt s = hashWithSalt s . unwrapHostExpr
+
+instance Hashable HostExpr where
+    hashWithSalt s = hashWithSalt s . unwrapHostExpr
 
 instance NFData HostExpr
 
 -- (Sebastian) can we treat opaque JVM objects here somehow?
 -- (Justus) Several. Well have to discus what the best option is at some point,
 --          because the concrete type of the host expression depends on the backend.
-
 -- some types for `bindingType`
-
 type RawSymbol = HostExpr
 
 -- | Type of references which can inhabit a `Var` once the source is copletely parsed.
 data Symbol a
     = Local !Binding -- ^ the basic symbols occuring in the algorithm language
-    | Sf !a !(Maybe FnId) -- ^ reference to a stateful function
-    | Env !HostExpr -- ^ reference to an environment object. this maybe a var or any other term of the host language.
+    | Sf !a
+         !(Maybe FnId) -- ^ reference to a stateful function
+    | Env !HostExpr -- ^ reference to an environment object. this
+                    -- maybe a var or any other term of the host
+                    -- language.
     deriving (Show, Eq, Generic)
 
 type ResolvedSymbol = Symbol QualifiedBinding
 
 instance IsString ResolvedSymbol where
-    fromString str = case fromString str of
-        Unqual bnd -> Local bnd
-        Qual q     -> Sf q Nothing
+    fromString str =
+        case fromString str of
+            Unqual bnd -> Local bnd
+            Qual q -> Sf q Nothing
 
 instance ExtractBindings (Symbol a) where
     extractBindings (Local l) = return l
-    extractBindings _         = mempty
+    extractBindings _ = mempty
 
 instance NFData a => NFData (Symbol a) where
     rnf (Local b) = rnf b
-    rnf (Env e)   = rnf e
-    rnf (Sf s i)  = rnf s `seq` rnf i
-
-
--- IMPORTANT: we need this to be polymorphic over `bindingType` or at least I would very much
--- recommend that, because then we can separate the generation of the algorithms language
--- and the symbol resolution.
--- If we dont separate those we'll have to reimplement the complete symbol resolution pass for
--- each frontend
-
--- I changed this again so that application and let both do not use lists.
--- this makes generic transformations much simpler to write, such as SSA
---
---
--- For comparison, here is the GHC intermediate language `Core`
---
--- data Expr b
+    rnf (Env e) = rnf e
+    rnf (Sf s i) = rnf s `seq` rnf i
     -- much like us they are polymorphic over the
     -- binding type, however in their case its the for
     -- assigments, not variables
@@ -119,7 +110,6 @@ instance NFData a => NFData (Symbol a) where
     --
     --   | Cast  (Expr b) Coercion
         -- This we might need if we get a type system
-
     --   | Tick  (Tickish Id) (Expr b)
         -- No clue what this is used for yet
     --
@@ -132,152 +122,191 @@ instance NFData a => NFData (Symbol a) where
     --   deriving Data
     --
 
+-- IMPORTANT: we need this to be polymorphic over `bindingType` or at
+-- least I would very much recommend that, because then we can
+-- separate the generation of the algorithms language and the symbol
+-- resolution.  If we dont separate those we'll have to reimplement
+-- the complete symbol resolution pass for each frontend I changed
+-- this again so that application and let both do not use lists.  this
+-- makes generic transformations much simpler to write, such as SSA
+--
+--
+-- For comparison, here is the GHC intermediate language `Core`
+--
+-- data Expr b
 -- | An expression in the algorithm language.
 -- Abstracted over a concrete type of local binding (target) and a type of reference (source).
 data AExprF bndType refType a
-  = VarF refType -- ^ A reference to a value
-  | LetF (AbstractAssignment bndType) a a -- ^ Binding of a value to one ore more identifiers
-  | ApplyF a a -- ^ Function application
-  | LambdaF (AbstractAssignment bndType) a -- ^ Anonymous function definition
-  deriving (Functor, Foldable, Traversable, Show, Eq)
+    = VarF refType -- ^ A reference to a value
+    | LetF (AbstractAssignment bndType)
+           a
+           a -- ^ Binding of a value to one ore more identifiers
+    | ApplyF a
+             a -- ^ Function application
+    | LambdaF (AbstractAssignment bndType)
+              a -- ^ Anonymous function definition
+    deriving (Functor, Foldable, Traversable, Show, Eq)
 
 type instance Base (AExpr bndType refType) = AExprF bndType refType
 
-newtype AExpr bndType refType = AExpr { unAExpr :: AExprF bndType refType (AExpr bndType refType) }
-  deriving (Show, Eq)
+newtype AExpr bndType refType = AExpr
+    { unAExpr :: AExprF bndType refType (AExpr bndType refType)
+    } deriving (Show, Eq)
 
 instance Recursive (AExpr bndType refType) where
-  project = unAExpr
+    project = unAExpr
 
 instance Corecursive (AExpr bndType refType) where
-  embed = AExpr
+    embed = AExpr
 
 pattern Var :: refType -> AExpr bndType refType
+
 pattern Var v = AExpr (VarF v)
 
-pattern Let :: AbstractAssignment bndType
-            -> AExpr bndType refType
-            -> AExpr bndType refType
-            -> AExpr bndType refType
+pattern Let ::
+        AbstractAssignment bndType ->
+          AExpr bndType refType ->
+            AExpr bndType refType -> AExpr bndType refType
+
 pattern Let a b c = AExpr (LetF a b c)
 
-pattern Apply :: AExpr bndType refType
-              -> AExpr bndType refType
-              -> AExpr bndType refType
+pattern Apply ::
+        AExpr bndType refType ->
+          AExpr bndType refType -> AExpr bndType refType
+
 pattern Apply a b = AExpr (ApplyF a b)
 
-pattern Lambda :: AbstractAssignment bndType
-               -> AExpr bndType refType
-               -> AExpr bndType refType
-pattern Lambda a b = AExpr (LambdaF a b)
+pattern Lambda ::
+        AbstractAssignment bndType ->
+          AExpr bndType refType -> AExpr bndType refType
 
-#if __GLASGOW_HASKELL__ >= 804
+pattern Lambda a b = AExpr (LambdaF a b)
+#if COMPLETE_PRAGMA_WORKS
 {-# COMPLETE Var, Let, Apply, Lambda #-}
 #endif
-
 instance IsString b => IsString (AExpr a b) where
     fromString = Var . fromString
 
 instance ExtractBindings ref => ExtractBindings (AExpr bnd ref) where
-    extractBindings e = [ b | Var bnds <- universe e, b <- extractBindings bnds ]
+    extractBindings e = [b | Var bnds <- universe e, b <- extractBindings bnds]
 
 instance (NFData a, NFData b) => NFData (AExpr a b) where
-    rnf = cata $ \case
-      VarF b -> rnf b
-      LetF assign a b -> assign `deepseq` a `deepseq` rnf b
-      ApplyF a b -> a `deepseq` rnf b
-      LambdaF assign b -> assign `deepseq` rnf b
+    rnf =
+        cata $ \case
+            VarF b -> rnf b
+            LetF assign a b -> assign `deepseq` a `deepseq` rnf b
+            ApplyF a b -> a `deepseq` rnf b
+            LambdaF assign b -> assign `deepseq` rnf b
 
 instance Uniplate (AExpr bndType refType) where
-  uniplate (Var v)               = plate Var |- v
-  uniplate (Let assign val body) = plate Let |- assign |* val |* body
-  uniplate (Apply f v)           = plate Apply |* f |* v
-  uniplate (Lambda assign body)  = plate Lambda |- assign |* body
+    uniplate (Var v) = plate Var |- v
+    uniplate (Let assign val body) = plate Let |- assign |* val |* body
+    uniplate (Apply f v) = plate Apply |* f |* v
+    uniplate (Lambda assign body) = plate Lambda |- assign |* body
 
 instance Biplate (AExpr bndType refType) (AExpr bndType refType) where
-  biplate = plateSelf
+    biplate = plateSelf
 
 -- instance Uniplate refType => Biplate (AExpr bndType refType) refTyp where
 --   biplate (Var v)               = plate Var |* v
 --   biplate (Let assign val body) = plate Let |- assign |- val |- body
 --   biplate (Apply f v)           = plate Apply |- f |- v
 --   biplate (Lambda assign body)  = plate Lambda |- assign |- body
-
 -- instance Biplate (AExpr bndType refType) (AbstractAssignment bndType) where
 --   biplate (Var v)               = plate Var |- v
 --   biplate (Let assign val body) = plate Let |* assign |- val |- body
 --   biplate (Apply f v)           = plate Apply |- f |- v
 --   biplate (Lambda assign body)  = plate Lambda |* assign |- body
-
 -- | Backward compatible alias
 type Expr refType = AExpr Binding refType
 
 -- | An Alang expression with optionally type annotated bindings (let bindings and lambda arguments)
-newtype AnnExpr ann bndType refType
-  = AnnExpr { unAnnExpr :: Annotated ann (AExprF bndType refType (AnnExpr ann bndType refType)) }
-  deriving Eq
+newtype AnnExpr ann bndType refType = AnnExpr
+    { unAnnExpr :: Annotated ann (AExprF bndType refType (AnnExpr ann bndType refType))
+    } deriving (Eq)
 
 pattern AnnVar :: ann -> refType -> AnnExpr ann bndType refType
+
 pattern AnnVar ann v = AnnExpr (Annotated ann (VarF v))
 
-pattern AnnLet :: ann
-               -> AbstractAssignment bndType
-               -> AnnExpr ann bndType refType
-               -> AnnExpr ann bndType refType
-               -> AnnExpr ann bndType refType
-pattern AnnLet ann assign val body = AnnExpr (Annotated ann (LetF assign val body))
+pattern AnnLet ::
+        ann ->
+          AbstractAssignment bndType ->
+            AnnExpr ann bndType refType ->
+              AnnExpr ann bndType refType -> AnnExpr ann bndType refType
 
-pattern AnnApply :: ann
-                 -> AnnExpr ann bndType refType
-                 -> AnnExpr ann bndType refType
-                 -> AnnExpr ann bndType refType
+pattern AnnLet ann assign val body =
+        AnnExpr (Annotated ann (LetF assign val body))
+
+pattern AnnApply ::
+        ann ->
+          AnnExpr ann bndType refType ->
+            AnnExpr ann bndType refType -> AnnExpr ann bndType refType
+
 pattern AnnApply ann f a = AnnExpr (Annotated ann (ApplyF f a))
 
-pattern AnnLambda :: ann
-                  -> AbstractAssignment bndType
-                  -> AnnExpr ann bndType refType
-                  -> AnnExpr ann bndType refType
-pattern AnnLambda ann assign body = AnnExpr (Annotated ann (LambdaF assign body))
+pattern AnnLambda ::
+        ann ->
+          AbstractAssignment bndType ->
+            AnnExpr ann bndType refType -> AnnExpr ann bndType refType
 
-#if __GLASGOW_HASKELL__ >= 804
+pattern AnnLambda ann assign body =
+        AnnExpr (Annotated ann (LambdaF assign body))
+#if COMPLETE_PRAGMA_WORKS
 {-# COMPLETE AnnVar, AnnLet, AnnApply, AnnLambda #-}
 #endif
+type AnnExprF ann bndType refType
+     = Compose (Annotated ann) (AExprF bndType refType)
 
-type AnnExprF ann bndType refType = Compose (Annotated ann) (AExprF bndType refType)
-
-type instance Base (AnnExpr ann bndType refType) = AnnExprF ann bndType refType
+type instance Base (AnnExpr ann bndType refType) =
+     AnnExprF ann bndType refType
 
 pattern AnnVarF :: ann -> refType -> AnnExprF ann bndType refType a
+
 pattern AnnVarF ann v = Compose (Annotated ann (VarF v))
 
-pattern AnnLetF :: ann -> AbstractAssignment bndType -> a -> a
-                -> AnnExprF ann bndType refType a
-pattern AnnLetF ann assign val body = Compose (Annotated ann (LetF assign val body))
+pattern AnnLetF ::
+        ann ->
+          AbstractAssignment bndType ->
+            a -> a -> AnnExprF ann bndType refType a
 
-pattern AnnApplyF :: ann -> a -> a -> AnnExprF ann bndType refType a
+pattern AnnLetF ann assign val body =
+        Compose (Annotated ann (LetF assign val body))
+
+pattern AnnApplyF ::
+        ann -> a -> a -> AnnExprF ann bndType refType a
+
 pattern AnnApplyF ann f a = Compose (Annotated ann (ApplyF f a))
 
-pattern AnnLambdaF :: ann -> AbstractAssignment bndType -> a
-                   -> AnnExprF ann bndType refType a
-pattern AnnLambdaF ann assign body = Compose (Annotated ann (LambdaF assign body))
+pattern AnnLambdaF ::
+        ann ->
+          AbstractAssignment bndType -> a -> AnnExprF ann bndType refType a
 
-#if __GLASGOW_HASKELL__ >= 804
+pattern AnnLambdaF ann assign body =
+        Compose (Annotated ann (LambdaF assign body))
+#if COMPLETE_PRAGMA_WORKS
 {-# COMPLETE AnnVarF, AnnLetF, AnnApplyF, AnnLambdaF #-}
 #endif
+instance Recursive (AnnExpr ann bndType refType) where
+    project = Compose . unAnnExpr
 
-instance Recursive (AnnExpr ann bndType refType) where project = Compose . unAnnExpr
-instance Corecursive (AnnExpr ann bndType refType) where embed (Compose v) = AnnExpr v
+instance Corecursive (AnnExpr ann bndType refType) where
+    embed (Compose v) = AnnExpr v
 
 instance Uniplate (AnnExpr ann bndType refType) where
-  uniplate (AnnVar ann v)               = plate AnnVar |- ann |- v
-  uniplate (AnnLet ann assign val body) = plate AnnLet |- ann |- assign |* val |* body
-  uniplate (AnnApply ann f v)           = plate AnnApply |- ann |* f |* v
-  uniplate (AnnLambda ann assign body)  = plate AnnLambda |- ann |- assign |* body
+    uniplate (AnnVar ann v) = plate AnnVar |- ann |- v
+    uniplate (AnnLet ann assign val body) =
+        plate AnnLet |- ann |- assign |* val |* body
+    uniplate (AnnApply ann f v) = plate AnnApply |- ann |* f |* v
+    uniplate (AnnLambda ann assign body) =
+        plate AnnLambda |- ann |- assign |* body
 
 instance ExtractBindings ref => ExtractBindings (AnnExpr ann bnd ref) where
-  extractBindings e = [ b | AnnVar _ bnds <- universe e, b <- extractBindings bnds ]
+    extractBindings e =
+        [b | AnnVar _ bnds <- universe e, b <- extractBindings bnds]
 
-instance Biplate (AnnExpr ann bndType refType) (AnnExpr ann bndType refType) where biplate = plateSelf
+instance Biplate (AnnExpr ann bndType refType) (AnnExpr ann bndType refType) where
+    biplate = plateSelf
 
 type OptTyAnnExpr = AnnExpr (Maybe DefaultTyExpr) Binding
 
@@ -286,15 +315,19 @@ type TyAnnExpr = AnnExpr DefaultTyExpr Binding
 -- | Backward compatibility alias
 type Expression = Expr ResolvedSymbol
 
-
 -- | Traverse an ALang expression from left to right and top down, building a new expression.
-lrPrewalkExprM :: Monad m => (AExpr bndT refT -> m (AExpr bndT refT)) -> AExpr bndT refT -> m (AExpr bndT refT)
-lrPrewalkExprM f e = f e >>= \case
-    Let bnd val body -> Let bnd <$> lrPrewalkExprM f val <*> lrPrewalkExprM f body
-    Apply fn arg -> Apply <$> lrPrewalkExprM f fn <*> lrPrewalkExprM f arg
-    Lambda assign body -> Lambda assign <$> lrPrewalkExprM f body
-    e' -> return e'
-
+lrPrewalkExprM ::
+       Monad m
+    => (AExpr bndT refT -> m (AExpr bndT refT))
+    -> AExpr bndT refT
+    -> m (AExpr bndT refT)
+lrPrewalkExprM f e =
+    f e >>= \case
+        Let bnd val body ->
+            Let bnd <$> lrPrewalkExprM f val <*> lrPrewalkExprM f body
+        Apply fn arg -> Apply <$> lrPrewalkExprM f fn <*> lrPrewalkExprM f arg
+        Lambda assign body -> Lambda assign <$> lrPrewalkExprM f body
+        e' -> return e'
 
 -- -- | Traverse an ALang expression from right to left and top down.
 -- rlPrewalkExprM :: Monad m => (AExpr bndT refT -> m (AExpr bndT refT)) -> AExpr bndT refT -> m (AExpr bndT refT)
@@ -303,26 +336,26 @@ lrPrewalkExprM f e = f e >>= \case
 --   Apply fn arg -> flip Apply <$> rlPrewalkExprM f arg <*> rlPrewalkExprM f fn
 --   Lambda assign body -> Lambda assign <$> rlPrewalkExprM f body
 --   e' -> return e'
-
-
 -- -- | Same as 'lrPrewalkExprM' but does not carry a monadic value.
 -- lrPrewalkExpr :: (AExpr bndT refT -> AExpr bndT refT) -> AExpr bndT refT -> (AExpr bndT refT)
 -- lrPrewalkExpr f = runIdentity . lrPrewalkExprM (return . f)
-
-
 -- -- | Same as 'rlPrewalkExprM' but does not carry a monadic value.
 -- rlPrewalkExpr :: (AExpr bndT refT -> AExpr bndT refT) -> AExpr bndT refT -> (AExpr bndT refT)
 -- rlPrewalkExpr f = runIdentity . rlPrewalkExprM (return . f)
-
-
 -- | Traverse an ALang expression from left to right and from the bottom up.
-lrPostwalkExprM :: Monad m => (AExpr bndT refT -> m (AExpr bndT refT)) -> AExpr bndT refT -> m (AExpr bndT refT)
-lrPostwalkExprM f e = f =<< case e of
-    Let assign val body -> Let assign <$> lrPostwalkExprM f val <*> lrPostwalkExprM f body
-    Apply fn arg -> Apply <$> lrPostwalkExprM f fn <*> lrPostwalkExprM f arg
-    Lambda assign body -> Lambda assign <$> lrPostwalkExprM f body
-    _ -> return e
-
+lrPostwalkExprM ::
+       Monad m
+    => (AExpr bndT refT -> m (AExpr bndT refT))
+    -> AExpr bndT refT
+    -> m (AExpr bndT refT)
+lrPostwalkExprM f e =
+    f =<<
+    case e of
+        Let assign val body ->
+            Let assign <$> lrPostwalkExprM f val <*> lrPostwalkExprM f body
+        Apply fn arg -> Apply <$> lrPostwalkExprM f fn <*> lrPostwalkExprM f arg
+        Lambda assign body -> Lambda assign <$> lrPostwalkExprM f body
+        _ -> return e
 
 -- -- | Traverse an ALang expression from right to left and from the bottom up.
 -- rlPostwalkExprM :: Monad m => (AExpr bndT refT -> m (AExpr bndT refT)) -> AExpr bndT refT -> m (AExpr bndT refT)
@@ -331,18 +364,16 @@ lrPostwalkExprM f e = f =<< case e of
 --     Apply fn arg -> flip Apply <$> lrPostwalkExprM f arg <*>  lrPostwalkExprM f fn
 --     Lambda assign body -> Lambda assign <$> lrPostwalkExprM f body
 --     _ -> return e
-
-
 -- | Same as 'lrPostwalkExprM' but does not carry a monad.
-lrPostwalkExpr :: (AExpr bndT refT -> AExpr bndT refT) -> AExpr bndT refT -> (AExpr bndT refT)
+lrPostwalkExpr ::
+       (AExpr bndT refT -> AExpr bndT refT)
+    -> AExpr bndT refT
+    -> (AExpr bndT refT)
 lrPostwalkExpr f = runIdentity . lrPostwalkExprM (return . f)
-
 
 -- -- | Same as 'lrPostwalkExprM' bot does not carry a monad.
 -- rlPostwalkExpr :: (AExpr bndT refT -> AExpr bndT refT) -> AExpr bndT refT -> (AExpr bndT refT)
 -- rlPostwalkExpr f = runIdentity . rlPostwalkExprM (return . f)
-
-
 -- -- | Generic fold over an ALang expression.
 -- -- Folds from top down and from left to right.
 -- foldlExprM :: Monad m => (AExpr bndT refT -> b -> m b) -> b -> AExpr bndT refT -> m b
@@ -357,8 +388,6 @@ lrPostwalkExpr f = runIdentity . lrPostwalkExprM (return . f)
 --             foldlExprM f b1 e2
 --         Lambda _ e1 -> foldlExprM f b' e1
 --         _ -> return b'
-
-
 -- -- | Generic fold over an ALang expression.
 -- -- Folds from bottom up and from right to left.
 -- foldrExprM :: Monad m => (a -> AExpr bndT refT -> m a) -> AExpr bndT refT -> a -> m a
@@ -373,49 +402,37 @@ lrPostwalkExpr f = runIdentity . lrPostwalkExprM (return . f)
 --         Lambda _ e1 -> foldrExprM f e1 a
 --         _ -> return a
 --     f a' e
-
-
 -- -- | Same as 'foldlExprM' but does not carry a monad.
 -- foldlExpr :: (AExpr bndT refT -> b -> b) -> b -> AExpr bndT refT -> b
 -- foldlExpr f b e = runIdentity $ foldlExprM (\x y -> return $ f x y) b e
-
-
 -- -- | Same as 'foldrExprM' but does not carry a monad.
 -- foldrExpr :: (a -> AExpr bndT refT -> a) -> AExpr bndT refT -> a -> a
 -- foldrExpr f e b = runIdentity $ foldrExprM (\x y -> return $ f x y) e b
-
-
 -- lrMapBndsRefsA :: Applicative f => (bndT -> f bndT') -> (refT -> f refT') -> AExpr bndT refT -> f (AExpr bndT' refT')
 -- lrMapBndsRefsA = bitraverse
-
-
 -- lrMapBndsA :: Applicative f => (bndT -> f bndT') -> AExpr bndT refT -> f (AExpr bndT' refT)
 -- lrMapBndsA = flip bitraverse pure
-
-
 -- lrMapRefsA :: Applicative f => (refT -> f refT') -> AExpr bndT refT -> f (AExpr bndT refT')
 -- lrMapRefsA = bitraverse pure
-
-
 -- lrMapBndsRefs :: (bndT -> bndT') -> (refT -> refT') -> AExpr bndT refT -> AExpr bndT' refT'
 -- lrMapBndsRefs = bimap
-
-
 mapBnds :: (bndT -> bndT') -> AExpr bndT refT -> AExpr bndT' refT
-mapBnds f = cata $ embed . \case
-  LetF assign a b -> LetF (fmap f assign) a b
-  LambdaF assign b -> LambdaF (fmap f assign) b
-  VarF v -> VarF v
-  ApplyF a b -> ApplyF a b
-
+mapBnds f =
+    cata $
+    embed . \case
+        LetF assign a b -> LetF (fmap f assign) a b
+        LambdaF assign b -> LambdaF (fmap f assign) b
+        VarF v -> VarF v
+        ApplyF a b -> ApplyF a b
 
 mapRefs :: (refT -> refT') -> AExpr bndT refT -> AExpr bndT refT'
-mapRefs f = cata $ embed . \case
-  VarF ref -> VarF $ f ref
-  LetF assign a b -> LetF assign a b
-  LambdaF assign b -> LambdaF assign b
-  ApplyF a b -> ApplyF a b
-
+mapRefs f =
+    cata $
+    embed . \case
+        VarF ref -> VarF $ f ref
+        LetF assign a b -> LetF assign a b
+        LambdaF assign b -> LambdaF assign b
+        ApplyF a b -> ApplyF a b
 
 removeTyAnns :: TyAnnExpr a -> Expr a
 removeTyAnns = cata $ embed . (^. value) . getCompose

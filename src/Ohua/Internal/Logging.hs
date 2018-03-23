@@ -32,10 +32,10 @@ import qualified Data.Text.Lazy              as TL
 import qualified Data.Text.Lazy.Encoding     as TL
 import           System.IO                   (Handle, stderr)
 
-#if __GLASGOW_HASKELL__ >= 800
+#include "compat.h"
 
+#if BASE_HAS_SEMIGROUP
 import qualified Data.Semigroup              as SG
-
 #endif
 
 
@@ -217,7 +217,7 @@ data LogStr = LogStr !Int Builder
 instance Monoid LogStr where
   mempty = LogStr 0 (toBuilder BS.empty)
 
-#if __GLASGOW_HASKELL__ >= 800
+#if BASE_HAS_SEMIGROUP
 
   mappend = (SG.<>)
 

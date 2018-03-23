@@ -6,9 +6,7 @@
 -- Maintainer  : dev@justus.science, sebastian.ertel@gmail.com
 -- Stability   : experimental
 -- Portability : portable
-
 -- This source code is licensed under the terms described in the associated LICENSE.TXT file
-
 -- This module defines the dataflow IR.
 -- It introduces the notion of a Flow type and defines a new stateful function execution that
 -- works based on flows instead of variables.
@@ -16,34 +14,33 @@
 -- One important aspect of DFLang: it does not define any abstractions, i.e., there are no function definitions.
 --
 {-# LANGUAGE StandaloneDeriving #-}
+
 module Ohua.DFLang.Lang where
 
-import           Control.DeepSeq
-import           Data.Foldable   (toList)
-import           Data.Hashable
-import           Data.Monoid
-import           Data.Sequence
-import           Data.String
-import           Ohua.ALang.Lang
-import           Ohua.Types
-import           Ohua.Util
-import qualified Ohua.Util.Str   as Str
+import Control.DeepSeq
+import Data.Foldable (toList)
+import Data.Hashable
+import Data.Monoid
+import Data.Sequence
+import Data.String
+import Ohua.ALang.Lang
+import Ohua.Types
+import Ohua.Util
+import qualified Ohua.Util.Str as Str
 
 -- | A sequence of let statements with a terminating binding to be used as return value
 data DFExpr = DFExpr
-    { letExprs  :: Seq LetExpr
+    { letExprs :: Seq LetExpr
     , returnVar :: !Binding
-    }
-    deriving (Eq, Show)
+    } deriving (Eq, Show)
 
 data LetExpr = LetExpr
-    { callSiteId       :: !FnId
+    { callSiteId :: !FnId
     , returnAssignment :: !Assignment
-    , functionRef      :: !DFFnRef
-    , callArguments    :: ![DFVar]
-    , contextArg       :: !(Maybe Binding)
-    }
-    deriving (Eq, Show)
+    , functionRef :: !DFFnRef
+    , callArguments :: ![DFVar]
+    , contextArg :: !(Maybe Binding)
+    } deriving (Eq, Show)
 
 data DFFnRef
     = DFFunction !QualifiedBinding -- a build-in function of DFLang
@@ -51,21 +48,23 @@ data DFFnRef
     deriving (Eq, Show)
 
 instance Hashable DFFnRef where
-  hashWithSalt s = hashWithSalt s . \case
-    DFFunction f -> (0::Int, f)
-    EmbedSf f -> (1, f)
+    hashWithSalt s =
+        hashWithSalt s . \case
+            DFFunction f -> (0 :: Int, f)
+            EmbedSf f -> (1, f)
 
 data DFVar
     = DFEnvVar !HostExpr
     | DFVar !Binding
     deriving (Eq, Show)
 
-
 instance Hashable DFVar where
-   hashWithSalt s (DFVar v)    = hashWithSalt s (0::Int, v)
-   hashWithSalt s (DFEnvVar e) = hashWithSalt s (1::Int, e)
+    hashWithSalt s (DFVar v) = hashWithSalt s (0 :: Int, v)
+    hashWithSalt s (DFEnvVar e) = hashWithSalt s (1 :: Int, e)
 
-instance IsString DFVar where fromString = DFVar . fromString
+instance IsString DFVar where
+    fromString = DFVar . fromString
+
 instance Num DFVar where
     fromInteger = DFEnvVar . fromInteger
     (+) = intentionally_not_implemented
@@ -78,29 +77,33 @@ instance NFData DFExpr where
     rnf (DFExpr a b) = a `deepseq` rnf b
 
 instance NFData LetExpr where
-    rnf (LetExpr a b c d e) = a `deepseq` b `deepseq` c `deepseq` d `deepseq` rnf e
+    rnf (LetExpr a b c d e) =
+        a `deepseq` b `deepseq` c `deepseq` d `deepseq` rnf e
 
 instance NFData DFFnRef where
     rnf (DFFunction bnd) = rnf bnd
-    rnf (EmbedSf bnd)    = rnf bnd
+    rnf (EmbedSf bnd) = rnf bnd
 
 instance NFData DFVar where
     rnf (DFEnvVar e) = rnf e
-    rnf (DFVar v)    = rnf v
-
+    rnf (DFVar v) = rnf v
 
 showDFExpr :: DFExpr -> Str.Str
 showDFExpr (DFExpr lets retVar) =
     Str.unlines $ (toList $ fmap showLet lets) <> [showBnd retVar]
   where
     showBnd (Binding b) = b
-    showAssign (Direct v)       = showBnd v
-    showAssign (Destructure vs) = "[" <> Str.intercalate ", " (map showBnd vs) <> "]"
+    showAssign (Direct v) = showBnd v
+    showAssign (Destructure vs) =
+        "[" <> Str.intercalate ", " (map showBnd vs) <> "]"
     showAssign (Recursive r) = "(rec) " <> showBnd r
     showRef (DFFunction a) = Str.showS a
-    showRef (EmbedSf a)    = Str.showS a
+    showRef (EmbedSf a) = Str.showS a
     showVar (DFEnvVar h) = Str.showS h
-    showVar (DFVar v)    = showBnd v
+    showVar (DFVar v) = showBnd v
     showLet (LetExpr fid ass ref args ctxArc) =
-        "let " <> showAssign ass <> " = " <> showRef ref <> "<" <> Str.showS fid <> "> ("
-        <> Str.intercalate ", " (map showVar args) <> ")" <> maybe "" (\a -> " [" <> showBnd a <>"]") ctxArc
+        "let " <> showAssign ass <> " = " <> showRef ref <> "<" <> Str.showS fid <>
+        "> (" <>
+        Str.intercalate ", " (map showVar args) <>
+        ")" <>
+        maybe "" (\a -> " [" <> showBnd a <> "]") ctxArc
