@@ -33,3 +33,6 @@ seq = "ohua.lang/seq"
 
 mkTuple :: QualifiedBinding
 mkTuple = QualifiedBinding ohuaLangNS "(,)"
+
+smapG :: QualifiedBinding
+smapG = "ohua.lang/smapG"

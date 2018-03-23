@@ -20,6 +20,7 @@ import Ohua.Types
 import Ohua.Util.Str (showS)
 import Ohua.DFLang.HOF.If (scopeVars)
 import Data.Monoid
+import qualified Ohua.ALang.Refs as ARefs
 
 
 data SmapGFn = SmapGFn
@@ -29,15 +30,16 @@ data SmapGFn = SmapGFn
     }
 
 instance HigherOrderFunction SmapGFn where
-    name = "ohua.lang/smapGen"
+    name = tagFnName ARefs.smapG
     parseCallAndInitState [LamArg lam, Variable v] =
         pure $ SmapGFn v lam undefined
     parseCallAndInitState a =
         throwError $ "Unexpected number/type of arguments to smap" <> showS a
     createContextEntry = do
-        SmapGFn {collSource} <- get
+        SmapGFn {collSource, smapLambda} <- get
         smapId <- generateId
         items <- generateBindingWith "items"
+        idId <- generateId
         triggerArcBnd <- generateBindingWith "trigger"
         modify $ \s -> s {triggerArc = triggerArcBnd}
         pure
@@ -47,6 +49,12 @@ instance HigherOrderFunction SmapGFn where
                   Refs.smapGFun
                   [collSource]
                   Nothing
+            , LetExpr
+                  idId
+                  (beginAssignment smapLambda)
+                  Refs.id
+                  [DFVar items]
+                  (Just triggerArcBnd)
             ]
     createContextExit (Destructure d) =
         throwError $ "Smap result cannot be destructured: " <> showS d

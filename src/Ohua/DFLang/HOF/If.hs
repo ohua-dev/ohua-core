@@ -22,6 +22,7 @@ import qualified Ohua.DFLang.Refs    as Refs
 import           Ohua.Monad
 import           Ohua.Types
 import qualified Ohua.Util.Str       as Str
+import qualified Ohua.ALang.Refs as ARefs
 
 data IfFn = IfFn
     { conditionVariable :: !DFVar
@@ -60,7 +61,7 @@ checkAssignment branch other =
 
 
 instance HigherOrderFunction IfFn where
-    name = "ohua.lang/if"
+    name = tagFnName ARefs.ifThenElse
     parseCallAndInitState [Variable v, LamArg thenBr@(Lam {beginAssignment = Direct ret}), LamArg elseBr] =
         pure $ IfFn v thenBr elseBr ret
     parseCallAndInitState args =

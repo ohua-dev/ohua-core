@@ -19,6 +19,7 @@ import qualified Ohua.DFLang.Refs as Refs
 import Ohua.Monad
 import Ohua.Types
 import Ohua.Util.Str (showS, (<>))
+import qualified Ohua.ALang.Refs as ARefs
 
 
 data SmapFn = SmapFn
@@ -28,7 +29,7 @@ data SmapFn = SmapFn
     }
 
 instance HigherOrderFunction SmapFn where
-    name = "ohua.lang/smap"
+    name = tagFnName ARefs.smap
     parseCallAndInitState [LamArg lam, Variable v] =
         return $ SmapFn v lam (error "size uninitialized")
     parseCallAndInitState a =

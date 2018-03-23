@@ -18,6 +18,7 @@ import           Ohua.DFLang.Lang
 import qualified Ohua.DFLang.Refs    as Refs
 import           Ohua.Monad
 import           Ohua.Types
+import qualified Ohua.ALang.Refs as ARefs
 
 data SeqFn = SeqFn {
   before    :: Binding,
@@ -25,22 +26,24 @@ data SeqFn = SeqFn {
 }
 
 instance HigherOrderFunction SeqFn where
-  name = "ohua.lang/seq"
-
-  parseCallAndInitState [Variable (DFVar before0), LamArg after] = return $ SeqFn before0 after
-  parseCallAndInitState _ = failWith "seq not defined for arguments: " -- TODO ++ show arguments
-
-  createContextEntry = return S.empty
-
-  createContextExit _ = return S.empty
-
-  scopeFreeVariables _ _ = return (S.empty, [])
-
-  contextifyUnboundFunctions _ = do
-    seqExprOut <- generateBindingWith "seq"
-    seqId <- generateId
-    bndBefore <- gets before
-    pure $ Just
-      ( [LetExpr seqId (Direct seqExprOut) Refs.seq [DFVar bndBefore] Nothing]
-      , seqExprOut
-      )
+    name = tagFnName ARefs.seq
+    parseCallAndInitState [Variable (DFVar before0), LamArg after] =
+        return $ SeqFn before0 after
+    parseCallAndInitState _ = failWith "seq not defined for arguments: " -- TODO ++ show arguments
+    createContextEntry = return S.empty
+    createContextExit _ = return S.empty
+    scopeFreeVariables _ _ = return (S.empty, [])
+    contextifyUnboundFunctions _ = do
+        seqExprOut <- generateBindingWith "seq"
+        seqId <- generateId
+        bndBefore <- gets before
+        pure $
+            Just
+                ( [ LetExpr
+                        seqId
+                        (Direct seqExprOut)
+                        Refs.seq
+                        [DFVar bndBefore]
+                        Nothing
+                  ]
+                , seqExprOut)

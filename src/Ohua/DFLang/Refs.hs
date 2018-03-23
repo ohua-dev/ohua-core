@@ -22,7 +22,6 @@ collect = DFFunction "ohua.lang/collect"
 smapFun :: DFFnRef
 smapFun = DFFunction "ohua.lang/smapFun"
 
-
 id :: DFFnRef
 id = EmbedSf Refs.id
 
