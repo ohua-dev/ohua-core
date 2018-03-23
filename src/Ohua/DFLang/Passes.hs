@@ -241,6 +241,7 @@ hofs =
     [ WHOF (Proxy :: Proxy IfFn)
     , WHOF (Proxy :: Proxy SmapFn)
     , WHOF (Proxy :: Proxy SeqFn)
+    , WHOF (Proxy :: Proxy SmapGFn)
     ]
 
 hofNames :: HM.HashMap QualifiedBinding WHOF

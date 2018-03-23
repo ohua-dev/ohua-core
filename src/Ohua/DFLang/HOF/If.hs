@@ -10,7 +10,8 @@
 -- This source code is licensed under the terms described in the associated LICENSE.TXT file
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE RecordWildCards #-}
-module Ohua.DFLang.HOF.If where
+module Ohua.DFLang.HOF.If
+  (IfFn, scopeVars) where
 
 
 import           Control.Monad.State
@@ -32,6 +33,23 @@ data IfFn = IfFn
 
 instance HigherOrderFunction IfFn where
     name = "ohua.lang/if"
+scopeVars ::
+       (MonadGenBnd m, MonadGenId m, Monad m)
+    => Binding
+    -> [Binding]
+    -> m (LetExpr, [(Binding, Binding)])
+scopeVars scopeSource freeVars = do
+    scopeId <- generateId
+    newVars <- mapM generateBindingWith freeVars
+    pure
+        ( LetExpr
+              scopeId
+              (Destructure newVars)
+              Refs.scope
+              (map DFVar freeVars)
+              (Just scopeSource)
+        , zip freeVars newVars)
+
 
     parseCallAndInitState
         [ Variable v
@@ -43,15 +61,17 @@ instance HigherOrderFunction IfFn where
     createContextEntry = do
         f <- get
         ifId <- generateId
-        let thenBnd = case beginAssignment $ thenBranch f of
-                        Direct b -> b
-                        _ -> error "if HOF transform expects one direct assignment for `then` branch"
-            elseBnd = case beginAssignment $ elseBranch f of
-                        Direct b -> b
-                        _ -> error "if HOF transform expects one direct assignment for `else` branch"
-        modify $ \s -> s { ifRet = thenBnd }
-        pure [ LetExpr ifId (Destructure [thenBnd, elseBnd]) Refs.bool [conditionVariable f] Nothing ]
-
+        thenBnd <- checkAssignment "then" (beginAssignment $ thenBranch f)
+        elseBnd <- checkAssignment "else" (beginAssignment $ elseBranch f)
+        modify $ \s -> s {ifRet = thenBnd}
+        pure
+            [ LetExpr
+                  ifId
+                  (Destructure [thenBnd, elseBnd])
+                  Refs.bool
+                  [conditionVariable f]
+                  Nothing
+            ]
     createContextExit assignment = do
         switchId <- generateId
         IfFn {..} <- get
@@ -60,16 +80,13 @@ instance HigherOrderFunction IfFn where
             ]
 
     scopeFreeVariables lam freeVars = do
-        selected <- mapM generateBindingWith freeVars
-        selectorId <- generateId
-        let sourceVar = case beginAssignment lam of
-                          Direct v -> v
-                          _ -> error "if HOF transform expects direct assignment in all branches"
-        pure
-            (   [ LetExpr selectorId (Destructure selected) Refs.scope (map DFVar freeVars) (Just sourceVar)
-                ]
-            ,   zip freeVars selected
-            )
-
+        sourceVar <-
+            case beginAssignment lam of
+                Direct v -> pure v
+                _ ->
+                    throwError $
+                    "if HOF transform expects direct assignment in all branches"
+        (scopeExpr, varMap) <- scopeVars sourceVar freeVars
+        pure ([scopeExpr], varMap)
     contextifyUnboundFunctions (Lam (Direct x) _) = return $ Just ([], x)
     contextifyUnboundFunctions _ = failWith "Unexpected destructuring in begin assignment"

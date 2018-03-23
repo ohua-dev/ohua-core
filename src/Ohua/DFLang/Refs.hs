@@ -63,3 +63,11 @@ array = EmbedSf Refs.array
 
 mkTuple :: DFFnRef
 mkTuple = EmbedSf Refs.mkTuple
+
+
+smapGFun :: DFFnRef
+smapGFun = DFFunction "ohua.lang/smapGFun"
+
+
+collectG :: DFFnRef
+collectG = DFFunction "ohua.lang/collectG"

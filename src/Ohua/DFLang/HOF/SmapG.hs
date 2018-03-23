@@ -1,0 +1,70 @@
+-- |
+-- Module      : $Header$
+-- Description : Implementation for the @smap-g@ higher order function.
+-- Copyright   : (c) Justus Adam 2018. All Rights Reserved.
+-- License     : EPL-1.0
+-- Maintainer  : dev@justus.science, sebastian.ertel@gmail.com
+-- Stability   : experimental
+-- 
+-- This source code is licensed under the terms described in the associated LICENSE.TXT file
+
+module Ohua.DFLang.HOF.SmapG (SmapGFn) where
+
+import Control.Monad.Except
+import Control.Monad.State
+import Ohua.DFLang.HOF
+import Ohua.DFLang.Lang
+import qualified Ohua.DFLang.Refs as Refs
+import Ohua.Monad
+import Ohua.Types
+import Ohua.Util.Str (showS)
+import Ohua.DFLang.HOF.If (scopeVars)
+import Data.Monoid
+
+
+data SmapGFn = SmapGFn
+    { collSource :: !DFVar
+    , smapLambda :: !Lambda
+    , triggerArc :: Binding
+    }
+
+instance HigherOrderFunction SmapGFn where
+    name = "ohua.lang/smapGen"
+    parseCallAndInitState [LamArg lam, Variable v] =
+        pure $ SmapGFn v lam undefined
+    parseCallAndInitState a =
+        throwError $ "Unexpected number/type of arguments to smap" <> showS a
+    createContextEntry = do
+        SmapGFn {collSource} <- get
+        smapId <- generateId
+        items <- generateBindingWith "items"
+        triggerArcBnd <- generateBindingWith "trigger"
+        modify $ \s -> s {triggerArc = triggerArcBnd}
+        pure
+            [ LetExpr
+                  smapId
+                  (Destructure [items, triggerArcBnd])
+                  Refs.smapGFun
+                  [collSource]
+                  Nothing
+            ]
+    createContextExit (Destructure d) =
+        throwError $ "Smap result cannot be destructured: " <> showS d
+    createContextExit assignment = do
+        collectId <- generateId
+        SmapGFn {triggerArc, smapLambda} <- get
+        pure
+            [ LetExpr
+                  collectId
+                  assignment
+                  Refs.collectG
+                  [DFVar triggerArc, DFVar $ resultBinding smapLambda]
+                  Nothing
+            ]
+    scopeFreeVariables _ freeVars = do
+        SmapGFn {triggerArc} <- get
+        (scopeExpr, varMap) <- scopeVars triggerArc freeVars
+        pure ([scopeExpr], varMap)
+    contextifyUnboundFunctions _ = do
+        SmapGFn {triggerArc} <- get
+        pure $ Just (mempty, triggerArc)
