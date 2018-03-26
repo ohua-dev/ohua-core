@@ -36,3 +36,6 @@ mkTuple = QualifiedBinding ohuaLangNS "(,)"
 
 smapG :: QualifiedBinding
 smapG = "ohua.lang/smapG"
+
+generate :: QualifiedBinding
+generate = "ohua.lang/generate"

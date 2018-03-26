@@ -89,9 +89,6 @@ library:
   - Ohua.DFLang.Refs
   - Ohua.DFLang.Util
   - Ohua.DFLang.HOF
-  - Ohua.DFLang.HOF.Smap
-  - Ohua.DFLang.HOF.If
-  - Ohua.DFLang.HOF.Seq
   - Ohua.DFLang.Passes
   - Ohua.DFLang.TailRec
   - Ohua.DFLang.Optimizations

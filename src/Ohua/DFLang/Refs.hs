@@ -74,3 +74,15 @@ collectG = DFFunction "ohua.lang/collectG"
 
 repeat :: DFFnRef
 repeat = DFFunction "ohua.lang/repeat"
+
+
+isJust :: DFFnRef
+isJust = EmbedSf "ohua.lang/isJust"
+
+
+ndMerge :: DFFnRef
+ndMerge = DFFunction "ohua.lang/mdMerge"
+
+
+toGen :: DFFnRef
+toGen = DFFunction "ohua.lang/toGen"

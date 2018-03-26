@@ -8,7 +8,7 @@
 -- 
 -- This source code is licensed under the terms described in the associated LICENSE.TXT file
 
-module Ohua.DFLang.HOF.SmapG (SmapGFn) where
+module Ohua.DFLang.HOF.SmapG (SmapGFn, scopeVars) where
 
 import Control.Monad.Except
 import Control.Monad.State
