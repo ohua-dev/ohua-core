@@ -28,7 +28,7 @@ findExpr fnRef = find ((== fnRef) . functionRef)
 
 -- | Find all locally bound variables.
 findBoundVars :: (Functor f, Foldable f) => f LetExpr -> HS.HashSet Binding
-findBoundVars = HS.fromList . fold . fmap (flattenAssign . returnAssignment)
+findBoundVars = HS.fromList . fold . fmap (extractBindings . returnAssignment)
 
 -- | Find the free variables inside a set of expressions (i.e. a lambda expression).
 findFreeVars :: (Functor f, Foldable f) => f LetExpr -> HS.HashSet Binding

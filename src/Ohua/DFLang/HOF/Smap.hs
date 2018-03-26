@@ -108,4 +108,4 @@ instance HigherOrderFunction SmapFn where
                        Nothing
         pure $ Just ([ctxOp], ctxSource)
       where
-        elemSource = head $ flattenAssign $ beginAssignment lam
+        elemSource = head $ extractBindings $ beginAssignment lam

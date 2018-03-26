@@ -18,6 +18,6 @@ main = hspec $ do
     DFLowering.ifSpec
     DFLowering.seqSpec
     DFLowering.smapSpec
-    ALangVerify.currying
+    --ALangVerify.currying
     TestALangUtils.spec
     TestAesonConvert.spec

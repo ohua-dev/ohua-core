@@ -40,5 +40,5 @@ renderExpr = fst . cata worker
     showAssign (Destructure bs) =
         "[" <> punctuateH left ", " (map showBnd bs) <> "]"
     showAssign (Recursive _) = error "implement show for recursive bindings"
-    showBnd = text . toString . unBinding
+    showBnd = text . toString . unwrap
     showQualBnd = text . show

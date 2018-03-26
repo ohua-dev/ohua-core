@@ -1,9 +1,8 @@
 module Ohua.DFGraph.Show where
 
 import qualified Data.Text as T
-import Ohua.ALang.Lang (unwrapHostExpr)
 import Ohua.DFGraph
-import Ohua.Types (unFnId)
+import Ohua.Types (unwrap)
 import Text.PrettyPrint.Boxes
 
 -- | TODO show return arc
@@ -21,14 +20,14 @@ asTable (OutGraph ops arcs' _) =
         ]
   where
     idList =
-        vcat right $ text "ids" : map (text . show . unFnId . operatorId) ops
+        vcat right $ text "ids" : map (text . show . unwrap . operatorId) ops
     typeList = vcat left $ text "types" : map (text . show . operatorType) ops
     sourceList =
         vcat left $
         (text "source" :) $
         (`map` map source arcs') $ \case
-            EnvSource i -> text $ show (unwrapHostExpr i)
+            EnvSource i -> text $ show (unwrap i)
             LocalSource t -> targetToBox t
     targetList =
         vcat left $ (text "target" :) $ (targetToBox . target) `map` arcs'
-    targetToBox (Target op idx) = text $ show (unFnId op) ++ " @ " ++ show idx
+    targetToBox (Target op idx) = text $ show (unwrap op) ++ " @ " ++ show idx

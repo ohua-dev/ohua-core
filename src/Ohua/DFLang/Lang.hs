@@ -23,7 +23,6 @@ import Data.Hashable
 import Data.Monoid
 import Data.Sequence
 import Data.String
-import Ohua.ALang.Lang
 import Ohua.Types
 import Ohua.Util
 import qualified Ohua.Util.Str as Str
@@ -92,7 +91,8 @@ showDFExpr :: DFExpr -> Str.Str
 showDFExpr (DFExpr lets retVar) =
     Str.unlines $ (toList $ fmap showLet lets) <> [showBnd retVar]
   where
-    showBnd (Binding b) = b
+    showBnd :: Binding -> Str.Str
+    showBnd = unwrap
     showAssign (Direct v) = showBnd v
     showAssign (Destructure vs) =
         "[" <> Str.intercalate ", " (map showBnd vs) <> "]"

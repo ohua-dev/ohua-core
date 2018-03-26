@@ -11,25 +11,68 @@
 {-# LANGUAGE CPP                        #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiWayIf                 #-}
-module Ohua.Types where
+module Ohua.Types
+    ( FnId
+    , Binding
+    , NSRef
+    , QualifiedBinding(..)
+    , SomeBinding(..)
+    , symbolFromString
+    , ExtractBindings(..)
+    , AbstractAssignment(..), Assignment
+    , _Direct
+    , _Destructure
+    , _Recursive
+    , HostExpr
+    , Options
+    , State
+    , Environment
+    , Error
+    , nameGenerator
+    , idCounter
+    , envExpressions
+    , NameGenerator
+    , simpleNameList
+    , takenNames
+    , callEnvExpr
+    , callLocalFunction
+    , transformRecursiveFunctions
+    , options
+    , Annotated(Annotated)
+    , TyExprF(..)
+    , TyExpr, pattern TyApp, pattern TyRef
+    , TyVar(..)
+    , SomeTyVar
+    , DefaultTyExpr
 
-import           Control.Comonad
-import           Control.DeepSeq
-import           Data.Bifoldable
-import           Data.Bifunctor
-import           Data.Bitraversable
-import           Data.Default.Class
-import           Data.Functor.Foldable hiding (fold)
-import           Data.Hashable
-import qualified Data.HashSet          as HS
-import           Data.String
-import qualified Data.Vector           as V
-import           GHC.Exts
-import           GHC.Generics
-import           Lens.Micro
-import           Ohua.LensClasses
-import           Ohua.Util
-import qualified Ohua.Util.Str         as Str
+    -- * Creating and inspecting values
+    , SourceType
+    , Make(make)
+    , makeThrow
+    , Unwrap(unwrap)
+    -- ** Unsafely creating values
+    , UnsafeMake(unsafeMake)
+    ) where
+
+import Control.Comonad
+import Control.DeepSeq
+import Control.Monad.Error.Class hiding (Error)
+import Data.Bifoldable
+import Data.Bifunctor
+import Data.Bitraversable
+import Data.Default.Class
+import Data.Functor.Foldable hiding (fold)
+import qualified Data.HashSet as HS
+import Data.Hashable
+import Data.String
+import qualified Data.Vector as V
+import GHC.Exts
+import GHC.Generics
+import Lens.Micro
+import Ohua.LensClasses
+import Ohua.Util
+import qualified Ohua.Util.Str as Str
+import Ohua.Util.Str ((<>))
 
 #include "compat.h"
 
@@ -37,62 +80,100 @@ import qualified Ohua.Util.Str         as Str
 import qualified Data.Semigroup        as SG
 #endif
 
+type family SourceType t
+
+class Make t where
+    -- | Safely construct a value of type @t@ from its source type
+    -- potentially reporting an error.
+    make :: MonadError Error m => SourceType t -> m t
+
+-- | Same as 'make' but instead throws an exception
+makeThrow :: Make t => SourceType t -> t
+makeThrow = either (error . Str.toString) id . make
+
+-- | Convert a value @t@ back to its source type @t@. 
+class Unwrap t where
+    unwrap :: t -> SourceType t
+
+-- | Unsafe version of 'make'. Constructs the type skipping the checks.
+class UnsafeMake t where
+    unsafeMake :: SourceType t -> t
 
 -- | The numeric id of a function call site
-newtype FnId = FnId { unFnId :: Int }
-  deriving (Eq, Ord, Generic, Enum, Num, NFData, Hashable)
+newtype FnId =
+    FnId Int
+    deriving (Eq, Ord, Generic, Enum, Num, NFData, Hashable)
+
+type instance SourceType FnId = Int
 
 instance Show FnId where
-    show = show . unFnId
+    show = show . unwrap
+
+instance UnsafeMake FnId where
+    unsafeMake = FnId
+
+instance Make FnId where
+    make i
+        | i < 0 =
+            throwError $
+            "Function id must be larger than 0, was " <> Str.showS i
+        | otherwise = pure $ unsafeMake i
+
+instance Unwrap FnId where
+    unwrap (FnId i) = i
 
 -- | A binding name
-newtype Binding = Binding { unBinding :: Str.Str }
-    deriving ( Eq
-             , Hashable
-             , Generic
-             , Ord
-             , Monoid
-             , NFData
-#if BASE_HAS_SEMIGROUP
-             , SG.Semigroup
-#endif
-             )
+newtype Binding =
+    Binding Str.Str
+    deriving (Eq, Hashable, Generic, Ord, Monoid, NFData)
 
-instance Show Binding where show = show . unBinding
+#if BASE_HAS_SEMIGROUP
+deriving instance SG.Semigroup Binding
+#endif
+
+instance Show Binding where show = show . unwrap
+
+type instance SourceType Binding = Str.Str
+
+instance Make Binding where
+    make "" = throwError "Binding cannot be empty"
+    make s = pure $ unsafeMake s
+
+instance UnsafeMake Binding where
+    unsafeMake = Binding
+
+instance Unwrap Binding where
+    unwrap (Binding b) = b
 
 instance IsString Binding where
-    fromString = Binding . Str.fromString
-
-type FnName = Binding
-
-unwrapFnName :: FnName -> Binding
-unwrapFnName = id
-{-# DEPRECATED unwrapFnName "Use Binding or QualifiedBinding instead" #-}
+    fromString = makeThrow . Str.fromString
 
 -- | Hierarchical reference to a namespace
-newtype NSRef = NSRef { unwrapNSRef :: V.Vector Binding }
+newtype NSRef =
+    NSRef (V.Vector Binding)
     deriving (Eq, Generic, NFData, Ord)
 
 instance Show NSRef where
-    show = Str.toString . Str.intercalate "." . map unBinding . nsRefToList
+    show = Str.toString . Str.intercalate "." . map unwrap . unwrap
 
 instance IsList NSRef where
   type Item NSRef = Binding
-  fromList = NSRef . fromList
-  toList = GHC.Exts.toList . unwrapNSRef
+  fromList = makeThrow . fromList
+  toList = GHC.Exts.toList . unwrap
 
+type instance SourceType NSRef = [Binding]
 
--- | Creates a 'NSRef' from a hierarchical sorted list of namespaces
-nsRefFromList :: [Binding] -> NSRef
-nsRefFromList = NSRef . V.fromList
+instance UnsafeMake NSRef where
+    unsafeMake = NSRef . V.fromList
+  
+instance Make NSRef where
+    make = pure . unsafeMake
 
-
--- | Extract an NSRef into a list of hierarchical namespaces
-nsRefToList :: NSRef -> [Binding]
-nsRefToList = V.toList . unwrapNSRef
+instance Unwrap NSRef where
+    unwrap (NSRef l) = V.toList l
 
 instance Hashable NSRef where
-    hashWithSalt salt = hashWithSalt salt . nsRefToList
+    hashWithSalt salt = hashWithSalt salt . unwrap
     {-# INLINE hashWithSalt #-}
 
 
@@ -103,7 +184,7 @@ data QualifiedBinding = QualifiedBinding
     } deriving (Eq, Generic, Ord)
 
 instance Show QualifiedBinding where
-    show (QualifiedBinding ns n) = show ns ++ "/" ++ Str.toString (unBinding n)
+    show (QualifiedBinding ns n) = show ns ++ "/" ++ Str.toString (unwrap n)
 
 instance Hashable QualifiedBinding where
     hashWithSalt s (QualifiedBinding a b) = hashWithSalt s (a, b)
@@ -127,25 +208,32 @@ instance Hashable SomeBinding where
     hashWithSalt s (Qual b)   = hashWithSalt s (1 :: Int, b)
 
 instance IsString SomeBinding where
-    fromString = either error id . symbolFromString
+    fromString = either (error . Str.toString) id . symbolFromString
 
 -- | Attempt to parse a string into either a simple binding or a qualified binding.
 -- Assumes a form "name.space/value" for qualified bindings.
-symbolFromString :: String -> Either String SomeBinding
-symbolFromString s | Str.null s = Left "Symbols cannot be empty"
-                   | otherwise =
-    case Str.break (== '/') s of
-        (symNs, slashName)
-            | Str.null symNs -> Left "Unexpected '/' at start"
-            | Str.null slashName -> Right $ Unqual $ Binding (Str.fromString symNs)
-            | Just ('/', symName) <- Str.uncons slashName ->
-                if  | '/' `Str.elem` symName -> Left "Too many '/' delimiters found."
-                    | Str.null symName -> Left "Name cannot be empty"
-                    | otherwise ->
-                        Right $ Qual $ QualifiedBinding
-                            (nsRefFromList $ map Binding $ Str.split (== '.') (fromString symNs))
-                            (Binding $ fromString symName)
-        _ -> error "Leading slash expected after `break`"
+symbolFromString :: String -> Either Error SomeBinding
+symbolFromString s
+    | Str.null s = Left "Symbols cannot be empty"
+    | otherwise =
+        case Str.break (== '/') s of
+            (symNs, slashName)
+                | Str.null symNs -> Left "Unexpected '/' at start"
+                | Str.null slashName ->
+                    Right $ Unqual $ Binding (Str.fromString symNs)
+                | Just ('/', symName) <- Str.uncons slashName ->
+                    if | '/' `Str.elem` symName ->
+                           Left "Too many '/' delimiters found."
+                       | Str.null symName -> Left "Name cannot be empty"
+                       | otherwise ->
+                           do ns <-
+                                  make =<<
+                                  mapM
+                                      make
+                                      (Str.split (== '.') (fromString symNs))
+                              bnd <- make $ fromString symName
+                              Right $ Qual $ QualifiedBinding ns bnd
+            _ -> error "Leading slash expected after `break`"
 
 class ExtractBindings a where
     extractBindings :: a -> [Binding]
@@ -166,26 +254,25 @@ data AbstractAssignment binding
 type Assignment = AbstractAssignment Binding
 
 instance Show binding => Show (AbstractAssignment binding) where
-    show (Direct b)      = show b
+    show (Direct b) = show b
     show (Destructure b) = show b
-    show (Recursive b)   = "(rec) " ++ show b
+    show (Recursive b) = "(rec) " ++ show b
 
 instance IsString Assignment where
     fromString = Direct . fromString
 
 instance IsList Assignment where
     type Item Assignment = Binding
-
     fromList = Destructure
     toList (Destructure l) = l
-    toList _               = error "Direct return is not a list"
+    toList _ = error "Direct return is not a list"
 
 instance ExtractBindings Assignment
 
 instance NFData binding => NFData (AbstractAssignment binding) where
     rnf (Destructure ds) = rnf ds
-    rnf (Direct d)       = rnf d
-    rnf (Recursive d)    = rnf d
+    rnf (Direct d) = rnf d
+    rnf (Recursive d) = rnf d
 
 _Direct :: Prism' (AbstractAssignment binding) binding
 _Direct = prism' Direct $ \case { Direct a -> Just a; _ -> Nothing }
@@ -196,9 +283,45 @@ _Destructure = prism' Destructure $ \case { Destructure a -> Just a; _ -> Nothin
 _Recursive :: Prism' (AbstractAssignment binding) binding
 _Recursive = prism' Recursive $ \case { Recursive r -> Just r; _ -> Nothing }
 
-flattenAssign :: Assignment -> [Binding]
-flattenAssign = extractBindings
+-- bindingType is the type of general bindings Binding is the type for
+-- function arguments and `let`s etc which we know to always be local
+-- I revised the proposal. I got rid of `Fn`. Not because of cyclic
+-- dependencies but because I think that function application can be
+-- more general.
+-- | Numerical reference to a spliced expression from the host environment.
+newtype HostExpr = HostExpr
+    { unwrapHostExpr :: Int
+    } deriving (Eq, Ord, Generic)
 
+instance Show HostExpr where
+    show = show . unwrap
+
+-- Only exists to allow literal integers to be interpreted as host expressions
+instance Num HostExpr where
+    fromInteger = makeThrow . fromInteger
+    (+) = intentionally_not_implemented
+    (-) = intentionally_not_implemented
+    (*) = intentionally_not_implemented
+    abs = intentionally_not_implemented
+    signum = intentionally_not_implemented
+
+instance Hashable HostExpr where
+    hashWithSalt s = hashWithSalt s . unwrapHostExpr
+
+instance NFData HostExpr where rnf = rnf . unwrap
+
+type instance SourceType HostExpr = Int
+
+instance UnsafeMake HostExpr where
+    unsafeMake = HostExpr
+
+instance Make HostExpr where
+    make i
+        | i < 0 = throwError $ "HostExpr cannot be < 0"
+        | otherwise = pure $ unsafeMake i
+
+instance Unwrap HostExpr where
+    unwrap (HostExpr i) = i
 
 type Error = Str.Str
 
@@ -214,21 +337,41 @@ instance Default Options where
 -- | State of the ohua compiler monad.
 data State envExpr = State !NameGenerator !FnId !(V.Vector envExpr)
 
+type instance SourceType (State envExpr) =
+     (NameGenerator, FnId, V.Vector envExpr)
+
+instance Make (State envExpr) where
+    make (ng, fnid, exprs) = pure $ State ng fnid exprs
+
 -- | The read only compiler environment
 newtype Environment = Environment Options
+
+instance Default Environment where
+    def = Environment def
 
 nameGenerator :: Lens' (State envExpr) NameGenerator
 nameGenerator f (State gen counter envExprs) =
     f gen <&> \ng -> State ng counter envExprs
 
 idCounter :: Lens' (State envExpr) FnId
-idCounter f (State gen counter envExprs) = f counter <&> \c -> State gen c envExprs
+idCounter f (State gen counter envExprs) =
+    f counter <&> \c -> State gen c envExprs
 
-envExpressions :: Lens (State envExpr) (State envExpr') (V.Vector envExpr)  (V.Vector envExpr')
+envExpressions ::
+       Lens (State envExpr) (State envExpr') (V.Vector envExpr) (V.Vector envExpr')
 envExpressions f (State gen counter envExprs) = State gen counter <$> f envExprs
 
 -- | Stateful name generator
 data NameGenerator = NameGenerator !(HS.HashSet Binding) [Binding]
+
+type instance SourceType NameGenerator = (HS.HashSet Binding, [Binding])
+
+instance UnsafeMake NameGenerator where
+    unsafeMake = uncurry NameGenerator
+
+instance Make NameGenerator where
+    make = pure . unsafeMake
+
 
 takenNames :: Lens' NameGenerator (HS.HashSet Binding)
 takenNames f (NameGenerator taken l) = flip NameGenerator l <$> f taken
@@ -248,10 +391,13 @@ transformRecursiveFunctions f (Options c l e) = f e <&> Options c l
 options :: Lens' Environment Options
 options f (Environment opts) = Environment <$> f opts
 
-data Annotated annotation value = Annotated !annotation !value
+data Annotated annotation value =
+    Annotated !annotation
+              !value
     deriving (Eq, Show)
 
-instance (NFData annotation, NFData value) => NFData (Annotated annotation value) where
+instance (NFData annotation, NFData value) =>
+         NFData (Annotated annotation value) where
     rnf (Annotated ann val) = ann `deepseq` rnf val
 
 instance HasValue (Annotated annotation value) (Annotated annotation value') value value' where

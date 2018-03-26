@@ -15,7 +15,6 @@ import           Data.Foldable
 import qualified Data.HashMap.Strict as HM
 import           Data.Maybe
 import           GHC.Generics
-import           Ohua.ALang.Lang
 import           Ohua.DFLang.Lang
 import           Ohua.Types
 
@@ -110,5 +109,5 @@ toGraph (DFExpr lets r) = OutGraph ops grArcs (getSource r)
 
 
 spliceEnv :: (Int -> a) -> OutGraph -> AbstractOutGraph a
-spliceEnv lookupExpr = fmap f where f (HostExpr i) = lookupExpr i
+spliceEnv lookupExpr = fmap f where f i = lookupExpr $ unwrap i
 

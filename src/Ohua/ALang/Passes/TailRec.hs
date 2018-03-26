@@ -8,9 +8,8 @@ import Ohua.Types
 
 import Control.Monad.Writer
 import Data.Functor.Foldable
-import Debug.Trace
 
---
+
 -- This must run before algos are being inlined!
 --
 -- TODO verify the following assumption:
@@ -30,7 +29,7 @@ markRecursiveBindings = fst . runWriter . cata go
             (e', isUsed) <-
                 listens
                     (not .
-                     null . HS.intersection (HS.fromList (flattenAssign assign)))
+                     null . HS.intersection (HS.fromList (extractBindings assign)))
                     e
             if isUsed
                 then case assign of
@@ -47,22 +46,15 @@ markRecursiveBindings = fst . runWriter . cata go
 
 findRecCall ::
        Expression -> HS.HashSet Binding -> (HS.HashSet Binding, Expression)
-findRecCall (Let (Direct a) expr inExpr) algosInScope =
-    let (t, e) = findRecCall expr $ HS.insert a algosInScope
-     in let found = trace ("current: " ++ show a ++ " --> found: " ++ show t) t
-         in case found of
-                _
-                    | HS.member a found ->
-                        let (iFound, iExpr) = findRecCall inExpr algosInScope
-                         in (iFound, Let (Recursive a) e iExpr)
-                    -- this is supposed to cover the following case:
-                    -- Let x $ Lambda ... Let a (Lambda ... Apply x Var "bla") ... Apply a Var "blub"
-                    -- TODO this does not work properly because it does not check whether it was found in a (new) nested lambda!
-                _ ->
-                    let (iFound, iExpr) = findRecCall inExpr algosInScope
-                     in (HS.union found iFound, Let (Direct a) e iExpr)
---                    _ | HS.size found > 0 -> let (iFound, iExpr) = findRecCall inExpr $ HS.insert a algosInScope in
---                                                 (HS.union found $ HS.delete a iFound, Let (Recursive a) e iExpr)
+findRecCall (Let (Direct a) expr inExpr) algosInScope
+    | HS.member a found = (iFound, Let (Recursive a) e iExpr)
+    | otherwise = (HS.union found iFound, Let (Direct a) e iExpr)
+  where
+    -- TODO: Why?
+    (found, e) = findRecCall expr $ HS.insert a algosInScope
+    (iFound, iExpr) = findRecCall inExpr algosInScope
+      
+      
 findRecCall (Let a expr inExpr) algosInScope =
     let (iFound, iExpr) = findRecCall inExpr algosInScope
      in (iFound, Let a expr iExpr)

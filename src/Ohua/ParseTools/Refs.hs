@@ -7,7 +7,7 @@ import           Ohua.Types
 
 
 ohuaLangNS :: NSRef
-ohuaLangNS = nsRefFromList ["ohua", "lang"]
+ohuaLangNS = makeThrow ["ohua", "lang"]
 
 
 mkQualVar :: NSRef -> Binding -> Expr SomeBinding

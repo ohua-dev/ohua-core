@@ -1,18 +1,16 @@
 {-# LANGUAGE NamedFieldPuns #-}
 module Ohua.Test.DFGraph where
 
-
-import           Control.Arrow
-import           Data.Foldable
-import           Data.Function
-import           Data.Graph.Inductive.Graph
-import           Data.Graph.Inductive.PatriciaTree
-import qualified Data.IntMap.Strict                as IntMap
-import           Data.Maybe
-import           Debug.Trace
-import           Ohua.ALang.Lang
-import           Ohua.DFGraph
-import           Ohua.Types
+import Control.Arrow
+import Data.Foldable
+import Data.Function
+import Data.Graph.Inductive.Graph
+import Data.Graph.Inductive.PatriciaTree
+import qualified Data.IntMap.Strict as IntMap
+import Data.Maybe
+import Debug.Trace
+import Ohua.DFGraph
+import Ohua.Types
 
 
 newtype OhuaGrGraph = OhuaGrGraph { unGr :: Gr QualifiedBinding OhuaGrEdgeLabel }
@@ -43,7 +41,7 @@ traceGr g = trace (prettify $ unGr g) g
 toFGLGraph :: OutGraph -> OhuaGrGraph
 toFGLGraph (OutGraph ops arcs _) = OhuaGrGraph $ mkGraph grNodes grEdges
   where
-    regularNodes = map (\(Operator oid type_) -> (unFnId oid, type_)) ops
+    regularNodes = map (\(Operator oid type_) -> (unwrap oid, type_)) ops
 
     envId = succ $ maximum $ map fst regularNodes -- one fresh id for an env node
 
@@ -51,11 +49,11 @@ toFGLGraph (OutGraph ops arcs _) = OhuaGrGraph $ mkGraph grNodes grEdges
 
     grEdges = map arcToEdge arcs
 
-    arcToEdge (Arc t s) = (sourceOp, unFnId $ operator t, OhuaGrEdgeLabel sourceIdx (index t))
+    arcToEdge (Arc t s) = (sourceOp, unwrap $ operator t, OhuaGrEdgeLabel sourceIdx (index t))
       where
         (sourceOp, sourceIdx) = case s of
-            LocalSource (Target op idx) -> (unFnId op, idx)
-            EnvSource e                 -> (envId, unwrapHostExpr e)
+            LocalSource (Target op idx) -> (unwrap op, idx)
+            EnvSource e                 -> (envId, unwrap e)
 
 
 isIsomorphic :: (Eq a, Ord b) => Gr a b -> Gr a b -> Bool

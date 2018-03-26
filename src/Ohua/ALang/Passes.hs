@@ -24,9 +24,11 @@ import qualified Data.HashMap.Strict as HM
 import qualified Data.HashSet as HS
 import Data.Maybe (fromMaybe)
 import Ohua.ALang.Lang
+import qualified Ohua.ALang.Refs as Refs
 import Ohua.Monad
 import Ohua.Types
 import Ohua.Util.Str as Str
+
 
 -- | Inline all references to lambdas.
 -- Aka `let f = (\a -> E) in f N` -> `(\a -> E) N`
@@ -108,13 +110,10 @@ letLift =
                     _ -> id
          in f $ embed e
 
-idName :: QualifiedBinding
-idName = QualifiedBinding (nsRefFromList ["ohua", "lang"]) "id"
-
 -- | Inline all direct reassignments.
 -- Aka `let x = E in let y = x in y` -> `let x = E in x`
 inlineReassignments :: Expression -> Expression
-inlineReassignments = flip runReader mempty . cata go
+inlineReassignments = flip runReader HM.empty . cata go
   where
     go (LetF assign val body) =
         val >>= \case
@@ -122,7 +121,7 @@ inlineReassignments = flip runReader mempty . cata go
                 case assign of
                     Direct bnd -> local (HM.insert bnd v) body
                     Destructure _ ->
-                        Let assign (Apply (Var (Sf idName Nothing)) v) <$> body
+                        Let assign (Apply (Var (Sf Refs.id Nothing)) v) <$> body
                     Recursive _ ->
                         error
                             "TODO implement inlining reassignments for recursive bindings"
@@ -155,7 +154,7 @@ ensureAtLeastOneCall :: (Monad m, MonadGenBnd m) => Expression -> m Expression
 ensureAtLeastOneCall e@(Var _) = do
     newBnd <- generateBinding
     pure $
-        Let (Direct newBnd) (Var (Sf idName Nothing) `Apply` e) $
+        Let (Direct newBnd) (Var (Sf Refs.id Nothing) `Apply` e) $
         Var (Local newBnd)
 ensureAtLeastOneCall e = cata f e
   where
@@ -165,7 +164,7 @@ ensureAtLeastOneCall e = cata f e
                 newBnd <- generateBinding
                 pure $
                     Lambda bnd $
-                    Let (Direct newBnd) (Var (Sf idName Nothing) `Apply` v) $
+                    Let (Direct newBnd) (Var (Sf Refs.id Nothing) `Apply` v) $
                     Var (Local newBnd)
             eInner -> pure $ Lambda bnd eInner
     f eInner = embed <$> sequence eInner
@@ -180,7 +179,7 @@ removeUnusedBindings = fst . runWriter . cata go
     go (VarF val@(Local b)) = tell (HS.singleton b) >> return (Var val)
     go (LetF bnds val body) = do
         (inner, used) <- listen body
-        if not $ any (`HS.member` used) $ flattenAssign bnds
+        if not $ any (`HS.member` used) $ extractBindings bnds
             then return inner
             else do
                 val' <- val
@@ -268,14 +267,13 @@ noUndefinedBindings :: MonadOhua envExpr m => Expression -> m ()
 noUndefinedBindings = flip runReaderT mempty . cata go
   where
     go (LetF (Recursive r) val body) = local (HS.insert r) $ val >> body
-    go (LetF assign val body) =
-        val >> local (HS.union $ HS.fromList $ flattenAssign assign) body
+    go (LetF assign val body) = val >> registerAssign assign body
     go (VarF (Local bnd)) = do
         isDefined <- asks (HS.member bnd)
         unless isDefined $ failWith $ "Not in scope " <> Str.showS bnd
-    go (LambdaF assign body) =
-        local (HS.union $ HS.fromList $ flattenAssign assign) body
+    go (LambdaF assign body) = registerAssign assign body
     go e = sequence_ e
+    registerAssign = local . HS.union . HS.fromList . extractBindings
 
 checkProgramValidity :: MonadOhua envExpr m => Expression -> m ()
 checkProgramValidity e = do

@@ -55,7 +55,7 @@ transformRecursiveTailCall ::
     -> m RecursiveLambdaSpec
 transformRecursiveTailCall lambdaFormals exprs =
     handleRecursiveTailCall lambdaFormals exprs $
-    traceShowId $ findExpr Refs.recur $ letExprs exprs
+    trace "its me" $ findExpr Refs.recur $ letExprs exprs
 
 handleRecursiveTailCall ::
        (MonadError Error m, MonadGenBnd m, MonadGenId m)

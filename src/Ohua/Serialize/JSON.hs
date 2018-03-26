@@ -18,17 +18,19 @@
 {-# LANGUAGE CPP #-}
 module Ohua.Serialize.JSON (encode, eitherDecode) where
 
+#include "compat.h"
 
-import           Data.Aeson
-#if !MIN_VERSION_aeson(1,2,2)
-import           Data.Aeson.Types
+import Data.Aeson
+import Data.List
+import Data.Maybe
+import Ohua.DFGraph
+import Ohua.Types hiding (Options)
+import qualified Ohua.Util.Str as Str
+
+
+#if AESON_EXPORTS_OPTIONS
+import Data.Aeson.Types
 #endif
-import           Data.List
-import           Data.Maybe
-import           Ohua.ALang.Lang
-import           Ohua.DFGraph
-import           Ohua.Types       hiding (Options)
-import qualified Ohua.Util.Str    as Str
 
 baseOptions :: Options
 baseOptions = defaultOptions

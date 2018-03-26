@@ -1,31 +1,59 @@
 module TestAesonConvert where
 
 
-import           Data.Aeson            as A
-import           Data.Aeson.Types      as A
-import           Ohua.ALang.Lang
-import           Ohua.DFGraph
-import           Ohua.Serialize.JSON   ()
-import           Ohua.Types
-import           Ohua.Types.Arbitrary  ()
-import           Test.Hspec
-import           Test.Hspec.QuickCheck
+import Control.Monad.Error.Class
+import Data.Aeson as A
+    ( FromJSON
+    , ToJSON
+    , eitherDecode
+    , encode
+    , parseJSON
+    , toJSON
+    )
+import qualified Data.Aeson.Types as A
+import Ohua.DFGraph
+import Ohua.Serialize.JSON ()
+import Ohua.Types
+import Ohua.Types.Arbitrary ()
+import Test.Hspec
+import Test.Hspec.QuickCheck
+import Test.QuickCheck.Property
 
 
-testConvert :: (ToJSON a, FromJSON a, Eq a) => a -> Bool
+
+
+testConvert :: (ToJSON a, FromJSON a, Eq a, Show a) => a -> Result
 testConvert thing =
-    Just thing == decode (encode thing) -- this uses and tests toEncoding
-    && parse parseJSON (toJSON thing) == A.Success thing -- this uses and tests toJSON
-    && decode (encode thing) == Just (toJSON thing) -- tests that `toEncoding` and `toJSON` do the same thing
-
+    case res of
+        Left err -> failed {reason = err}
+        Right () -> succeeded
+  where
+    res = do
+        eitherDecode (encode thing) >>= \v -- this uses and tests toEncoding
+         ->
+            if v == thing
+                then pure ()
+                else throwError $ "toEncoding was unequal: " ++ show v
+        -- this uses and tests toJSON
+        case A.parse parseJSON (toJSON thing) of
+            A.Error str -> throwError $ "toJSON threw error " ++ str
+            A.Success v
+                | v == thing -> pure ()
+                | otherwise -> throwError $ "toJSON was unequal: " ++ show v
+        -- tests that `toEncoding` and `toJSON` do the same thing
+        eitherDecode (encode thing) >>= \v ->
+            if v == thing
+                then pure ()
+                else throwError $
+                     "toEncoding and toJSON are not the same: " ++ show v
 
 spec :: Spec
 spec = describe "encode . decode == id" $ do
-    prop "for operators" (testConvert :: Operator -> Bool)
-    prop "for targets" (testConvert :: Target -> Bool)
-    prop "for arcs" (testConvert :: Arc HostExpr -> Bool)
-    prop "for sources" (testConvert :: Source HostExpr -> Bool)
-    prop "for fn names" (testConvert :: FnName -> Bool)
-    prop "for fn ids" (testConvert :: FnId -> Bool)
-    prop "for host expressions" (testConvert :: HostExpr -> Bool)
-    prop "for graphs" (testConvert :: OutGraph -> Bool)
+    prop "for operators" (testConvert :: Operator -> Result)
+    prop "for targets" (testConvert :: Target -> Result)
+    prop "for arcs" (testConvert :: Arc HostExpr -> Result)
+    prop "for sources" (testConvert :: Source HostExpr -> Result)
+    prop "for fn names" (testConvert :: Binding -> Result)
+    prop "for fn ids" (testConvert :: FnId -> Result)
+    prop "for host expressions" (testConvert :: HostExpr -> Result)
+    prop "for graphs" (testConvert :: OutGraph -> Result)

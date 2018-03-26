@@ -104,8 +104,8 @@ isSSA =
         modify (HS.insert bnd)
     go e = do
         case e of
-            LetF assign _ _ -> mapM_ failOrInsert $ flattenAssign assign
-            LambdaF assign _ -> mapM_ failOrInsert $ flattenAssign assign
+            LetF assign _ _ -> mapM_ failOrInsert $ extractBindings assign
+            LambdaF assign _ -> mapM_ failOrInsert $ extractBindings assign
             _ -> pure ()
         sequence_ e
 

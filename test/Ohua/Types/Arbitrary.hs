@@ -12,6 +12,9 @@ import           Ohua.Types
 import qualified Ohua.Util.Str   as Str
 import           Test.QuickCheck
 
+genFromMake :: (Make t, Arbitrary (SourceType t)) => Gen t
+genFromMake = suchThatMap (make <$> arbitrary) $ either (const Nothing) Just
+
 instance Arbitrary Str.Str where arbitrary = Str.fromString <$> arbitrary
 instance Arbitrary T.Text where arbitrary = T.pack <$> arbitrary
 instance Arbitrary Operator where
@@ -22,11 +25,11 @@ instance Arbitrary a => Arbitrary (Source a) where arbitrary = oneof [LocalSourc
 instance Arbitrary a => Arbitrary (AbstractOutGraph a) where arbitrary = liftM3 OutGraph arbitrary arbitrary arbitrary
 
 
-instance Arbitrary Binding where arbitrary = Binding <$> arbitrary
+instance Arbitrary Binding where arbitrary = genFromMake
 instance Arbitrary QualifiedBinding where arbitrary = QualifiedBinding <$> arbitrary <*> arbitrary
-instance Arbitrary NSRef where arbitrary = nsRefFromList <$> arbitrary
-instance Arbitrary FnId where arbitrary = FnId <$> arbitrary
-instance Arbitrary HostExpr where arbitrary = HostExpr <$> arbitrary
+instance Arbitrary NSRef where arbitrary = genFromMake
+instance Arbitrary FnId where arbitrary = genFromMake
+instance Arbitrary HostExpr where arbitrary = genFromMake
 instance Arbitrary a => Arbitrary (Symbol a) where
     arbitrary = oneof
         [ Local <$> arbitrary

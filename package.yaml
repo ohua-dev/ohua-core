@@ -53,6 +53,7 @@ default-extensions:
 - NamedFieldPuns
 - RecordWildCards
 - ConstraintKinds
+- StandaloneDeriving
 when:
   - condition: impl(ghc >= 8.2.0)   
     ghc-options:
@@ -96,6 +97,7 @@ library:
   - Ohua.DFLang.Optimizations
   - Ohua.DFGraph
   - Ohua.DFGraph.Show
+  - Ohua.Constants.HostExpr
   - Ohua.Serialize.JSON
   - Ohua.Util
   - Ohua.Util.Str

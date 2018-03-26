@@ -73,7 +73,7 @@ checkSSA = flip evalStateT mempty . mapM_ go
   where
     go le = do
         defined <- get
-        let produced = flattenAssign (returnAssignment le)
+        let produced = extractBindings (returnAssignment le)
             f a
                 | HS.member a defined = Just a
             f _ = Nothing
@@ -258,7 +258,7 @@ lowerHOF _ assign args = do
         for_ lambdas $ \(lam, body) -> do
             let boundVars =
                     findBoundVars body `mappend`
-                    HS.fromList (flattenAssign $ beginAssignment lam)
+                    HS.fromList (extractBindings $ beginAssignment lam)
             let freeVars = HS.toList $ findFreeVars0 boundVars body
             (scopers, renaming) <-
                 if null freeVars

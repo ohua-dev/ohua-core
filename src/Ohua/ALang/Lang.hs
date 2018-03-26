@@ -17,42 +17,14 @@ import Data.Functor.Compose
 import Data.Functor.Foldable
 import Data.Functor.Identity
 import Data.Generics.Uniplate.Direct
-import Data.Hashable
 import Data.String
 import GHC.Generics
 import Lens.Micro ((^.))
 import Ohua.LensClasses
 import Ohua.Types
-import Ohua.Util
 
 #include "compat.h"
 
--- bindingType is the type of general bindings Binding is the type for
--- function arguments and `let`s etc which we know to always be local
--- I revised the proposal. I got rid of `Fn`. Not because of cyclic
--- dependencies but because I think that function application can be
--- more general.
--- | Numerical reference to a spliced expression from the host environment.
-newtype HostExpr = HostExpr
-    { unwrapHostExpr :: Int
-    } deriving (Eq, Ord, Generic)
-
-instance Show HostExpr where
-    show = show . unwrapHostExpr
-
--- Only exists to allow literal integers to be interpreted as host expressions
-instance Num HostExpr where
-    fromInteger = HostExpr . fromInteger
-    (+) = intentionally_not_implemented
-    (-) = intentionally_not_implemented
-    (*) = intentionally_not_implemented
-    abs = intentionally_not_implemented
-    signum = intentionally_not_implemented
-
-instance Hashable HostExpr where
-    hashWithSalt s = hashWithSalt s . unwrapHostExpr
-
-instance NFData HostExpr
 
 -- (Sebastian) can we treat opaque JVM objects here somehow?
 -- (Justus) Several. Well have to discus what the best option is at some point,
