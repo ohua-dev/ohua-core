@@ -6,6 +6,14 @@
 -- Maintainer  : sebastian.ertel@gmail.com, dev@justus.science
 -- Stability   : experimental
 -- Portability : portable
+--
+-- This module implements a set of passes over ALang which perform
+-- various tasks. The most important function is `normalize`, which
+-- transforms an arbitrary ALang expression either into the normal
+-- form of a sequence of let bindings which are invocations of
+-- stateful functions on local or environment variables finalised by a
+-- local binding as a return value.
+
 -- This source code is licensed under the terms described in the associated LICENSE.TXT file
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ExplicitForAll #-}

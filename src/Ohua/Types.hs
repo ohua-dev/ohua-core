@@ -6,6 +6,12 @@
 -- Maintainer  : sebastian.ertel@gmail.com, dev@justus.science
 -- Stability   : experimental
 -- Portability : portable
+--
+-- Fundamental types used in the ohua compilation process. For many
+-- types this module exposes only the type, not its concrete
+-- construction. This is intentional, as internal representations may
+-- change. The type classes 'Make' and 'Unwrap' are provided to
+-- convert to and from those types as needed.
 
 -- This source code is licensed under the terms described in the associated LICENSE.TXT file
 {-# LANGUAGE CPP                        #-}
@@ -82,6 +88,12 @@ import qualified Data.Semigroup        as SG
 
 type family SourceType t
 
+-- | Though it may seem innocuous, this class, as well as 'Unwrap',
+-- are instrumental to the types defined in these modules. 'Make'
+-- provides a way for someone needing to use types defined in this
+-- module to safely instantiate them. 'Unwrap' provides a way of
+-- inspecting the raw values stored underneath. Though caution is
+-- advised with regards to the stability of that representation.
 class Make t where
     -- | Safely construct a value of type @t@ from its source type
     -- potentially reporting an error.
