@@ -1,8 +1,8 @@
-
+{-# LANGUAGE DeriveGeneric, OverloadedStrings #-}
 import Data.Aeson
 import GHC.Generics
 
-newtype MyType = MyType { aField :: Int } deriving (Eq, Show, Generic)
+data MyType = MyType Int deriving (Eq, Show, Generic)
 
 
 baseOptions :: Options
@@ -21,8 +21,9 @@ instance FromJSON MyType where
 
 main =
     let example = MyType 0
-        asJSON = encode example
+        asJSON = encode $ toJSON example
      in do print asJSON
+           print (eitherDecode "[0]" :: Either String MyType)
            case eitherDecode asJSON of
                Left err -> putStrLn err
                Right v
