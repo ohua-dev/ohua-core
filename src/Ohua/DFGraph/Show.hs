@@ -1,3 +1,8 @@
+-- This is necessary as otherwise, for some reason the type inference
+-- finds the lists to be ambiguous. I don't know why, it seems to me
+-- as though it should be obvious, since the argument to `vsep` and
+-- `vcat` and the likes aren't polymorphic.
+{-# LANGUAGE NoOverloadedLists #-}
 module Ohua.DFGraph.Show where
 
 import qualified Data.Text as T

@@ -7,6 +7,10 @@
 -- Stability   : experimental
 -- Portability : portable
 -- This source code is licensed under the terms described in the associated LICENSE.TXT file
+
+-- Same here as in `DFGraph.Show`, type inference can't deal with my lists 
+{-# LANGUAGE NoOverloadedLists #-}
+
 module Ohua.ALang.Show where
 
 import Data.Functor.Foldable
