@@ -224,19 +224,19 @@ instance IsString SomeBinding where
 
 -- | Attempt to parse a string into either a simple binding or a qualified binding.
 -- Assumes a form "name.space/value" for qualified bindings.
-symbolFromString :: String -> Either Error SomeBinding
+symbolFromString :: MonadError Error m => String -> m SomeBinding
 symbolFromString s
-    | Str.null s = Left "Symbols cannot be empty"
+    | Str.null s = throwError "Symbols cannot be empty"
     | otherwise =
         case Str.break (== '/') s of
             (symNs, slashName)
-                | Str.null symNs -> Left "Unexpected '/' at start"
+                | Str.null symNs -> throwError "Unexpected '/' at start"
                 | Str.null slashName ->
-                    Right $ Unqual $ Binding (Str.fromString symNs)
+                    pure $ Unqual $ Binding (Str.fromString symNs)
                 | Just ('/', symName) <- Str.uncons slashName ->
                     if | '/' `Str.elem` symName ->
-                           Left "Too many '/' delimiters found."
-                       | Str.null symName -> Left "Name cannot be empty"
+                           throwError "Too many '/' delimiters found."
+                       | Str.null symName -> throwError "Name cannot be empty"
                        | otherwise ->
                            do ns <-
                                   make =<<
@@ -244,8 +244,8 @@ symbolFromString s
                                       make
                                       (Str.split (== '.') (fromString symNs))
                               bnd <- make $ fromString symName
-                              Right $ Qual $ QualifiedBinding ns bnd
-            _ -> error "Leading slash expected after `break`"
+                              pure $ Qual $ QualifiedBinding ns bnd
+            _ -> throwError "Leading slash expected after `break`"
 
 class ExtractBindings a where
     extractBindings :: a -> [Binding]
