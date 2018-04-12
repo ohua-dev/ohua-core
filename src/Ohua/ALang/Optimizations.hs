@@ -11,8 +11,21 @@
 module Ohua.ALang.Optimizations where
 
 
-import           Ohua.ALang.Lang
+import Ohua.ALang.Lang
+import Ohua.Types
+import qualified Ohua.ALang.Refs as Refs
+import Data.Functor.Foldable
+
 
 
 runOptimizations :: Monad m => Expression -> m Expression
 runOptimizations = return
+
+
+-- | Removes id calls which don't destructure.
+removeId :: Expression -> Expression
+removeId =
+    para $ \case
+        LetF bnd@(Direct _) (Var (Sf func _) `Apply` somevalue, _) (rest, _)
+            | func == Refs.id -> Let bnd somevalue rest
+        other -> embed $ snd <$> other
