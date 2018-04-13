@@ -67,7 +67,8 @@ import Data.Bifoldable
 import Data.Bifunctor
 import Data.Bitraversable
 import Data.Default.Class
-import Data.Functor.Foldable hiding (fold)
+import Data.Functor.Foldable as RS hiding (fold)
+import Data.Foldable as F
 import qualified Data.HashSet as HS
 import Data.Hashable
 import Data.String
@@ -249,7 +250,7 @@ symbolFromString s
 
 class ExtractBindings a where
     extractBindings :: a -> [Binding]
-    default extractBindings :: (Foldable f, f b ~ a, ExtractBindings b) => a -> [Binding]
+    default extractBindings :: (F.Foldable f, f b ~ a, ExtractBindings b) => a -> [Binding]
     extractBindings = foldMap extractBindings
 
 instance ExtractBindings a => ExtractBindings [a]
@@ -261,7 +262,7 @@ data AbstractAssignment binding
     = Direct !binding
     | Recursive !binding
     | Destructure ![binding]
-    deriving (Eq, Functor, Traversable, Foldable)
+    deriving (Eq, Functor, Traversable, F.Foldable)
 
 type Assignment = AbstractAssignment Binding
 
@@ -430,7 +431,7 @@ instance Bitraversable Annotated where
 instance Functor (Annotated ann) where
     fmap = bimap id
 
-instance Foldable (Annotated ann) where
+instance F.Foldable (Annotated ann) where
     foldr = bifoldr (flip const)
 
 instance Traversable (Annotated ann) where
@@ -445,7 +446,7 @@ instance Comonad (Annotated ann) where
 data TyExprF binding a
     = TyRefF binding -- ^ A primitive referece to a type
     | TyAppF a a -- ^ A type application
-    deriving (Show, Eq, Functor, Traversable, Foldable)
+    deriving (Show, Eq, Functor, Traversable, F.Foldable)
 
 newtype TyExpr binding = TyExpr (TyExprF binding (TyExpr binding))
   deriving (Eq, Show)
@@ -462,8 +463,8 @@ pattern TyApp f v = TyExpr (TyAppF f v)
 
 type instance Base (TyExpr binding) = TyExprF binding
 
-instance Recursive (TyExpr binding) where project (TyExpr e) = e
-instance Corecursive (TyExpr binding) where embed = TyExpr
+instance RECURSION_SCHEMES_RECURSIVE_CLASS (TyExpr binding) where project (TyExpr e) = e
+instance RECURSION_SCHEMES_CORECURSIVE_CLASS (TyExpr binding) where embed = TyExpr
 
 instance (NFData binding, NFData a) => NFData (TyExprF binding a) where
   rnf (TyRefF v)   = rnf v
@@ -477,7 +478,7 @@ instance Functor TyExpr where
     fmap f (TyApp e1 e2) = recur e1 `TyApp` recur e2
       where recur = fmap f
 
-instance Foldable TyExpr where
+instance F.Foldable TyExpr where
     foldr f c (TyRef r) = f r c
     foldr f c (TyApp e1 e2) = recur e1 $ recur e2 c
       where recur = flip (foldr f)

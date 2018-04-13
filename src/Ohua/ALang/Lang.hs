@@ -14,7 +14,7 @@ module Ohua.ALang.Lang where
 
 import Control.DeepSeq
 import Data.Functor.Compose
-import Data.Functor.Foldable
+import Data.Functor.Foldable as RS
 import Data.Functor.Identity
 import Data.Generics.Uniplate.Direct
 import Data.String
@@ -22,6 +22,7 @@ import GHC.Generics
 import Lens.Micro ((^.))
 import Ohua.LensClasses
 import Ohua.Types
+import Data.Foldable as F
 
 #include "compat.h"
 
@@ -117,7 +118,7 @@ data AExprF bndType refType a
              a -- ^ Function application
     | LambdaF (AbstractAssignment bndType)
               a -- ^ Anonymous function definition
-    deriving (Functor, Foldable, Traversable, Show, Eq)
+    deriving (Functor, F.Foldable, Traversable, Show, Eq)
 
 type instance Base (AExpr bndType refType) = AExprF bndType refType
 
@@ -125,10 +126,10 @@ newtype AExpr bndType refType = AExpr
     { unAExpr :: AExprF bndType refType (AExpr bndType refType)
     } deriving (Show, Eq)
 
-instance Recursive (AExpr bndType refType) where
+instance RECURSION_SCHEMES_RECURSIVE_CLASS (AExpr bndType refType) where
     project = unAExpr
 
-instance Corecursive (AExpr bndType refType) where
+instance RECURSION_SCHEMES_CORECURSIVE_CLASS (AExpr bndType refType) where
     embed = AExpr
 
 pattern Var :: refType -> AExpr bndType refType
@@ -259,10 +260,10 @@ pattern AnnLambdaF ann assign body =
 #if COMPLETE_PRAGMA_WORKS
 {-# COMPLETE AnnVarF, AnnLetF, AnnApplyF, AnnLambdaF #-}
 #endif
-instance Recursive (AnnExpr ann bndType refType) where
+instance RECURSION_SCHEMES_RECURSIVE_CLASS (AnnExpr ann bndType refType) where
     project = Compose . unAnnExpr
 
-instance Corecursive (AnnExpr ann bndType refType) where
+instance RECURSION_SCHEMES_CORECURSIVE_CLASS (AnnExpr ann bndType refType) where
     embed (Compose v) = AnnExpr v
 
 instance Uniplate (AnnExpr ann bndType refType) where

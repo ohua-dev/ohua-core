@@ -30,3 +30,13 @@
  * anymore which satisfies the `-funused-imports` warning.
  */
 #define AESON_EXPORTS_OPTIONS !MIN_VERSION_aeson(1,2,2)
+
+#define RECURSION_SCHEMES_NEW_CLASS_NAMES MIN_VERSION_recursion_schemes(5,0,0)
+
+#if RECURSION_SCHEMES_NEW_CLASS_NAMES
+#define RECURSION_SCHEMES_RECURSIVE_CLASS Recursive
+#define RECURSION_SCHEMES_CORECURSIVE_CLASS Corecursive
+#else
+#define RECURSION_SCHEMES_RECURSIVE_CLASS RS.Foldable
+#define RECURSION_SCHEMES_CORECURSIVE_CLASS RS.Unfoldable
+#endif

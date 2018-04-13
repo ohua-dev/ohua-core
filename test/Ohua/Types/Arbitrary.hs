@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# LANGUAGE CPP #-}
 module Ohua.Types.Arbitrary where
 
 
@@ -11,9 +12,16 @@ import           Ohua.DFGraph
 import           Ohua.Types
 import qualified Ohua.Util.Str   as Str
 import           Test.QuickCheck
+import Data.Either
+
+#if !MIN_VERSION_base(4,10,0)
+fromRight :: Either a b -> b
+fromRight (Right b) = b
+fromRight _ = error "fromRight: was Left"
+#endif
 
 genFromMake :: (Make t, Arbitrary (SourceType t)) => Gen t
-genFromMake = suchThatMap (make <$> arbitrary) $ either (const Nothing) Just
+genFromMake = fmap fromRight $ (make <$> arbitrary) `suchThat` isRight
 
 instance Arbitrary Str.Str where arbitrary = Str.fromString <$> arbitrary
 instance Arbitrary T.Text where arbitrary = T.pack <$> arbitrary
