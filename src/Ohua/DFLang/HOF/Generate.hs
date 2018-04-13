@@ -1,7 +1,6 @@
 module Ohua.DFLang.HOF.Generate (GenFn) where
 
 import Control.Monad.State
-import Data.Sequence as S
 import qualified Ohua.ALang.Refs as ARefs
 import Ohua.DFLang.HOF
 import Ohua.DFLang.Lang
