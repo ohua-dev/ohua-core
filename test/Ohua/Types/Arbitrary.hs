@@ -4,33 +4,42 @@
 {-# LANGUAGE CPP #-}
 module Ohua.Types.Arbitrary where
 
-
-import           Control.Monad
-import qualified Data.Text       as T
-import           Ohua.ALang.Lang
-import           Ohua.DFGraph
-import           Ohua.Types
-import qualified Ohua.Util.Str   as Str
-import           Test.QuickCheck
+import Control.Monad
 import Data.Either
+import qualified Data.Text as T
+import Ohua.ALang.Lang
+import Ohua.DFGraph
+import Ohua.Types
+import qualified Ohua.Util.Str as Str
+import Test.QuickCheck
+
 
 #if !MIN_VERSION_base(4,10,0)
-fromRight :: Either a b -> b
-fromRight (Right b) = b
-fromRight _ = error "fromRight: was Left"
+fromRight :: b -> Either a b -> b
+fromRight _ (Right b) = b
+fromRight def _ = def
 #endif
 
-genFromMake :: (Make t, Arbitrary (SourceType t)) => Gen t
-genFromMake = fmap fromRight $ (make <$> arbitrary) `suchThat` isRight
 
-instance Arbitrary Str.Str where arbitrary = Str.fromString <$> arbitrary
-instance Arbitrary T.Text where arbitrary = T.pack <$> arbitrary
+genFromMake :: (Make t, Arbitrary (SourceType t)) => Gen t
+genFromMake =
+    fmap (fromRight $ error "impossible") $
+    (make <$> arbitrary) `suchThat` isRight
+
+instance Arbitrary Str.Str where
+    arbitrary = Str.fromString <$> arbitrary
+instance Arbitrary T.Text where
+    arbitrary = T.pack <$> arbitrary
 instance Arbitrary Operator where
     arbitrary = Operator <$> arbitrary <*> arbitrary
-instance Arbitrary Target where arbitrary = liftM2 Target arbitrary arbitrary
-instance Arbitrary a => Arbitrary (Arc a) where arbitrary = liftM2 Arc arbitrary arbitrary
-instance Arbitrary a => Arbitrary (Source a) where arbitrary = oneof [LocalSource <$> arbitrary, EnvSource <$> arbitrary]
-instance Arbitrary a => Arbitrary (AbstractOutGraph a) where arbitrary = liftM3 OutGraph arbitrary arbitrary arbitrary
+instance Arbitrary Target where
+    arbitrary = liftM2 Target arbitrary arbitrary
+instance Arbitrary a => Arbitrary (Arc a) where
+    arbitrary = liftM2 Arc arbitrary arbitrary
+instance Arbitrary a => Arbitrary (Source a) where
+    arbitrary = oneof [LocalSource <$> arbitrary, EnvSource <$> arbitrary]
+instance Arbitrary a => Arbitrary (AbstractOutGraph a) where
+    arbitrary = liftM3 OutGraph arbitrary arbitrary arbitrary
 
 
 instance Arbitrary Binding where arbitrary = genFromMake

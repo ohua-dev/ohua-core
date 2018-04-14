@@ -21,16 +21,15 @@ module Ohua.Serialize.JSON (encode, eitherDecode) where
 #include "compat.h"
 
 import Data.Aeson
+import Data.Aeson.Types
 import Data.List
 import Data.Maybe
 import Ohua.DFGraph
 import Ohua.Types hiding (Options)
 import qualified Ohua.Util.Str as Str
+import Control.Monad
 
 
-#if AESON_EXPORTS_OPTIONS
-import Data.Aeson.Types
-#endif
 
 baseOptions :: Options
 baseOptions = defaultOptions
@@ -58,6 +57,20 @@ qualBindOptions = baseOptions
     { fieldLabelModifier =
         fieldLabelModifier baseOptions . fromMaybe (error "no prefix") . stripPrefix "qb"
     }
+
+
+makeInJSON :: Make t => SourceType t -> Parser t
+makeInJSON = either (fail . Str.toString) pure . make
+
+unwrapToEncoding :: (Unwrap t, ToJSON (SourceType t)) => t -> Encoding
+unwrapToEncoding = toEncoding . unwrap
+
+unwrapToJSON :: (Unwrap t, ToJSON (SourceType t)) => t -> Value
+unwrapToJSON = toJSON . unwrap
+
+makeParseJSON :: (Make t, FromJSON (SourceType t)) => Value -> Parser t
+makeParseJSON = makeInJSON <=< parseJSON
+
 
 instance ToJSON Str.Str where
     toJSON = toJSON . Str.toString
@@ -99,17 +112,17 @@ instance ToJSON QualifiedBinding where
 instance FromJSON QualifiedBinding where
     parseJSON = genericParseJSON qualBindOptions
 instance ToJSON Binding where
-    toEncoding = genericToEncoding baseOptions
-    toJSON = genericToJSON baseOptions
+    toEncoding = unwrapToEncoding
+    toJSON = unwrapToJSON
 instance FromJSON Binding where
-    parseJSON = genericParseJSON baseOptions
+    parseJSON = makeParseJSON
 instance ToJSON FnId where
-    toEncoding = genericToEncoding baseOptions
-    toJSON = genericToJSON baseOptions
+    toEncoding = unwrapToEncoding
+    toJSON = unwrapToJSON
 instance FromJSON FnId where
-    parseJSON = genericParseJSON baseOptions
+    parseJSON = makeParseJSON
 instance ToJSON NSRef where
-    toEncoding = genericToEncoding baseOptions
-    toJSON = genericToJSON baseOptions
+    toEncoding = unwrapToEncoding
+    toJSON = unwrapToJSON
 instance FromJSON NSRef where
-    parseJSON = genericParseJSON baseOptions
+    parseJSON = makeParseJSON
