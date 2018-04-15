@@ -27,11 +27,10 @@ import qualified Data.Text            as T
 import           Lens.Micro
 import           System.IO
 import           System.IO.Unsafe
-#if BASE_HAS_SEMIGROUP
-import qualified Data.Semigroup       as SG
-#endif
 import           Data.String
 import           GHC.Stack
+
+SEMIGROUP_COMPAT_IMPORT
 
 type Prism s t a b = Traversal s t a b
 

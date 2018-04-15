@@ -13,6 +13,10 @@
  */
 #define BASE_HAS_SEMIGROUP MIN_VERSION_base(4,9,0)
 
+#if BASE_HAS_SEMIGROUP
+#define SEMIGROUP_COMPAT_IMPORT import qualified Data.Semigroup as SG
+#endif
+
 /**
  * This check is necessary as before GHC 8.2 there was no `COMPLETE`
  * pragma and additionally the version that GHC 8.2 shipped with broke

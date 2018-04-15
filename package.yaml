@@ -116,6 +116,8 @@ library:
   - fgl
   include-dirs:
     cbits
+  includes:
+    compat.h
   when:
   - condition: flag(debug)
     cpp-options: -DDEBUG=1
