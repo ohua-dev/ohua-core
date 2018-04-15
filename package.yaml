@@ -17,6 +17,7 @@ homepage: https://bitbucket.org/sertel/ohua
 github: ohua-dev/ohua-core
 extra-source-files:
 - README.md
+- cbits/compat.h
 dependencies:
 - base >=4.8 && <5
 - text
@@ -116,8 +117,6 @@ library:
   - fgl
   include-dirs:
     cbits
-  includes:
-    compat.h
   when:
   - condition: flag(debug)
     cpp-options: -DDEBUG=1
