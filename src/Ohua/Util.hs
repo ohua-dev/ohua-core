@@ -9,15 +9,13 @@
 
 -- This source code is licensed under the terms described in the associated LICENSE.TXT file
 {-# LANGUAGE CPP                  #-}
-
-#define IMPL_SEMIGROUP __GLASGOW_HASKELL__ >= 800
-#define HAS_NEW_CALLSTACK_API MIN_VERSION_base(4,9,0)
-
-
 {-# LANGUAGE Rank2Types           #-}
 {-# LANGUAGE UndecidableInstances #-}
-#if !HAS_NEW_CALLSTACK_API
-{-# LANGUAGE ImplicitParams #-}
+
+#include "compat.h"
+
+#if !NEW_CALLSTACK_API
+{-# LANGUAGE ImplicitParams, ConstraintKinds #-}
 #endif
 module Ohua.Util where
 
@@ -29,7 +27,7 @@ import qualified Data.Text            as T
 import           Lens.Micro
 import           System.IO
 import           System.IO.Unsafe
-#if IMPL_SEMIGROUP
+#if BASE_HAS_SEMIGROUP
 import qualified Data.Semigroup       as SG
 #endif
 import           Data.String
@@ -92,16 +90,18 @@ forceTraceReport msg val = val `deepseq` trace msg (pure ())
 
 
 intentionally_not_implemented :: a
-intentionally_not_implemented = error "This is intentionally not implemented, don't use it!"
+intentionally_not_implemented =
+    error "This is intentionally not implemented, don't use it!"
 
 
 
--- | This type onlt exists to overwrite the implementation of 'Monoid' for functions.
--- It changes 'mappend' to be '(.)'. This makes it possible to accumulate a chain of functions in a
+-- | This type onlt exists to overwrite the implementation of 'Monoid'
+-- for functions.  It changes 'mappend' to be '(.)'. This makes it
+-- possible to accumulate a chain of functions in a
 -- 'Control.Monad.Writer.MonadWriter'.
 newtype Mutator a = Mutator { mutAsFn :: a -> a }
 
-#if IMPL_SEMIGROUP
+#if BASE_HAS_SEMIGROUP
 instance SG.Semigroup (Mutator a) where
   Mutator m1 <> Mutator m2 = Mutator $ m1 . m2
 #endif
@@ -109,7 +109,7 @@ instance SG.Semigroup (Mutator a) where
 instance Monoid (Mutator a) where
   mempty = Mutator id
 
-#if IMPL_SEMIGROUP
+#if BASE_HAS_SEMIGROUP
   mappend = (SG.<>)
 #else
   Mutator m1 `mappend` Mutator m2 = Mutator $ m1 . m2
@@ -117,24 +117,24 @@ instance Monoid (Mutator a) where
 
 tellMut :: MonadWriter (Mutator a) m => (a -> a) -> m ()
 tellMut = tell . Mutator
-  
-throwErrorS ::
-#if HAS_NEW_CALLSTACK_API
-  ( HasCallStack
-#else
-  ( ?callStack :: CallStack
+
+
+
+#if !NEW_CALLSTACK_API
+type HasCallStack = ?callStack :: CallStack
+
+callStack :: HasCallStack => CallStack
+callStack = ?callStack
 #endif
-  , MonadError s m
-  , IsString s
-  , Monoid s
-  )
-  => s
-  -> m a
+
+callStackToStr :: CallStack -> String
+#if NEW_CALLSTACK_API
+callStackToStr = prettyCallStack
+#else
+callStackToStr = showCallStack
+#endif
+
+throwErrorS :: (HasCallStack, MonadError s m, IsString s, Monoid s) => s -> m a
 throwErrorS msg = throwError $ msg <> "\n" <> fromString cs
   where
-   cs =
-#if HAS_NEW_CALLSTACK_API
-     prettyCallStack callStack
-#else
-     showCallStack ?callStack
-#endif
+    cs = callStackToStr callStack

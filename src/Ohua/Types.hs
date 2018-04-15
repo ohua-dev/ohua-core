@@ -67,8 +67,8 @@ import Data.Bifoldable
 import Data.Bifunctor
 import Data.Bitraversable
 import Data.Default.Class
-import Data.Functor.Foldable as RS hiding (fold)
 import Data.Foldable as F
+import Data.Functor.Foldable as RS hiding (fold)
 import qualified Data.HashSet as HS
 import Data.Hashable
 import Data.String
@@ -80,6 +80,7 @@ import Ohua.LensClasses
 import Ohua.Util
 import qualified Ohua.Util.Str as Str
 import Ohua.Util.Str ((<>))
+
 
 #include "compat.h"
 
@@ -190,7 +191,8 @@ instance Hashable NSRef where
     {-# INLINE hashWithSalt #-}
 
 
--- | A qualified binding. References a particular bound value inside a namespace.
+-- | A qualified binding. References a particular bound value inside a
+-- namespace.
 data QualifiedBinding = QualifiedBinding
     { qbNamespace :: NSRef
     , qbName      :: Binding
@@ -210,7 +212,8 @@ instance IsString QualifiedBinding where
         Qual q -> q
         _      -> error "unqualified binding"
 
--- | Utility type for parsing. Denotes a binding which may or may not be qualified.
+-- | Utility type for parsing. Denotes a binding which may or may not
+-- be qualified.
 data SomeBinding
     = Unqual Binding
     | Qual QualifiedBinding
@@ -223,8 +226,9 @@ instance Hashable SomeBinding where
 instance IsString SomeBinding where
     fromString = either (error . Str.toString) id . symbolFromString
 
--- | Attempt to parse a string into either a simple binding or a qualified binding.
--- Assumes a form "name.space/value" for qualified bindings.
+-- | Attempt to parse a string into either a simple binding or a
+-- qualified binding.  Assumes a form "name.space/value" for qualified
+-- bindings.
 symbolFromString :: MonadError Error m => String -> m SomeBinding
 symbolFromString s
     | Str.null s = throwError "Symbols cannot be empty"
@@ -288,13 +292,22 @@ instance NFData binding => NFData (AbstractAssignment binding) where
     rnf (Recursive d) = rnf d
 
 _Direct :: Prism' (AbstractAssignment binding) binding
-_Direct = prism' Direct $ \case { Direct a -> Just a; _ -> Nothing }
+_Direct =
+    prism' Direct $ \case
+        Direct a -> Just a
+        _ -> Nothing
 
 _Destructure :: Prism' (AbstractAssignment binding) [binding]
-_Destructure = prism' Destructure $ \case { Destructure a -> Just a; _ -> Nothing }
+_Destructure =
+    prism' Destructure $ \case
+        Destructure a -> Just a
+        _ -> Nothing
 
 _Recursive :: Prism' (AbstractAssignment binding) binding
-_Recursive = prism' Recursive $ \case { Recursive r -> Just r; _ -> Nothing }
+_Recursive =
+    prism' Recursive $ \case
+        Recursive r -> Just r
+        _ -> Nothing
 
 -- bindingType is the type of general bindings Binding is the type for
 -- function arguments and `let`s etc which we know to always be local
@@ -338,7 +351,10 @@ instance Unwrap HostExpr where
 
 type Error = Str.Str
 
-data Options = Options !(Maybe QualifiedBinding) !(Maybe QualifiedBinding) Bool
+data Options =
+    Options !(Maybe QualifiedBinding)
+            !(Maybe QualifiedBinding)
+            Bool
 
 instance Default Options where
     def =
@@ -463,8 +479,10 @@ pattern TyApp f v = TyExpr (TyAppF f v)
 
 type instance Base (TyExpr binding) = TyExprF binding
 
-instance RECURSION_SCHEMES_RECURSIVE_CLASS (TyExpr binding) where project (TyExpr e) = e
-instance RECURSION_SCHEMES_CORECURSIVE_CLASS (TyExpr binding) where embed = TyExpr
+instance RECURSION_SCHEMES_RECURSIVE_CLASS (TyExpr binding) where
+    project (TyExpr e) = e
+instance RECURSION_SCHEMES_CORECURSIVE_CLASS (TyExpr binding) where
+    embed = TyExpr
 
 instance (NFData binding, NFData a) => NFData (TyExprF binding a) where
   rnf (TyRefF v)   = rnf v
@@ -493,9 +511,10 @@ data TyVar tyConRef tyVarRef
     | TyVar tyVarRef
     deriving (Show, Eq)
 
-instance (NFData tyConRef, NFData tyVarRef) => NFData (TyVar tyConRef tyVarRef) where
-  rnf (TyCon c) = rnf c
-  rnf (TyVar v) = rnf v
+instance (NFData tyConRef, NFData tyVarRef) =>
+         NFData (TyVar tyConRef tyVarRef) where
+    rnf (TyCon c) = rnf c
+    rnf (TyVar v) = rnf v
 
 instance Bifunctor TyVar where
     bimap f _ (TyCon c) = TyCon (f c)
