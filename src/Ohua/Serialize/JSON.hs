@@ -102,10 +102,10 @@ instance ToJSON OutGraph where
 instance FromJSON OutGraph where
     parseJSON = genericParseJSON baseOptions
 instance ToJSON HostExpr where
-    toEncoding = genericToEncoding baseOptions
-    toJSON = genericToJSON baseOptions
+    toEncoding = unwrapToEncoding
+    toJSON = unwrapToJSON
 instance FromJSON HostExpr where
-    parseJSON = genericParseJSON baseOptions
+    parseJSON = makeParseJSON
 instance ToJSON QualifiedBinding where
     toEncoding = genericToEncoding qualBindOptions
     toJSON = genericToJSON qualBindOptions

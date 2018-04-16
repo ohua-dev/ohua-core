@@ -10,27 +10,36 @@
 -- This source code is licensed under the terms described in the associated LICENSE.TXT file
 {-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# OPTIONS_GHC -fno-warn-orphans -fno-warn-missing-methods -fno-warn-unused-top-binds #-}
+{-# LANGUAGE CPP #-}
+{-# OPTIONS_GHC -fno-warn-orphans -fno-warn-missing-methods #-}
+
+#if __GLASGOE_HASKELL__ >= 800
+{-# OPTIONS_GHC -fno-warn-unused-top-binds #-}
+#endif
+
 module PassesSpec (passesSpec) where
 
-import           Control.DeepSeq
-import           Control.Monad.Except
-import           Data.Default.Class
-import           Data.Either
-import           GHC.Stack
-import           Ohua.ALang.Lang
-import           Ohua.ALang.Passes
-import           Ohua.ALang.Passes.SSA
-import           Ohua.ALang.Passes.TailRec
-import qualified Ohua.ALang.Refs           as ALangRefs
-import           Ohua.Monad
-import           Ohua.Types
-import           Test.Hspec
---import           Test.Hspec.QuickCheck
-import           Test.QuickCheck
-import           Test.QuickCheck.Property  as P
+import Control.DeepSeq
+import Control.Monad.Except
+import Data.Default.Class
+import Data.Either
+import GHC.Stack
+import Ohua.ALang.Lang
+import Ohua.ALang.Passes
+import Ohua.ALang.Passes.SSA
+import Ohua.ALang.Passes.TailRec
+import qualified Ohua.ALang.Refs as ALangRefs
+import Ohua.Monad
+import Ohua.Types
+import Test.Hspec
 
-import           Ohua.Types.Arbitrary      ()
+--import           Test.Hspec.QuickCheck
+import Test.QuickCheck
+import Test.QuickCheck.Property as P
+
+import Ohua.Types.Arbitrary ()
+import Ohua.Util
+
 
 
 smapName :: QualifiedBinding
@@ -54,9 +63,6 @@ runPasses expr =
 
 type ALangCheck = Either String
 
-
-throwErrorS :: (HasCallStack, MonadError String m) => String -> m ()
-throwErrorS str = throwError $ str ++ " at " ++ prettyCallStack callStack
 
 everyLetBindsCall :: Expression -> ALangCheck ()
 everyLetBindsCall (Let _ (Apply _ _) body) = everyLetBindsCall body

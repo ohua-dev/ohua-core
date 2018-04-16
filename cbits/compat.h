@@ -15,6 +15,8 @@
 
 #if BASE_HAS_SEMIGROUP
 #define SEMIGROUP_COMPAT_IMPORT import qualified Data.Semigroup as SG
+#else
+#define SEMIGROUP_COMPAT_IMPORT 
 #endif
 
 /**
