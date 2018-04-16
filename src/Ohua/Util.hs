@@ -137,3 +137,8 @@ throwErrorS :: (HasCallStack, MonadError s m, IsString s, Monoid s) => s -> m a
 throwErrorS msg = throwError $ msg <> "\n" <> fromString cs
   where
     cs = callStackToStr callStack
+
+#if !MICROLENS_HAS_FLIP_FMAP
+(<&>) :: Functor f => f a -> (a -> b) -> f b
+(<&>) = flip fmap
+#endif

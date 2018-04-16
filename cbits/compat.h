@@ -60,3 +60,9 @@
  * get call stacks.
  */
 #define NEW_CALLSTACK_API MIN_VERSION_base(4,9,0)
+
+/**
+ * The <&> operaator, which I use a lot was added to microlens in
+ * version 4.5.0.0.
+ */
+#define MICROLENS_HAS_FLIP_FMAP MIN_VERSION_microlens(0,4,5)

@@ -13,7 +13,7 @@
 {-# LANGUAGE CPP #-}
 {-# OPTIONS_GHC -fno-warn-orphans -fno-warn-missing-methods #-}
 
-#if __GLASGOE_HASKELL__ >= 800
+#if __GLASGOW_HASKELL__ >= 800
 {-# OPTIONS_GHC -fno-warn-unused-top-binds #-}
 #endif
 
@@ -23,7 +23,6 @@ import Control.DeepSeq
 import Control.Monad.Except
 import Data.Default.Class
 import Data.Either
-import GHC.Stack
 import Ohua.ALang.Lang
 import Ohua.ALang.Passes
 import Ohua.ALang.Passes.SSA
