@@ -64,6 +64,7 @@ assertE False = throwError "AssertionError"
 mapLeft :: (a -> c) -> Either a b -> Either c b
 mapLeft f (Left l)  = Left $ f l
 mapLeft _ (Right r) = Right r
+{-# INLINE mapLeft #-}
 
 
 class ShowT a where

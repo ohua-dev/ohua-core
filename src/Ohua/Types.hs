@@ -485,11 +485,11 @@ instance RECURSION_SCHEMES_CORECURSIVE_CLASS (TyExpr binding) where
     embed = TyExpr
 
 instance (NFData binding, NFData a) => NFData (TyExprF binding a) where
-  rnf (TyRefF v)   = rnf v
-  rnf (TyAppF f v) = f `deepseq` rnf v
+    rnf (TyRefF v) = rnf v
+    rnf (TyAppF f v) = f `deepseq` rnf v
 
 instance NFData binding => NFData (TyExpr binding) where
-  rnf (TyExpr e) = rnf e
+    rnf (TyExpr e) = rnf e
 
 instance Functor TyExpr where
     fmap f (TyRef r) = TyRef $ f r
@@ -497,13 +497,17 @@ instance Functor TyExpr where
       where recur = fmap f
 
 instance F.Foldable TyExpr where
-    foldr f c (TyRef r) = f r c
-    foldr f c (TyApp e1 e2) = recur e1 $ recur e2 c
-      where recur = flip (foldr f)
+    foldr f =
+        flip $
+        cata $ \case
+            TyRefF r -> f r
+            TyAppF a b -> a . b
 
 instance Traversable TyExpr where
-    traverse f (TyRef r)     = TyRef <$> f r
-    traverse f (TyApp e1 e2) = TyApp <$> traverse f e1 <*> traverse f e2
+    traverse f =
+        cata $ \case
+            TyRefF r -> TyRef <$> f r
+            TyAppF a b -> TyApp <$> a <*> b
 
 -- | Default primitive type references (type variables and constructors)
 data TyVar tyConRef tyVarRef
