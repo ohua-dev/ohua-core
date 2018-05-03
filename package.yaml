@@ -147,6 +147,6 @@ tests:
     - fgl
 flags:
   debug:
-    description: null
+    description: Log additional information for debugging.
     manual: false
     default: false
