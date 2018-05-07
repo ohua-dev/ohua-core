@@ -17,7 +17,28 @@
 #if !NEW_CALLSTACK_API
 {-# LANGUAGE ImplicitParams, ConstraintKinds #-}
 #endif
-module Ohua.Util where
+module Ohua.Util
+    ( Prism
+    , Prism'
+    , prism
+    , prism'
+    , assertM
+    , assertE
+    , mapLeft
+    , ShowT(..)
+    , trace
+    , traceShowId
+    , forceAndReport
+    , forceTraceReport
+    , intentionally_not_implemented
+    , Mutator(..)
+    , tellMut
+    , HasCallStack
+    , callStack
+    , callStackToStr
+    , throwErrorS
+    , (<&>)
+    ) where
 
 import           Control.DeepSeq
 import           Control.Exception
@@ -32,12 +53,16 @@ import           GHC.Stack
 
 SEMIGROUP_COMPAT_IMPORT
 
+
+-- | Similar to prisms from lens, but implemented with traversals.
 type Prism s t a b = Traversal s t a b
 
 
+-- | A 'Prism' where the types can't change by using the setter,
 type Prism' a b = Prism a a b b
 
 
+-- | Create a 'Prism' from a getter and a setter.
 prism :: (b -> t) -> (s -> Either t a) -> Prism s t a b
 prism make get f thing =
     case get thing of
@@ -45,57 +70,73 @@ prism make get f thing =
         Right b     -> make <$> f b
 
 
+-- | Create a 'Prism'' from a getter and a setter.
 prism' :: (b -> a) -> (a -> Maybe b) -> Prism' a b
 prism' make get = prism make (\s -> maybe (Left s) Right $ get s)
 
 
-
+-- | Throw an 'error' if the condition is not met. The difference to
+-- 'assert' is that the error is tied to @m@ and is not lazy as it
+-- would be when using @pure $ assert cond val@.
 assertM :: Applicative m => Bool -> m ()
 assertM = flip assert (pure ())
 {-# INLINE assertM #-}
 
 
+-- | Similar to 'assertM' but throws a canonical 'Error' in the monad
+-- @m@ rather than an 'error'.
 assertE :: MonadError String m => Bool -> m ()
 assertE True  = return ()
 assertE False = throwError "AssertionError"
 {-# INLINE assertE #-}
 
 
+-- | Apply a function to the left value in an 'Either'
 mapLeft :: (a -> c) -> Either a b -> Either c b
 mapLeft f (Left l)  = Left $ f l
 mapLeft _ (Right r) = Right r
 {-# INLINE mapLeft #-}
 
 
+-- | Convert values to 'T.Text'
 class ShowT a where
     showT :: a -> T.Text
 
 instance {-# OVERLAPPABLE #-} Show a => ShowT a where
     showT = T.pack . show
 
+-- | Same as @trace@ from @Debug.Trace@.
 trace :: String -> a -> a
 trace msg a = unsafePerformIO (hPutStrLn stderr msg >> pure a)
 {-# NOINLINE trace #-}
 
 
+-- | Same as @traceShowId@ from @Debug.Trace@.
 traceShowId :: Show a => a -> a
 traceShowId a = trace (show a) a
 
+
+-- | Force the evaluation of the value and then print a message to stdout.
 forceAndReport :: (MonadIO m, NFData a) => String -> a -> m ()
 forceAndReport msg val = val `deepseq` liftIO (putStrLn msg)
 
 
+-- | Force the evaluation of a value and then print a message using 'trace'.
 forceTraceReport :: (Applicative f, NFData a) => String -> a -> f ()
 forceTraceReport msg val = val `deepseq` trace msg (pure ())
 
 
+-- | An 'error' call to indicate a certain class method is
+-- intentionally not implemented. Mostly used when 'Num' is
+-- implemented for a type to get the overloaded integer syntax but the
+-- type does not actually support numeric operations.
 intentionally_not_implemented :: a
 intentionally_not_implemented =
     error "This is intentionally not implemented, don't use it!"
 
 
 
--- | This type onlt exists to overwrite the implementation of 'Monoid'
+-- | This type only exists to overwrite the implementation of 'Monoid'
 -- for functions.  It changes 'mappend' to be '(.)'. This makes it
 -- possible to accumulate a chain of functions in a
 -- 'Control.Monad.Writer.MonadWriter'.
@@ -115,18 +156,23 @@ instance Monoid (Mutator a) where
   Mutator m1 `mappend` Mutator m2 = Mutator $ m1 . m2
 #endif
 
+
+-- | Append a function to a chain in a writer.
 tellMut :: MonadWriter (Mutator a) m => (a -> a) -> m ()
 tellMut = tell . Mutator
 
 
 
 #if !NEW_CALLSTACK_API
+-- | Backport of the new callstack API.
 type HasCallStack = ?callStack :: CallStack
 
+-- | Backport of the new callstack API.
 callStack :: HasCallStack => CallStack
 callStack = ?callStack
 #endif
 
+-- | Get a readable representation of a callstack.
 callStackToStr :: CallStack -> String
 #if NEW_CALLSTACK_API
 callStackToStr = prettyCallStack
@@ -134,12 +180,15 @@ callStackToStr = prettyCallStack
 callStackToStr = showCallStack
 #endif
 
+
+-- | Throw a canonical compiler error with a callstack appended.
 throwErrorS :: (HasCallStack, MonadError s m, IsString s, Monoid s) => s -> m a
 throwErrorS msg = throwError $ msg <> "\n" <> fromString cs
   where
     cs = callStackToStr callStack
 
 #if !MICROLENS_HAS_FLIP_FMAP
+-- | If microlens does not export this operator this does. Same as, and implemented as, @'flip' 'fmap'@.
 (<&>) :: Functor f => f a -> (a -> b) -> f b
 (<&>) = flip fmap
 #endif
