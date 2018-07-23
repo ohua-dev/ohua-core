@@ -1,8 +1,8 @@
--- This file has been generated from package.yaml by hpack version 0.20.0.
+-- This file has been generated from package.yaml by hpack version 0.28.2.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 9058c59f5dfcc4e89b2053bf6a8fa0556920743ffc167554fd815ec0bf38edcf
+-- hash: b0758c8528d8dbaf9a7282f4a149dbfd1def84ff6fd69fb7567bf1687d4872d5
 
 name:           ohua-core
 version:        0.7.2
@@ -21,7 +21,6 @@ license:        OtherLicense
 license-file:   LICENSE.txt
 build-type:     Simple
 cabal-version:  >= 1.10
-
 extra-source-files:
     cbits/compat.h
     README.md

@@ -7,12 +7,82 @@
 -- Stability   : experimental
 -- Portability : portable
 -- This source code is licensed under the terms described in the associated LICENSE.TXT file
+--
+-- This module defines the algorithm language. An intermediate language based on
+-- the call-by-need lambda calculus.
+--
+-- The best place to start would be the 'AExprF' data type. 'AExprF' is a simple
+-- functor, which defines the basic alang syntax and it is the only actual type
+-- present at runtime. The other expression types are either synonyms or
+-- specializations which map back to the 'AExprF' type in some way.
+--
+-- == Different types of ALang
+--
+-- Alang is built around the @recursion-schemes@ library, which allows generic
+-- traversals and easy manipulation of tree style recursive data types. As a
+-- result all versions of alang have an underlying /base functor/ type and a top
+-- level type. The "base functor" is used when pattern matching in the generic
+-- functions, such as 'RS.cata', and the top level type is used when constructing
+-- new values. The base functor has the same name as its corresponding top level
+-- type, with an "F" prepended. Patterns for top level types are type synonyms
+-- for efficiency reasons.
+--
+-- The simplest type is 'AExpr' which nests only 'AExprF' into itself. The
+-- convenience patterns are 'Var', 'Let', 'Apply' and 'Lambda'.
+--
+-- Next there is the 'AnnExpr' type which is the same as 'AExpr', but also
+-- carries an annotation on every node of the AST, the convenience patterns are
+-- 'AnnVar', 'AnnLet', 'AnnApply' and 'AnnLambda'. 'AnnExprF' is its base
+-- functor which itself maps back to 'AExprF' constructors.
+--
+-- == Traversals
+--
+-- ALang leverages the power of __two__ /scrap-your-boilerplate/ libraries,
+-- @recursion-schemes@ and @uniplate@. Both libraries define generic ways of
+-- traversing the entire expression tree easily. Depending on the function used
+-- various kinds of information can be propagated up or down the tree.
+--
+-- Generally speaking the interface for the @uniplate@ library is easier to
+-- understand for beginners, whereas the @recursion-schemes@ library is, in my
+-- opinion, more type safe.
+--
+-- For anyone interested in learning about recursion schemes (which is also
+-- applicable to @uniplate@) I recommend
+-- <https://blog.sumtypeofway.com/an-introduction-to-recursion-schemes/ this
+-- multi part blog post> by Patrick Thomson.
+--
+-- == API Stability
+--
+-- The unwrapping functions, such as 'unAExpr', 'unAnnExpr' and 'unAnnExprF'
+-- should be considered unstable.
+--
+-- The patterns, such as 'Var', 'AnnLambda' etc should be considered the stable
+-- interface, and be preferred over unwrapping of the newtypes.
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
-module Ohua.ALang.Lang where
+module Ohua.ALang.Lang
+  (
+  -- * Various kinds of expression types
+  -- ** The fundamental expression type and its base functor
+    AExprF(..)
+  , AExpr(unAExpr, Var, Let, Apply, Lambda)
+  -- ** An annotated version of the expression AST
+  , AnnExpr(unAnnExpr, AnnVar, AnnLet, AnnApply, AnnLambda)
+  , AnnExprF(unAnnExprF, AnnVarF, AnnLetF, AnnApplyF, AnnLambdaF)
+  -- * Other basic types
+  , Symbol(..)
+  , ResolvedSymbol
+  -- ** Common type aliases
+  , OptTyAnnExpr, TyAnnExpr, Expression
+  , Expr
+  -- * Traversals not provided by recursions schemes or generic-deriving
+  , lrPrewalkExprM, lrPostwalkExprM, lrPostwalkExpr
+  , mapBnds, mapRefs, removeTyAnns
+  ) where
 
 import Control.DeepSeq
+import Data.Foldable as F
 import Data.Functor.Compose
 import Data.Functor.Foldable as RS
 import Data.Functor.Identity
@@ -22,7 +92,6 @@ import GHC.Generics
 import Lens.Micro ((^.))
 import Ohua.LensClasses
 import Ohua.Types
-import Data.Foldable as F
 
 #include "compat.h"
 
@@ -109,6 +178,13 @@ instance NFData a => NFData (Symbol a) where
 -- data Expr b
 -- | An expression in the algorithm language.
 -- Abstracted over a concrete type of local binding (target) and a type of reference (source).
+--
+-- This is the "base functor" for an 'Expression'. Which means this construct is
+-- generic in its subterms to be in accordance with the @recursion-schemes@
+-- library. This type is usually not used directly, instead the 'Var', 'Let'
+-- etc. patterns are used. The actual constructors of this type are encountered
+-- when using functions from the @recursion-schemes@ library, such as 'cata' and
+-- 'para'.
 data AExprF bndType refType a
     = VarF refType -- ^ A reference to a value
     | LetF (AbstractAssignment bndType)
@@ -122,6 +198,7 @@ data AExprF bndType refType a
 
 type instance Base (AExpr bndType refType) = AExprF bndType refType
 
+-- | A type alias which recurses the 'AExprF' type onto itself.
 newtype AExpr bndType refType = AExpr
     { unAExpr :: AExprF bndType refType (AExpr bndType refType)
     } deriving (Show, Eq)
@@ -132,10 +209,12 @@ instance RECURSION_SCHEMES_RECURSIVE_CLASS (AExpr bndType refType) where
 instance RECURSION_SCHEMES_CORECURSIVE_CLASS (AExpr bndType refType) where
     embed = AExpr
 
+-- | A convenience alias for a 'VarF' in the recursive 'AExpr' type
 pattern Var :: refType -> AExpr bndType refType
 
 pattern Var v = AExpr (VarF v)
 
+-- | A convenience alias for a 'LetF' in the recursive 'AExpr' type
 pattern Let ::
         AbstractAssignment bndType ->
           AExpr bndType refType ->
@@ -143,12 +222,14 @@ pattern Let ::
 
 pattern Let a b c = AExpr (LetF a b c)
 
+-- | A convenience alias for a 'ApplyF' in the recursive 'AExpr' type
 pattern Apply ::
         AExpr bndType refType ->
           AExpr bndType refType -> AExpr bndType refType
 
 pattern Apply a b = AExpr (ApplyF a b)
 
+-- | A convenience alias for a 'LambdaF' in the recursive 'AExpr' type
 pattern Lambda ::
         AbstractAssignment bndType ->
           AExpr bndType refType -> AExpr bndType refType
@@ -193,15 +274,18 @@ instance Biplate (AExpr bndType refType) (AExpr bndType refType) where
 -- | Backward compatible alias
 type Expr refType = AExpr Binding refType
 
--- | An Alang expression with optionally type annotated bindings (let bindings and lambda arguments)
+-- | An Alang expression with optionally type annotated bindings (let bindings
+-- and lambda arguments)
 newtype AnnExpr ann bndType refType = AnnExpr
     { unAnnExpr :: Annotated ann (AExprF bndType refType (AnnExpr ann bndType refType))
     } deriving (Eq)
 
+-- | Annotated version of the 'Var' constructor pattern
 pattern AnnVar :: ann -> refType -> AnnExpr ann bndType refType
 
 pattern AnnVar ann v = AnnExpr (Annotated ann (VarF v))
 
+-- | Annotated version of the 'Let' constructor pattern
 pattern AnnLet ::
         ann ->
           AbstractAssignment bndType ->
@@ -211,6 +295,7 @@ pattern AnnLet ::
 pattern AnnLet ann assign val body =
         AnnExpr (Annotated ann (LetF assign val body))
 
+-- | Annotated version of the 'Apply' constructor pattern
 pattern AnnApply ::
         ann ->
           AnnExpr ann bndType refType ->
@@ -218,6 +303,7 @@ pattern AnnApply ::
 
 pattern AnnApply ann f a = AnnExpr (Annotated ann (ApplyF f a))
 
+-- | Annotated version of the 'Lambda' constructor pattern
 pattern AnnLambda ::
         ann ->
           AbstractAssignment bndType ->
@@ -228,15 +314,31 @@ pattern AnnLambda ann assign body =
 #if COMPLETE_PRAGMA_WORKS
 {-# COMPLETE AnnVar, AnnLet, AnnApply, AnnLambda #-}
 #endif
-type AnnExprF ann bndType refType
-     = Compose (Annotated ann) (AExprF bndType refType)
+
+annExprLens app (AnnExpr e) = AnnExpr <$> app e
+
+-- | This instance cannot change the type of @ann@, because @ann@ also occurs in
+-- the 'value' part, which is inaccessible with this function. If you with to
+-- achieve this effect use 'RS.cata' or something similar and use 'annotation'
+-- on the functor 'AnnExprF', the instance of which /does/ have the power to
+-- change the type.
+instance HasAnnotation (AnnExpr ann bnd ref) (AnnExpr ann bnd ref) ann ann where
+    annotation = annExprLens . annotation
+
+instance HasValue (AnnExpr ann bnd ref) (AnnExpr ann bnd' ref') (AExprF bnd ref (AnnExpr ann bnd ref)) (AExprF bnd' ref' (AnnExpr ann bnd' ref')) where
+    value = annExprLens . value
+
+-- | Base Functor for the 'AnnExpr' type
+newtype AnnExprF ann bndType refType a = AnnExprF
+    { unAnnExprF :: Annotated ann (AExprF bndType refType a)
+    } deriving (Functor)
 
 type instance Base (AnnExpr ann bndType refType) =
      AnnExprF ann bndType refType
 
 pattern AnnVarF :: ann -> refType -> AnnExprF ann bndType refType a
 
-pattern AnnVarF ann v = Compose (Annotated ann (VarF v))
+pattern AnnVarF ann v = AnnExprF (Annotated ann (VarF v))
 
 pattern AnnLetF ::
         ann ->
@@ -244,27 +346,27 @@ pattern AnnLetF ::
             a -> a -> AnnExprF ann bndType refType a
 
 pattern AnnLetF ann assign val body =
-        Compose (Annotated ann (LetF assign val body))
+        AnnExprF (Annotated ann (LetF assign val body))
 
 pattern AnnApplyF ::
         ann -> a -> a -> AnnExprF ann bndType refType a
 
-pattern AnnApplyF ann f a = Compose (Annotated ann (ApplyF f a))
+pattern AnnApplyF ann f a = AnnExprF (Annotated ann (ApplyF f a))
 
 pattern AnnLambdaF ::
         ann ->
           AbstractAssignment bndType -> a -> AnnExprF ann bndType refType a
 
 pattern AnnLambdaF ann assign body =
-        Compose (Annotated ann (LambdaF assign body))
+        AnnExprF (Annotated ann (LambdaF assign body))
 #if COMPLETE_PRAGMA_WORKS
 {-# COMPLETE AnnVarF, AnnLetF, AnnApplyF, AnnLambdaF #-}
 #endif
 instance RECURSION_SCHEMES_RECURSIVE_CLASS (AnnExpr ann bndType refType) where
-    project = Compose . unAnnExpr
+    project = AnnExprF . unAnnExpr
 
 instance RECURSION_SCHEMES_CORECURSIVE_CLASS (AnnExpr ann bndType refType) where
-    embed (Compose v) = AnnExpr v
+    embed (AnnExprF v) = AnnExpr v
 
 instance Uniplate (AnnExpr ann bndType refType) where
     uniplate (AnnVar ann v) = plate AnnVar |- ann |- v
@@ -273,6 +375,14 @@ instance Uniplate (AnnExpr ann bndType refType) where
     uniplate (AnnApply ann f v) = plate AnnApply |- ann |* f |* v
     uniplate (AnnLambda ann assign body) =
         plate AnnLambda |- ann |- assign |* body
+
+annExprFLens app (AnnExprF e) = AnnExprF <$> app e
+
+instance HasAnnotation (AnnExprF ann bnd ref a) (AnnExprF ann' bnd ref a) ann ann' where
+    annotation = annExprFLens . annotation
+
+instance HasValue (AnnExprF ann bnd ref a) (AnnExprF ann bnd' ref' a') (AExprF bnd ref a) (AExprF bnd' ref' a') where
+    value = annExprFLens . value
 
 instance ExtractBindings ref => ExtractBindings (AnnExpr ann bnd ref) where
     extractBindings e =
@@ -408,4 +518,4 @@ mapRefs f =
         ApplyF a b -> ApplyF a b
 
 removeTyAnns :: TyAnnExpr a -> Expr a
-removeTyAnns = cata $ embed . (^. value) . getCompose
+removeTyAnns = cata $ embed . (^. value)
