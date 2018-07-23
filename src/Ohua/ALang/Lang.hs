@@ -24,16 +24,22 @@
 -- level type. The "base functor" is used when pattern matching in the generic
 -- functions, such as 'RS.cata', and the top level type is used when constructing
 -- new values. The base functor has the same name as its corresponding top level
--- type, with an "F" prepended. Patterns for top level types are type synonyms
+-- type, with an /F/ prepended. Patterns for top level types are type synonyms
 -- for efficiency reasons.
 --
 -- The simplest type is 'AExpr' which nests only 'AExprF' into itself. The
 -- convenience patterns are 'Var', 'Let', 'Apply' and 'Lambda'.
 --
+-- === Annotated AST
+--
 -- Next there is the 'AnnExpr' type which is the same as 'AExpr', but also
--- carries an annotation on every node of the AST, the convenience patterns are
--- 'AnnVar', 'AnnLet', 'AnnApply' and 'AnnLambda'. 'AnnExprF' is its base
--- functor which itself maps back to 'AExprF' constructors.
+-- carries an annotation, via the 'Annotated' type, on every node of the AST,
+-- the convenience patterns are 'AnnVar', 'AnnLet', 'AnnApply' and 'AnnLambda'.
+-- 'AnnExprF' is its base functor which itself maps back to 'AExprF'
+-- constructors.
+--
+-- The two lenses from 'Annotated', 'annotation' and 'value' also work on
+-- 'AnnExpr' and 'AnnExprF'.
 --
 -- == Traversals
 --
@@ -48,8 +54,8 @@
 --
 -- For anyone interested in learning about recursion schemes (which is also
 -- applicable to @uniplate@) I recommend
--- <https://blog.sumtypeofway.com/an-introduction-to-recursion-schemes/ this
--- multi part blog post> by Patrick Thomson.
+-- <https://blog.sumtypeofway.com/an-introduction-to-recursion-schemes/ this multi part blog post>
+-- by Patrick Thomson.
 --
 -- == API Stability
 --
@@ -83,24 +89,22 @@ module Ohua.ALang.Lang
 
 import Control.DeepSeq
 import Data.Foldable as F
-import Data.Functor.Compose
 import Data.Functor.Foldable as RS
 import Data.Functor.Identity
 import Data.Generics.Uniplate.Direct
 import Data.String
 import GHC.Generics
-import Lens.Micro ((^.))
+import Lens.Micro ((^.),Lens)
 import Ohua.LensClasses
 import Ohua.Types
 
 #include "compat.h"
 
-
+-- Discussion on `HostExpr`:
 -- (Sebastian) can we treat opaque JVM objects here somehow?
 -- (Justus) Several. Well have to discus what the best option is at some point,
 --          because the concrete type of the host expression depends on the backend.
 -- some types for `bindingType`
-type RawSymbol = HostExpr
 
 -- | Type of references which can inhabit a `Var` once the source is copletely parsed.
 data Symbol a
@@ -183,8 +187,8 @@ instance NFData a => NFData (Symbol a) where
 -- generic in its subterms to be in accordance with the @recursion-schemes@
 -- library. This type is usually not used directly, instead the 'Var', 'Let'
 -- etc. patterns are used. The actual constructors of this type are encountered
--- when using functions from the @recursion-schemes@ library, such as 'cata' and
--- 'para'.
+-- when using functions from the @recursion-schemes@ library, such as 'RS.cata' and
+-- 'RS.para'.
 data AExprF bndType refType a
     = VarF refType -- ^ A reference to a value
     | LetF (AbstractAssignment bndType)
@@ -315,13 +319,16 @@ pattern AnnLambda ann assign body =
 {-# COMPLETE AnnVar, AnnLet, AnnApply, AnnLambda #-}
 #endif
 
+annExprLens ::
+       Lens (AnnExpr ann bndType refType) (AnnExpr ann' bndType' refType') (Annotated ann (AExprF bndType refType (AnnExpr ann bndType refType))) (Annotated ann' (AExprF bndType' refType' (AnnExpr ann' bndType' refType')))
 annExprLens app (AnnExpr e) = AnnExpr <$> app e
+{-# INLINE annExprLens #-}
 
 -- | This instance cannot change the type of @ann@, because @ann@ also occurs in
--- the 'value' part, which is inaccessible with this function. If you with to
--- achieve this effect use 'RS.cata' or something similar and use 'annotation'
--- on the functor 'AnnExprF', the instance of which /does/ have the power to
--- change the type.
+-- the 'value' part, which is inaccessible with this function. If you wish to
+-- achieve this effect use a traversal like 'RS.cata' and use 'annotation' on
+-- the functor 'AnnExprF', the instance of which /does/ have the power to change
+-- the type.
 instance HasAnnotation (AnnExpr ann bnd ref) (AnnExpr ann bnd ref) ann ann where
     annotation = annExprLens . annotation
 
@@ -376,7 +383,10 @@ instance Uniplate (AnnExpr ann bndType refType) where
     uniplate (AnnLambda ann assign body) =
         plate AnnLambda |- ann |- assign |* body
 
+annExprFLens ::
+       Lens (AnnExprF ann bndType refType a) (AnnExprF ann' bndType' refType' a') (Annotated ann (AExprF bndType refType a)) (Annotated ann' (AExprF bndType' refType' a'))
 annExprFLens app (AnnExprF e) = AnnExprF <$> app e
+{-# INLINE annExprFLens #-}
 
 instance HasAnnotation (AnnExprF ann bnd ref a) (AnnExprF ann' bnd ref a) ann ann' where
     annotation = annExprFLens . annotation
