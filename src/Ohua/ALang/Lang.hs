@@ -72,10 +72,19 @@ module Ohua.ALang.Lang
   -- * Various kinds of expression types
   -- ** The fundamental expression type and its base functor
     AExprF(..)
+#if GHC_HAS_BUNDLED_PATTERN_SYNONYMS
   , AExpr(unAExpr, Var, Let, Apply, Lambda)
+#else
+  , AExpr(unAExpr), pattern Var, pattern Let, pattern Apply, pattern Lambda
+#endif
   -- ** An annotated version of the expression AST
+#if GHC_HAS_BUNDLED_PATTERN_SYNONYMS
   , AnnExpr(unAnnExpr, AnnVar, AnnLet, AnnApply, AnnLambda)
   , AnnExprF(unAnnExprF, AnnVarF, AnnLetF, AnnApplyF, AnnLambdaF)
+#else
+  , AnnExpr(unAnnExpr), pattern AnnVar, pattern AnnLet, pattern AnnApply, pattern AnnLambda
+  , AnnExprF(unAnnExprF), pattern AnnVarF, pattern AnnLetF, pattern AnnApplyF, pattern AnnLambdaF
+#endif
   -- * Other basic types
   , Symbol(..)
   , ResolvedSymbol

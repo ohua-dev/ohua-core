@@ -16,7 +16,7 @@
 #if BASE_HAS_SEMIGROUP
 #define SEMIGROUP_COMPAT_IMPORT import qualified Data.Semigroup as SG
 #else
-#define SEMIGROUP_COMPAT_IMPORT 
+#define SEMIGROUP_COMPAT_IMPORT
 #endif
 
 /**
@@ -66,3 +66,9 @@
  * version 4.5.0.0.
  */
 #define MICROLENS_HAS_FLIP_FMAP MIN_VERSION_microlens(0,4,5)
+
+/**
+ * Bundling pattern synonyms with datatypes only became available in GHC 8. In
+ * earlier versions the patterns had to be exported separately.
+ */
+#define GHC_HAS_BUNDLED_PATTERN_SYNONYMS __GLASGOW_HASKELL__ >= 800

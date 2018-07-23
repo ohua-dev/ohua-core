@@ -46,7 +46,11 @@ module Ohua.Types
     , options
     , Annotated(Annotated)
     , TyExprF(..)
-    , TyExpr, pattern TyApp, pattern TyRef
+#if GHC_HAS_BUNDLED_PATTERN_SYNONYMS
+    , TyExpr(unTyExpr, TyApp, TyRef)
+#else
+    , TyExpr(unTyExpr), pattern TyApp, pattern TyRef
+#endif
     , TyVar(..)
     , SomeTyVar
     , DefaultTyExpr
@@ -69,6 +73,7 @@ import Data.Bitraversable
 import Data.Default.Class
 import Data.Foldable as F
 import Data.Functor.Foldable as RS hiding (fold)
+import Data.Generics.Uniplate.Direct
 import qualified Data.HashSet as HS
 import Data.Hashable
 import Data.String
@@ -105,7 +110,7 @@ class Make t where
 makeThrow :: Make t => SourceType t -> t
 makeThrow = either (error . Str.toString) id . make
 
--- | Convert a value @t@ back to its source type @t@. 
+-- | Convert a value @t@ back to its source type @t@.
 class Unwrap t where
     unwrap :: t -> SourceType t
 
@@ -179,7 +184,7 @@ type instance SourceType NSRef = [Binding]
 
 instance UnsafeMake NSRef where
     unsafeMake = NSRef . V.fromList
-  
+
 instance Make NSRef where
     make = pure . unsafeMake
 
@@ -420,6 +425,14 @@ transformRecursiveFunctions f (Options c l e) = f e <&> Options c l
 options :: Lens' Environment Options
 options f (Environment opts) = Environment <$> f opts
 
+-- | Generic way of attaching arbitrary, alterable data to some type.
+--
+-- This is used primarily to add information to AST nodes, such as with the
+-- 'Ohua.ALang.Lang.AnnExpr' type, wich uses 'Annotated' internally.
+--
+-- It is recommended to use the lenses 'annotated' and 'value' to interact with
+-- this type and other annotated values, as those are a more stable and clean
+-- interface.
 data Annotated annotation value =
     Annotated !annotation
               !value
@@ -458,14 +471,20 @@ instance Comonad (Annotated ann) where
     duplicate x@(Annotated ann _) = Annotated ann x
     extend f a@(Annotated ann _) = Annotated ann (f a)
 
--- | A type expression
+-- | A type expression. Similar to the AST in "Ohua.ALang.Lang" this expression
+-- type leverages @recursion-schemes@ and @uniplate@ for generic traversals.
+--
+-- The actual expression type is 'TyExpr' and its associated patterns, 'TyRef'
+-- and 'TyApp'. The 'TyExprF' type is its base functor, encountered when using
+-- the @recursion-schemes@ library functions, such as 'RS.cata'.
 data TyExprF binding a
     = TyRefF binding -- ^ A primitive referece to a type
     | TyAppF a a -- ^ A type application
     deriving (Show, Eq, Functor, Traversable, F.Foldable)
 
-newtype TyExpr binding = TyExpr (TyExprF binding (TyExpr binding))
-  deriving (Eq, Show)
+newtype TyExpr binding = TyExpr
+    { unTyExpr :: TyExprF binding (TyExpr binding)
+    } deriving (Eq, Show)
 
 pattern TyRef :: binding -> TyExpr binding
 pattern TyRef b = TyExpr (TyRefF b)
@@ -483,6 +502,17 @@ instance RECURSION_SCHEMES_RECURSIVE_CLASS (TyExpr binding) where
     project (TyExpr e) = e
 instance RECURSION_SCHEMES_CORECURSIVE_CLASS (TyExpr binding) where
     embed = TyExpr
+
+instance Uniplate (TyExpr bnd) where
+    uniplate (TyRef r) = plate (TyRef r)
+    uniplate (TyApp a b) = plate TyApp |* a |* b
+
+instance Biplate (TyExpr bnd) (TyExpr bnd) where
+    biplate = plateSelf
+
+instance Uniplate bnd => Biplate (TyExpr bnd) bnd where
+    biplate (TyRef r) = plate TyRef |* r
+    biplate (TyApp a b) = plate TyApp |+ a |+ b
 
 instance (NFData binding, NFData a) => NFData (TyExprF binding a) where
     rnf (TyRefF v) = rnf v
