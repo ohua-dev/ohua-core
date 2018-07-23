@@ -216,10 +216,10 @@ newtype AExpr bndType refType = AExpr
     { unAExpr :: AExprF bndType refType (AExpr bndType refType)
     } deriving (Show, Eq)
 
-instance RECURSION_SCHEMES_RECURSIVE_CLASS (AExpr bndType refType) where
+instance RS.RECURSION_SCHEMES_RECURSIVE_CLASS (AExpr bndType refType) where
     project = unAExpr
 
-instance RECURSION_SCHEMES_CORECURSIVE_CLASS (AExpr bndType refType) where
+instance RS.RECURSION_SCHEMES_CORECURSIVE_CLASS (AExpr bndType refType) where
     embed = AExpr
 
 -- | A convenience alias for a 'VarF' in the recursive 'AExpr' type
@@ -378,10 +378,10 @@ pattern AnnLambdaF ann assign body =
 #if COMPLETE_PRAGMA_WORKS
 {-# COMPLETE AnnVarF, AnnLetF, AnnApplyF, AnnLambdaF #-}
 #endif
-instance RECURSION_SCHEMES_RECURSIVE_CLASS (AnnExpr ann bndType refType) where
+instance RS.RECURSION_SCHEMES_RECURSIVE_CLASS (AnnExpr ann bndType refType) where
     project = AnnExprF . unAnnExpr
 
-instance RECURSION_SCHEMES_CORECURSIVE_CLASS (AnnExpr ann bndType refType) where
+instance RS.RECURSION_SCHEMES_CORECURSIVE_CLASS (AnnExpr ann bndType refType) where
     embed (AnnExprF v) = AnnExpr v
 
 instance Uniplate (AnnExpr ann bndType refType) where

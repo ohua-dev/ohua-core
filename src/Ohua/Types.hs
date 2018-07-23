@@ -498,9 +498,9 @@ pattern TyApp f v = TyExpr (TyAppF f v)
 
 type instance Base (TyExpr binding) = TyExprF binding
 
-instance RECURSION_SCHEMES_RECURSIVE_CLASS (TyExpr binding) where
+instance RS.RECURSION_SCHEMES_RECURSIVE_CLASS (TyExpr binding) where
     project (TyExpr e) = e
-instance RECURSION_SCHEMES_CORECURSIVE_CLASS (TyExpr binding) where
+instance RS.RECURSION_SCHEMES_CORECURSIVE_CLASS (TyExpr binding) where
     embed = TyExpr
 
 instance Uniplate (TyExpr bnd) where
