@@ -72,3 +72,9 @@
  * earlier versions the patterns had to be exported separately.
  */
 #define GHC_HAS_BUNDLED_PATTERN_SYNONYMS __GLASGOW_HASKELL__ >= 800
+
+/**
+ * Starting from this base version the Prelude exports the '<>' operator, which
+ * the boxes library defines as well and thus we get a clash in `ALang.Show`.
+ */
+#define PRELUDE_EXPORTS_MAPPEND_OPERATOR MIN_VERSION_base(4,11,0)
