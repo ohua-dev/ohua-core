@@ -26,7 +26,7 @@
  * `COMPLETE` pragma for any GHC after 8.4, when the bug was
  * supposedly fixed.
  */
-#define COMPLETE_PRAGMA_WORKS __GLASGOW_HASKELL__ >= 804
+#define COMPLETE_PRAGMA_WORKS MIN_VERSION_GLASGOW_HASKELL(8,4,0,0)
 
 /**
  * The `Data.Aeson` module does not export `Options`, the fields for

@@ -77,7 +77,6 @@ import Data.Foldable as F
 import Data.Functor.Foldable as RS hiding (fold)
 import Data.Generics.Uniplate.Direct
 import qualified Data.HashSet as HS
-import Data.Hashable
 import Data.String
 import qualified Data.Text as T
 import qualified Data.Vector as V
