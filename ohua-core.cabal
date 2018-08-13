@@ -2,7 +2,7 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 7f72f9b58e1629ffa424d31783f2cafb42aa8654d9ea8cef15fcca03e65d0314
+-- hash: e64536c40dbd4af6167ce75d0bfdc8d3e343ebe5077505ae11af2d479c093c43
 
 name:           ohua-core
 version:        0.2.0
@@ -12,7 +12,7 @@ description:    Components for compiling a portable dataflow graph from an expre
                 Resuling graphs can be executed by any runtime, regardles of platform or laguage
                 that implements the ohua core operators and execution semantics.
 category:       Concurrency
-homepage:       https://bitbucket.org/sertel/ohua
+homepage:       https://ohua-dev.github.io/ohua
 bug-reports:    https://github.com/ohua-dev/ohua-core/issues
 author:         Sebastian Ertel,
                 Justus Adam
