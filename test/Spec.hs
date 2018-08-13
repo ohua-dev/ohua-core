@@ -1,9 +1,9 @@
 
+import Protolude
 
 -- import qualified ALangVerify
 import qualified DFLowering
 import           PassesSpec
-import qualified StrTest
 import           Test.Hspec
 import qualified TestAesonConvert
 import qualified TestALangUtils
@@ -13,7 +13,6 @@ import qualified TestALangUtils
 main :: IO ()
 main = hspec $ do
     passesSpec
-    StrTest.strTest
     DFLowering.generalLowering
     DFLowering.ifSpec
     DFLowering.seqSpec

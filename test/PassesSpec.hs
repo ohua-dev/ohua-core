@@ -19,10 +19,14 @@
 
 module PassesSpec (passesSpec) where
 
-import Control.DeepSeq
-import Control.Monad.Except
+import Protolude
+
 import Data.Default.Class
-import Data.Either
+import qualified Data.Text as T
+import Test.Hspec
+import Test.QuickCheck
+import Test.QuickCheck.Property as P
+
 import Ohua.ALang.Lang
 import Ohua.ALang.Passes
 import Ohua.ALang.Passes.SSA
@@ -30,12 +34,6 @@ import Ohua.ALang.Passes.TailRec
 import qualified Ohua.ALang.Refs as ALangRefs
 import Ohua.Monad
 import Ohua.Types
-import Test.Hspec
-
---import           Test.Hspec.QuickCheck
-import Test.QuickCheck
-import Test.QuickCheck.Property as P
-
 import Ohua.Types.Arbitrary ()
 import Ohua.Util
 
@@ -60,7 +58,7 @@ runPasses expr =
     flip (runFromExpr def) expr $
     performSSA >=> (normalize >=> \e -> checkProgramValidity e >> return e)
 
-type ALangCheck = Either String
+type ALangCheck = Either Text
 
 
 everyLetBindsCall :: Expression -> ALangCheck ()
@@ -75,7 +73,7 @@ noNestedLets _                  = return ()
 
 
 noLets :: Expression -> ALangCheck ()
-noLets e@(Let _ _ _)       = throwErrorS $ "Found a let " ++ show e
+noLets e@(Let _ _ _)       = throwErrorS $ "Found a let " <> show e
 noLets (Apply expr1 expr2) = noLets expr1 >> noLets expr2
 noLets (Lambda _ expr)     = noNestedLets expr
 noLets _                   = return ()
@@ -99,7 +97,8 @@ prop_passes input =
                         Left err ->
                             failed
                                 { P.reason =
-                                      unlines
+                                      toS $
+                                      T.unlines
                                           [ err
                                           , "Input:"
                                           , show input

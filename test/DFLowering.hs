@@ -5,13 +5,16 @@
 
 module DFLowering where
 
+import Protolude hiding (Symbol)
+
 import Data.Default.Class
-import Data.Function
 import Data.Graph.Inductive.Graph
 import Data.Graph.Inductive.PatriciaTree
 import qualified Data.IntMap.Strict as IntMap
 import qualified Data.IntSet as IntSet
 import Data.String
+import Test.Hspec
+
 import Ohua.ALang.Lang
 import qualified Ohua.ALang.Refs as ALangRefs
 import Ohua.DFGraph
@@ -21,8 +24,6 @@ import qualified Ohua.DFLang.Refs as Refs
 import Ohua.Monad
 import Ohua.Test.DFGraph
 import Ohua.Types
-import qualified Ohua.Util.Str as Str
-import Test.Hspec
 
 sf :: a -> AExpr bndType (Symbol a)
 sf = Var . flip Sf Nothing
@@ -41,7 +42,7 @@ shouldSatisfyRet action predicate = action >>= (`shouldSatisfy` predicate)
 
 runLowering :: Expression -> IO DFExpr
 runLowering =
-    fmap (either (error . Str.toString) id) .
+    fmap (either panic identity) .
     runSilentLoggingT . runFromExpr def lowerALang
 
 -- | IMPORTANT: Both source and target expression must be in SSA form

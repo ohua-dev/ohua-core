@@ -1,9 +1,11 @@
 module TestALangUtils where
 
+import Protolude
+
+import           Test.Hspec
 
 import           Ohua.ALang.Lang
 import           Ohua.Types
-import           Test.Hspec
 
 
 substitute' :: Binding -> Expression -> Expression -> Expression

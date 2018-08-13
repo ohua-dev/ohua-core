@@ -1,11 +1,13 @@
 module ALangVerify where
 
-import           Data.Default.Class
-import           Ohua.ALang.Lang
-import           Ohua.ALang.Passes
-import           Ohua.Monad
-import qualified Ohua.Util.Str      as Str
-import           Test.Hspec
+import Protolude
+
+import Data.Default.Class
+import Test.Hspec
+
+import Ohua.ALang.Lang
+import Ohua.ALang.Passes
+import Ohua.Monad
 
 -- OhuaT Expr (Either [Char] Expression)
 justTrace :: Show e => IO e -> Expectation
@@ -24,6 +26,6 @@ currying = describe "resolution of curried functions" $ do
           Let "x" (Apply "f'" "c")
           "x"
   let f = normalize
-  let runALangTransforms = fmap (either (error . Str.toString) id) . runSilentLoggingT . runFromExpr def f
+  let runALangTransforms = fmap (either panic identity) . runSilentLoggingT . runFromExpr def f
   let output = runALangTransforms sourceExpr
   it "just some output" $ justTrace output

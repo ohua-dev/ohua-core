@@ -10,16 +10,18 @@ import Data.Aeson as A
     , parseJSON
     , toJSON
     )
+
+import Protolude
+
 import qualified Data.Aeson.Types as A
-import Ohua.DFGraph
-import Ohua.Serialize.JSON ()
-import Ohua.Types
-import Ohua.Types.Arbitrary ()
 import Test.Hspec
 import Test.Hspec.QuickCheck
 import Test.QuickCheck.Property
 
-
+import Ohua.DFGraph
+import Ohua.Serialize.JSON ()
+import Ohua.Types
+import Ohua.Types.Arbitrary ()
 
 
 testConvert :: (ToJSON a, FromJSON a, Eq a, Show a) => a -> Result
@@ -33,19 +35,19 @@ testConvert thing =
          ->
             if v == thing
                 then pure ()
-                else throwError $ "toEncoding was unequal: " ++ show v
+                else throwError $ "toEncoding was unequal: " <> show v
         -- this uses and tests toJSON
         case A.parse parseJSON (toJSON thing) of
-            A.Error str -> throwError $ "toJSON threw error " ++ str
+            A.Error str -> throwError $ "toJSON threw error " <> str
             A.Success v
                 | v == thing -> pure ()
-                | otherwise -> throwError $ "toJSON was unequal: " ++ show v
+                | otherwise -> throwError $ "toJSON was unequal: " <> show v
         -- tests that `toEncoding` and `toJSON` do the same thing
         eitherDecode (encode thing) >>= \v ->
             if v == thing
                 then pure ()
                 else throwError $
-                     "toEncoding and toJSON are not the same: " ++ show v
+                     "toEncoding and toJSON are not the same: " <> show v
 
 spec :: Spec
 spec = describe "encode . decode == id" $ do
