@@ -17,6 +17,9 @@
 {-# LANGUAGE CPP                        #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiWayIf                 #-}
+
+#include "compat.h"
+
 module Ohua.Types
     ( FnId
     , Binding
@@ -67,7 +70,6 @@ module Ohua.Types
 import Protolude
 
 import Control.Comonad
--- import Control.Monad.Error.Class hiding (Error)
 import Data.Bifoldable
 import Data.Bitraversable
 import Data.Default.Class
@@ -75,6 +77,7 @@ import Data.Foldable as F
 import Data.Functor.Foldable as RS hiding (fold)
 import Data.Generics.Uniplate.Direct
 import qualified Data.HashSet as HS
+import Data.Hashable
 import Data.String
 import qualified Data.Text as T
 import qualified Data.Vector as V
@@ -83,12 +86,7 @@ import Lens.Micro hiding ((<&>))
 import Ohua.LensClasses
 import Ohua.Util
 
-
-#include "compat.h"
-
-#if BASE_HAS_SEMIGROUP
-import qualified Data.Semigroup        as SG
-#endif
+IMPORT_HASHABLE
 
 type family SourceType t
 
@@ -140,9 +138,7 @@ newtype Binding =
     Binding Text
     deriving (Eq, Hashable, Generic, Ord, Monoid, NFData, Show)
 
-#if BASE_HAS_SEMIGROUP
-deriving instance SG.Semigroup Binding
-#endif
+deriving instance Semigroup Binding
 
 type instance SourceType Binding = Text
 

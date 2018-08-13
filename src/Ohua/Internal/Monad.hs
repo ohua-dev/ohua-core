@@ -18,14 +18,14 @@ import Protolude
 
 import Control.Monad.Except
 import qualified Control.Monad.RWS.Lazy
-import Control.Monad.RWS.Strict hiding (fail)
+import Control.Monad.RWS.Strict (RWST, evalRWST)
 import qualified Control.Monad.State.Lazy
 import qualified Control.Monad.State.Strict
-import Control.Monad.Writer
+import Control.Monad.Writer (WriterT)
 import Data.Default.Class
 import qualified Data.HashSet as HS
 import qualified Data.Vector as V
-import Lens.Micro.Platform
+import Lens.Micro.Platform hiding ((&))
 import qualified Data.Text as T
 import Control.Monad.Logger
 import Ohua.ALang.Lang

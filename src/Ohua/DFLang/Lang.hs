@@ -13,7 +13,9 @@
 -- The ALang IR is transformed straight into the dataflow IR.
 -- One important aspect of DFLang: it does not define any abstractions, i.e., there are no function definitions.
 --
-{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE CPP #-}
+
+#include "compat.h"
 
 module Ohua.DFLang.Lang where
 
@@ -25,6 +27,8 @@ import qualified Data.Text as T
 
 import Ohua.Types
 import Ohua.Util
+
+IMPORT_HASHABLE
 
 -- | A sequence of let statements with a terminating binding to be used as return value
 data DFExpr = DFExpr

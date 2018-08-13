@@ -7,9 +7,17 @@
 -- Stability   : experimental
 -- Portability : portable
 -- This source code is licensed under the terms described in the associated LICENSE.TXT file
+{-# LANGUAGE CPP #-}
+
+#include "compat.h"
+
 module Ohua.DFLang.HOF.Smap where
 
 import Protolude
+
+#if !PROTOLUDE_EXPORTS_unzip
+import Data.List (unzip)
+#endif
 
 import qualified Data.Sequence as S
 

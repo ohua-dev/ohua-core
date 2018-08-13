@@ -2,7 +2,7 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 30f4e68b7161cc87d360262c6e4f0505d129915ce6fe83f07c13db78e030e573
+-- hash: 2831be35c073f6e376bec75762becc631305a274e1816c7961dde3a1246e500e
 
 name:           ohua-core
 version:        0.2.0
@@ -39,7 +39,7 @@ flag debug
 library
   hs-source-dirs:
       src
-  default-extensions: OverloadedStrings OverloadedLists MultiParamTypeClasses FunctionalDependencies TypeFamilies GADTs FlexibleContexts FlexibleInstances TypeSynonymInstances LambdaCase TupleSections BangPatterns ExplicitForAll ScopedTypeVariables DefaultSignatures DeriveFunctor DeriveFoldable DeriveTraversable DeriveGeneric PatternSynonyms NamedFieldPuns RecordWildCards ConstraintKinds StandaloneDeriving NoImplicitPrelude
+  default-extensions: OverloadedStrings OverloadedLists MultiParamTypeClasses FunctionalDependencies TypeFamilies GADTs FlexibleContexts FlexibleInstances TypeSynonymInstances LambdaCase TupleSections BangPatterns ExplicitForAll ScopedTypeVariables DefaultSignatures DeriveFunctor DeriveFoldable DeriveTraversable DeriveGeneric PatternSynonyms NamedFieldPuns RecordWildCards ConstraintKinds StandaloneDeriving NoImplicitPrelude RankNTypes
   include-dirs:
       cbits
   build-depends:
@@ -70,8 +70,8 @@ library
     , uniplate
     , unordered-containers
     , vector
-  if impl(ghc >= 8.2.0)
-    ghc-options: -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fno-warn-incomplete-patterns
+  if impl(ghc >= 8.4.0)
+    ghc-options: -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints
   if flag(debug)
     cpp-options: -DDEBUG=1
   exposed-modules:
@@ -118,7 +118,7 @@ library
 
 executable ohua-test-exec
   main-is: Main.hs
-  default-extensions: OverloadedStrings OverloadedLists MultiParamTypeClasses FunctionalDependencies TypeFamilies GADTs FlexibleContexts FlexibleInstances TypeSynonymInstances LambdaCase TupleSections BangPatterns ExplicitForAll ScopedTypeVariables DefaultSignatures DeriveFunctor DeriveFoldable DeriveTraversable DeriveGeneric PatternSynonyms NamedFieldPuns RecordWildCards ConstraintKinds StandaloneDeriving NoImplicitPrelude
+  default-extensions: OverloadedStrings OverloadedLists MultiParamTypeClasses FunctionalDependencies TypeFamilies GADTs FlexibleContexts FlexibleInstances TypeSynonymInstances LambdaCase TupleSections BangPatterns ExplicitForAll ScopedTypeVariables DefaultSignatures DeriveFunctor DeriveFoldable DeriveTraversable DeriveGeneric PatternSynonyms NamedFieldPuns RecordWildCards ConstraintKinds StandaloneDeriving NoImplicitPrelude RankNTypes
   build-depends:
       aeson
     , base >=4.8 && <5
@@ -133,8 +133,8 @@ executable ohua-test-exec
     , ohua-core
     , protolude
     , text
-  if impl(ghc >= 8.2.0)
-    ghc-options: -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fno-warn-incomplete-patterns
+  if impl(ghc >= 8.4.0)
+    ghc-options: -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints
   other-modules:
       Paths_ohua_core
   default-language: Haskell2010
@@ -144,7 +144,7 @@ executable test-graph-gen
   hs-source-dirs:
       test
       ./.
-  default-extensions: OverloadedStrings OverloadedLists MultiParamTypeClasses FunctionalDependencies TypeFamilies GADTs FlexibleContexts FlexibleInstances TypeSynonymInstances LambdaCase TupleSections BangPatterns ExplicitForAll ScopedTypeVariables DefaultSignatures DeriveFunctor DeriveFoldable DeriveTraversable DeriveGeneric PatternSynonyms NamedFieldPuns RecordWildCards ConstraintKinds StandaloneDeriving NoImplicitPrelude
+  default-extensions: OverloadedStrings OverloadedLists MultiParamTypeClasses FunctionalDependencies TypeFamilies GADTs FlexibleContexts FlexibleInstances TypeSynonymInstances LambdaCase TupleSections BangPatterns ExplicitForAll ScopedTypeVariables DefaultSignatures DeriveFunctor DeriveFoldable DeriveTraversable DeriveGeneric PatternSynonyms NamedFieldPuns RecordWildCards ConstraintKinds StandaloneDeriving NoImplicitPrelude RankNTypes
   build-depends:
       QuickCheck
     , aeson
@@ -160,8 +160,8 @@ executable test-graph-gen
     , ohua-core
     , protolude
     , text
-  if impl(ghc >= 8.2.0)
-    ghc-options: -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fno-warn-incomplete-patterns
+  if impl(ghc >= 8.4.0)
+    ghc-options: -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints
   other-modules:
       Ohua.Types.Arbitrary
   default-language: Haskell2010
@@ -171,7 +171,7 @@ test-suite ohua-tests
   main-is: Spec.hs
   hs-source-dirs:
       test
-  default-extensions: OverloadedStrings OverloadedLists MultiParamTypeClasses FunctionalDependencies TypeFamilies GADTs FlexibleContexts FlexibleInstances TypeSynonymInstances LambdaCase TupleSections BangPatterns ExplicitForAll ScopedTypeVariables DefaultSignatures DeriveFunctor DeriveFoldable DeriveTraversable DeriveGeneric PatternSynonyms NamedFieldPuns RecordWildCards ConstraintKinds StandaloneDeriving NoImplicitPrelude
+  default-extensions: OverloadedStrings OverloadedLists MultiParamTypeClasses FunctionalDependencies TypeFamilies GADTs FlexibleContexts FlexibleInstances TypeSynonymInstances LambdaCase TupleSections BangPatterns ExplicitForAll ScopedTypeVariables DefaultSignatures DeriveFunctor DeriveFoldable DeriveTraversable DeriveGeneric PatternSynonyms NamedFieldPuns RecordWildCards ConstraintKinds StandaloneDeriving NoImplicitPrelude RankNTypes
   build-depends:
       QuickCheck
     , aeson
@@ -190,8 +190,8 @@ test-suite ohua-tests
     , ohua-core
     , protolude
     , text
-  if impl(ghc >= 8.2.0)
-    ghc-options: -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -fno-warn-incomplete-patterns
+  if impl(ghc >= 8.4.0)
+    ghc-options: -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints
   other-modules:
       ALangVerify
       DFLowering

@@ -1,4 +1,4 @@
-{-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE CPP #-}
 module Ohua.Monad
     ( OhuaM, runFromExpr, runFromBindings
     , MonadGenId(generateId, resetIdCounter)
@@ -22,9 +22,14 @@ module Ohua.Monad
 
 import Protolude
 
+#if !PROTOLUDE_EXPORTS_hPutStr
+import Data.ByteString (hPutStr)
+#endif
+
 import Control.Monad.Logger
 import System.Log.FastLogger (fromLogStr)
 import Lens.Micro
+import Lens.Micro.Mtl (view)
 
 import Ohua.Internal.Monad
 import Ohua.Types
@@ -38,7 +43,7 @@ failWith = throwError
 
 
 fromEnv :: (MonadReadEnvironment m, Functor m) => Lens' Environment a -> m a
-fromEnv l = (^. l) <$> getEnvironment
+fromEnv l = view l <$> getEnvironment
 
 runHandleLoggingT :: Handle -> LoggingT m a -> m a
 runHandleLoggingT h = (`runLoggingT` output)

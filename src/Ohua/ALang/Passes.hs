@@ -23,8 +23,8 @@ module Ohua.ALang.Passes where
 
 import Protolude
 
-import Control.Monad.RWS.Lazy
-import Control.Monad.Writer
+import Control.Monad.RWS.Lazy (evalRWST)
+import Control.Monad.Writer (runWriter, listen, tell)
 import Data.Functor.Foldable
 import qualified Data.HashMap.Strict as HM
 import qualified Data.HashSet as HS

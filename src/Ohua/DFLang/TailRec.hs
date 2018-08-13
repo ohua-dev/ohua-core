@@ -3,7 +3,7 @@ module Ohua.DFLang.TailRec where
 import Protolude
 
 import Control.Exception
-import Control.Monad.Writer
+import Control.Monad.Writer (MonadWriter, tell)
 import qualified Data.HashMap.Strict as HM
 import qualified Data.HashSet as HS
 import Data.Sequence (Seq, (<|), (|>))

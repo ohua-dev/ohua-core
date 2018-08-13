@@ -39,18 +39,20 @@ module Ohua.Util
     , callStack
     , callStackToStr
     , throwErrorS
+    , (<&>)
     ) where
 
 import Protolude
 
 import Control.Exception
-import Control.Monad.Writer
+import Control.Monad.Writer (MonadWriter, tell)
 import Data.String
 import qualified Data.Text as T
 import Lens.Micro hiding ((<&>))
 
-SEMIGROUP_COMPAT_IMPORT
-
+#if !NEW_CALLSTACK_API
+import GHC.Stack
+#endif
 
 -- | Similar to prisms from lens, but implemented with traversals.
 type Prism s t a b = Traversal s t a b
@@ -130,19 +132,12 @@ intentionally_not_implemented =
 -- 'Control.Monad.Writer.MonadWriter'.
 newtype Mutator a = Mutator { mutAsFn :: a -> a }
 
-#if BASE_HAS_SEMIGROUP
-instance SG.Semigroup (Mutator a) where
+instance Semigroup (Mutator a) where
   Mutator m1 <> Mutator m2 = Mutator $ m1 . m2
-#endif
 
 instance Monoid (Mutator a) where
   mempty = Mutator identity
-
-#if BASE_HAS_SEMIGROUP
-  mappend = (SG.<>)
-#else
-  Mutator m1 `mappend` Mutator m2 = Mutator $ m1 . m2
-#endif
+  mappend = (<>)
 
 
 -- | Append a function to a chain in a writer.
@@ -170,7 +165,7 @@ callStackToStr = showCallStack
 
 
 -- | Throw a canonical compiler error with a callstack appended.
-throwErrorS :: (HasCallStack, MonadError s m, IsString s, Monoid s) => s -> m a
+throwErrorS :: (HasCallStack, MonadError s m, IsString s, Semigroup s) => s -> m a
 throwErrorS msg = throwError $ msg <> "\n" <> fromString cs
   where
     cs = callStackToStr callStack
@@ -179,3 +174,8 @@ panicS :: HasCallStack => Text -> a
 panicS msg = panic $ msg <> "\n" <> cs
   where
     cs = toS $ callStackToStr callStack
+
+#if !PROTOLUDE_HAS_FLIP_FMAP
+(<&>) :: Functor f => f a -> (a -> b) -> f b
+(<&>) = flip map
+#endif

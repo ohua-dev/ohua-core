@@ -62,12 +62,6 @@
 #define NEW_CALLSTACK_API MIN_VERSION_base(4,9,0)
 
 /**
- * The <&> operaator, which I use a lot was added to microlens in
- * version 4.5.0.0.
- */
-#define MICROLENS_HAS_FLIP_FMAP MIN_VERSION_microlens(0,4,5)
-
-/**
  * Bundling pattern synonyms with datatypes only became available in GHC 8. In
  * earlier versions the patterns had to be exported separately.
  */
@@ -78,3 +72,24 @@
  * the boxes library defines as well and thus we get a clash in `ALang.Show`.
  */
 #define PRELUDE_EXPORTS_MAPPEND_OPERATOR MIN_VERSION_base(4,11,0)
+
+/**
+ * Protolude includes (<&>) since base version 4.11, so before then I redefine
+ * it in Ohua.Util.
+ */
+#define PROTOLUDE_HAS_FLIP_FMAP MIN_VERSION_base(4,11,0)
+
+/**
+ * Protolude pre 0.2 does not include Hashable
+ */
+#define PROTOLUDE_EXPORTS_HASHABLE MIN_VERSION_protolude(0,2,0)
+
+#if PROTOLUDE_EXPORTS_HASHABLE
+#define IMPORT_HASHABLE
+#else
+#define IMPORT_HASHABLE import Data.Hashable
+#endif
+
+#define PROTOLUDE_EXPORTS_hPutStr MIN_VERSION_protolude(0,2,0)
+
+#define PROTOLUDE_EXPORTS_unzip MIN_VERSION_protolude(0,2,0)

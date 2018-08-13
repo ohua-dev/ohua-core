@@ -59,6 +59,7 @@ default-extensions:
 - ConstraintKinds
 - StandaloneDeriving
 - NoImplicitPrelude
+- RankNTypes
 when:
   - condition: impl(ghc >= 8.4.0)
     ghc-options:

@@ -15,7 +15,7 @@ module Ohua.DFLang.Passes where
 import Protolude
 
 import Control.Arrow
-import Control.Monad.Writer
+import Control.Monad.Writer (MonadWriter, tell, runWriterT)
 import qualified Data.HashMap.Strict as HM
 import qualified Data.HashSet as HS
 import Data.Sequence (Seq)
@@ -194,7 +194,7 @@ lowerLambdaExpr a _ =
     show a
 
 tieContext0 ::
-       (Monad m, Functor f, Monoid (f LetExpr), Foldable f)
+       (Monad m, Functor f, Semigroup (f LetExpr), Foldable f)
     => m (Maybe (f LetExpr, Binding))
     -> f LetExpr
     -> m (f LetExpr)
