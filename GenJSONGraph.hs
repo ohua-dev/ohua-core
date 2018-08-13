@@ -1,3 +1,5 @@
+import Protolude
+
 import           Data.Aeson
 import qualified Data.ByteString.Lazy as L
 import           Ohua.DFGraph

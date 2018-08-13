@@ -2,12 +2,15 @@
 
 module Ohua.ALang.Passes.TailRec where
 
-import qualified Data.HashSet as HS
-import Ohua.ALang.Lang
-import Ohua.Types
+import Protolude
 
 import Control.Monad.Writer
 import Data.Functor.Foldable
+import qualified Data.HashSet as HS
+
+import Ohua.ALang.Lang
+import Ohua.Types
+
 
 
 -- This must run before algos are being inlined!
@@ -34,7 +37,7 @@ markRecursiveBindings = fst . runWriter . cata go
             if isUsed
                 then case assign of
                          Direct bnd -> Let (Recursive bnd) e' <$> b
-                         _ -> error "Cannot use destrutured binding recursively"
+                         _ -> panic "Cannot use destrutured binding recursively"
                 else Let assign e' <$> b
     go (VarF val@(Local bnd)) = tell (HS.singleton bnd) >> pure (Var val)
     go e@(LambdaF assign _) = shadowAssign assign $ embed <$> sequence e
@@ -42,7 +45,7 @@ markRecursiveBindings = fst . runWriter . cata go
     shadowAssign (Direct b) = censor (HS.delete b)
     shadowAssign (Destructure bnds) = censor (`HS.difference` HS.fromList bnds)
     shadowAssign (Recursive _) =
-        error "TODO implement `shadowAssign` for `Recursive`"
+        panic "TODO implement `shadowAssign` for `Recursive`"
 
 findRecCall ::
        Expression -> HS.HashSet Binding -> (HS.HashSet Binding, Expression)
@@ -53,8 +56,8 @@ findRecCall (Let (Direct a) expr inExpr) algosInScope
     -- TODO: Why?
     (found, e) = findRecCall expr $ HS.insert a algosInScope
     (iFound, iExpr) = findRecCall inExpr algosInScope
-      
-      
+
+
 findRecCall (Let a expr inExpr) algosInScope =
     let (iFound, iExpr) = findRecCall inExpr algosInScope
      in (iFound, Let a expr iExpr)

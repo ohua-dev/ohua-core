@@ -23,3 +23,42 @@ Furthermore the compiler defines a set of hooks for adding custom manipulations 
 The default formatting for code is done using the `hindent` library, the
 configuration file `.hindent.yaml` can be found at the project root.
 
+## Notes on Protolude
+
+I use a `Prelude` replacement called `Protolude` in this project. This has a few
+minor consequences for how code is written. Most importantly I activate the
+`NoImplicitPrelude` extension by default, thus in every new module written you
+should first do an `import Prelude`.
+
+The following are some notes on using protolude, assembled for your convenience:
+
+- Protolude does not have `error`
+
+  For errors that should crash the program use `panic` instead, or even better
+  `panicS` from the `Ohua.Util` module, because that also adds a stack trace.
+
+- Trace functions (`trace`, `traceShowId` etc) are in scope by default, but
+  raise a warning.
+
+  Aka you can use them, but you have to remove them if you want the code to pass
+  the CI.
+
+- Protolude uses `Text` rather than `String` by default.
+
+  Aka use `<>` (also in scope by default) rather than `++` to concatenate
+  strings. The `toS` function converts between strings, you can use it to get a
+  `ByteString` or a `String`.
+
+- IO is polymorphic
+
+  `putStrLn "some string"` will raise an ambiguity error, you'll have to
+  annotate the string like so `putStrLn ("some string" :: Text)`
+
+- `mtl` stuff is in scope by default.
+
+  The `Reader`, `ExceptT` and `State` monad (+ transformers, + classes) are in
+  scope by default. No need to import `Control.Monad.Reader` etc
+
+
+For more information on protolude check out [the GitHUb
+repository](https://github.com/sdiehl/protolude).

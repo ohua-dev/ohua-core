@@ -21,21 +21,18 @@
 
 module Ohua.ALang.Passes where
 
-import Control.Applicative
+import Protolude
+
 import Control.Monad.RWS.Lazy
-import Control.Monad.Reader
-import Control.Monad.State
 import Control.Monad.Writer
-import Data.Bifunctor
 import Data.Functor.Foldable
 import qualified Data.HashMap.Strict as HM
 import qualified Data.HashSet as HS
-import Data.Maybe (fromMaybe)
+
 import Ohua.ALang.Lang
 import qualified Ohua.ALang.Refs as Refs
 import Ohua.Monad
 import Ohua.Types
-import Ohua.Util.Str as Str
 
 
 -- | Inline all references to lambdas.
@@ -86,7 +83,7 @@ reduceLetCWith f =
         e -> f e
 
 reduceLetC :: Expression -> Expression
-reduceLetC = reduceLetCWith id
+reduceLetC = reduceLetCWith identity
 
 reduceAppArgument :: Expression -> Expression
 reduceAppArgument =
@@ -115,7 +112,7 @@ letLift =
                 case e of
                     LetF _ _ _ -> reduceLetA
                     ApplyF _ _ -> reduceApplication
-                    _ -> id
+                    _ -> identity
          in f $ embed e
 
 -- | Inline all direct reassignments.
@@ -131,7 +128,7 @@ inlineReassignments = flip runReader HM.empty . cata go
                     Destructure _ ->
                         Let assign (Apply (Var (Sf Refs.id Nothing)) v) <$> body
                     Recursive _ ->
-                        error
+                        panic
                             "TODO implement inlining reassignments for recursive bindings"
             v -> Let assign v <$> body
     go (VarF val@(Local bnd)) = asks (fromMaybe (Var val) . HM.lookup bnd)
@@ -227,7 +224,7 @@ removeCurrying e = fst <$> evalRWST (para inlinePartials e) mempty ()
         Apply <$>
             (maybe
                  (failWith $
-                  "No suitable value found for binding " <> Str.showS bnd)
+                  "No suitable value found for binding " <> show bnd)
                  pure
                  val) <*>
             arg
@@ -247,7 +244,7 @@ noDuplicateIds = flip evalStateT mempty . cata go
   where
     go (VarF (Sf _ (Just funid))) = do
         isMember <- gets (HS.member funid)
-        when isMember $ failWith $ "Duplicate id " <> Str.showS funid
+        when isMember $ failWith $ "Duplicate id " <> show funid
         modify (HS.insert funid)
     go e = sequence_ e
 
@@ -258,7 +255,7 @@ applyToSf :: MonadOhua envExpr m => Expression -> m ()
 applyToSf =
     para $ \case
         ApplyF (Var (Local bnd), _) _ ->
-            failWith $ "Illegal Apply to local var " <> Str.showS bnd
+            failWith $ "Illegal Apply to local var " <> show bnd
         e -> sequence_ $ fmap snd e
 
 -- FIXME this function is never called. was it supposed to be part of
@@ -278,7 +275,7 @@ noUndefinedBindings = flip runReaderT mempty . cata go
     go (LetF assign val body) = val >> registerAssign assign body
     go (VarF (Local bnd)) = do
         isDefined <- asks (HS.member bnd)
-        unless isDefined $ failWith $ "Not in scope " <> Str.showS bnd
+        unless isDefined $ failWith $ "Not in scope " <> show bnd
     go (LambdaF assign body) = registerAssign assign body
     go e = sequence_ e
     registerAssign = local . HS.union . HS.fromList . extractBindings

@@ -10,29 +10,16 @@
 --
 -- Passes required to transform an expression in ALang into an expression in DFLang.
 --
-{-# LANGUAGE ExplicitForAll #-}
-{-# LANGUAGE NamedFieldPuns #-}
-{-# LANGUAGE OverloadedLists #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-
 module Ohua.DFLang.Passes where
 
-import Control.Arrow
-import Control.Monad.Except
-import Control.Monad.Reader
-import Control.Monad.State
-import Control.Monad.Writer
+import Protolude
 
---import           Control.Monad.Trans.Reader
-import Data.Either
-import Data.Foldable
+import Control.Arrow
+import Control.Monad.Writer
 import qualified Data.HashMap.Strict as HM
 import qualified Data.HashSet as HS
-import Data.Proxy
 import Data.Sequence (Seq)
-import Lens.Micro
+
 import Ohua.ALang.Lang
 import Ohua.DFLang.HOF as HOF
 import Ohua.DFLang.HOF.If
@@ -47,7 +34,6 @@ import Ohua.DFLang.Util
 import Ohua.Monad
 import Ohua.Types
 import Ohua.Util
-import qualified Ohua.Util.Str as Str
 
 type Pass m
      = QualifiedBinding -> FnId -> Assignment -> [Expression] -> m (Seq LetExpr)
@@ -60,13 +46,10 @@ newtype LetRec = LetRec
 
 type LetRecT m a = ReaderT LetRec m a
 
-traceState :: (MonadOhua env m) => LetRecT m a -> LetRecT m a
-traceState cont =
-    (flip trace cont . ("State: " ++) . show . HM.keys . unLetRec) =<< ask
 
 logState :: MonadLogger m => LetRecT m ()
 logState =
-    ask >>= logDebugN . ("Current state: " <>) . showT . HM.keys . unLetRec
+    ask >>= logDebugN . ("Current state: " <>) . show . HM.keys . unLetRec
 
 -- | Check that a sequence of let expressions does not redefine bindings.
 checkSSA :: (Foldable f, MonadOhua envExpr m) => f LetExpr -> m ()
@@ -79,7 +62,7 @@ checkSSA = flip evalStateT mempty . mapM_ go
                 | HS.member a defined = Just a
             f _ = Nothing
         case msum $ map f produced of
-            Just b -> failWith $ "Rebinding of " <> Str.showS b
+            Just b -> failWith $ "Rebinding of " <> show b
             Nothing -> return ()
         modify (addAll produced)
     addAll = flip $ foldr' HS.insert
@@ -104,14 +87,14 @@ lowerToDF ::
     => Expression
     -> LetRecT m Binding
 lowerToDF (Var (Local bnd)) = pure bnd
-lowerToDF (Var v) = failWith $ "Non local return binding: " <> Str.showS v
+lowerToDF (Var v) = failWith $ "Non local return binding: " <> show v
 lowerToDF (Let assign expr rest) = do
     logDebugN "Lowering Let -->"
     logState
     handleDefinitionalExpr assign expr continuation
   where
     continuation = lowerToDF rest
-lowerToDF g = failWith $ "Expected `let` or binding: " <> Str.showS g
+lowerToDF g = failWith $ "Expected `let` or binding: " <> show g
 
 handleDefinitionalExpr ::
        (MonadOhua env m, MonadWriter (Seq LetExpr) m)
@@ -134,14 +117,14 @@ handleDefinitionalExpr assign (Lambda arg expr) cont
             x ->
                 failWith $
                 "Invariant broken. Assignment should be a 'letrec' but was: " <>
-                Str.showS x
+                show x
     singleArg <-
         case arg of
             Direct b' -> pure b'
             x ->
                 failWith $
                 "Invariant broken. Assignment should be a 'Direct' but was: " <>
-                Str.showS x
+                show x
     -- execute the rest of the traversal (the continuation) in the new
     -- LetRecT environment
     local (LetRec . HM.insert b (assign, expr, singleArg) . unLetRec) cont
@@ -155,7 +138,7 @@ handleDefinitionalExpr assign l@(Apply _ _) cont = do
 handleDefinitionalExpr _ e _ =
     failWith $
     "Definitional expressions in a let can only be 'apply' or 'lambda' but got: " <>
-    Str.showS e
+    show e
 
 -- | Lower any not specially treated function type.
 lowerDefault :: MonadOhua env m => Pass m
@@ -196,10 +179,10 @@ handleApplyExpr l@(Apply _ _) = ask >>= go l [] . unLetRec
                             "Calling environment functions is not supported in this adapter"
                     Just fn -> (fn, , ve : args) <$> generateId
     go (Apply fn arg) args recAlgos = go fn (arg : args) recAlgos
-    go x _ _ = failWith $ "Expected Apply or Var but got: " <> Str.showS x
+    go x _ _ = failWith $ "Expected Apply or Var but got: " <> show x
 handleApplyExpr (Var (Sf fn fnId)) = (fn, , []) <$> maybe generateId return fnId
                                                                                  -- what is this?
-handleApplyExpr g = failWith $ "Expected apply but got: " <> Str.showS g
+handleApplyExpr g = failWith $ "Expected apply but got: " <> show g
 
 -- | Analyze a lambda expression. Since we perform lambda inlining,
 -- this can only be a letrec.
@@ -208,7 +191,7 @@ lowerLambdaExpr (Recursive _) expr = lowerALang expr
 lowerLambdaExpr a _ =
     failWith $
     "Expression was not inlined but assignment is not a 'letrec': " <>
-    Str.showS a
+    show a
 
 tieContext0 ::
        (Monad m, Functor f, Monoid (f LetExpr), Foldable f)
@@ -239,8 +222,8 @@ tieContext0 initExpr lets
 expectVar :: MonadError Error m => Expression -> m DFVar
 expectVar (Var (Local bnd)) = pure $ DFVar bnd
 expectVar (Var (Env i)) = pure $ DFEnvVar i
-expectVar (Var v) = failWith $ "Var must be local or env, was " <> Str.showS v
-expectVar a = failWith $ "Argument must be var, was " <> Str.showS a
+expectVar (Var v) = failWith $ "Var must be local or env, was " <> show v
+expectVar a = failWith $ "Argument must be var, was " <> show a
 
 lowerHOF ::
        forall f m envExpr.
@@ -280,7 +263,7 @@ lowerHOF _ assign args = do
     handleArg a =
         failWith $
         "unexpected type of argument, expected var or lambda, got " <>
-        Str.showS a
+        show a
 
 hofs :: [WHOF]
 hofs =
@@ -292,6 +275,6 @@ hofs =
     ]
 
 hofNames :: HM.HashMap QualifiedBinding WHOF
-hofNames = HM.fromList $ map (extractName &&& id) hofs
+hofNames = HM.fromList $ map (extractName &&& identity) hofs
   where
     extractName (WHOF (_ :: Proxy p)) = unTagFnName $ (name :: TaggedFnName p)

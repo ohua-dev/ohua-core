@@ -9,17 +9,17 @@
 -- This source code is licensed under the terms described in the associated LICENSE.TXT file
 module Ohua.DFLang.HOF.Smap where
 
+import Protolude
 
-import Control.Monad.Except
-import Control.Monad.State
 import qualified Data.Sequence as S
+
+import qualified Ohua.ALang.Refs as ARefs
 import Ohua.DFLang.HOF
 import Ohua.DFLang.Lang
 import qualified Ohua.DFLang.Refs as Refs
 import Ohua.Monad
 import Ohua.Types
-import Ohua.Util.Str (showS, (<>))
-import qualified Ohua.ALang.Refs as ARefs
+import Ohua.Util
 
 
 data SmapFn = SmapFn
@@ -31,9 +31,9 @@ data SmapFn = SmapFn
 instance HigherOrderFunction SmapFn where
     name = tagFnName ARefs.smap
     parseCallAndInitState [LamArg lam, Variable v] =
-        return $ SmapFn v lam (error "size uninitialized")
+        return $ SmapFn v lam (panicS "size uninitialized")
     parseCallAndInitState a =
-        throwError $ "Unexpected number/type of arguments to smap" <> showS a
+        throwError $ "Unexpected number/type of arguments to smap" <> show a
     createContextEntry = do
         f <- get
         sizeId <- generateId
@@ -59,7 +59,7 @@ instance HigherOrderFunction SmapFn where
                   Nothing
             ]
     createContextExit (Destructure d) =
-        throwError $ "Smap result cannot be destructured: " <> showS d
+        throwError $ "Smap result cannot be destructured: " <> show d
     createContextExit assignment = do
         collectId <- generateId
         f <- get
@@ -108,4 +108,6 @@ instance HigherOrderFunction SmapFn where
                        Nothing
         pure $ Just ([ctxOp], ctxSource)
       where
-        elemSource = head $ extractBindings $ beginAssignment lam
+        elemSource =
+            fromMaybe (panicS "Begin assignment should have one argument") $ head $
+            extractBindings $ beginAssignment lam

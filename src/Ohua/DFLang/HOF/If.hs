@@ -14,15 +14,14 @@ module Ohua.DFLang.HOF.If
     ( IfFn
     ) where
 
-import Control.Monad.State
-import Data.Monoid
+import Protolude
+
 import qualified Ohua.ALang.Refs as ARefs
 import Ohua.DFLang.HOF
 import Ohua.DFLang.Lang
 import qualified Ohua.DFLang.Refs as Refs
 import Ohua.Monad
 import Ohua.Types
-import qualified Ohua.Util.Str as Str
 
 data IfFn = IfFn
     { conditionVariable :: !DFVar
@@ -49,13 +48,13 @@ scopeVars scopeSource freeVars = do
         , zip freeVars newVars)
 
 checkAssignment ::
-       (Show a, MonadError Error m) => Str.Str -> AbstractAssignment a -> m a
+       (Show a, MonadError Error m) => Text -> AbstractAssignment a -> m a
 checkAssignment _ (Direct b) = pure b
 checkAssignment branch other =
     throwError $
     "if HOF transform expects one direct assignment for `" <> branch <>
     "` branch, got " <>
-    Str.showS other
+    show other
 
 instance HigherOrderFunction IfFn where
     name = tagFnName ARefs.ifThenElse
@@ -63,7 +62,7 @@ instance HigherOrderFunction IfFn where
         pure $ IfFn v thenBr elseBr ret
     parseCallAndInitState args =
         failWith $
-        "Unexpected number or type of argument for if " <> Str.showS args
+        "Unexpected number or type of argument for if " <> show args
     createContextEntry = do
         f <- get
         ifId <- generateId

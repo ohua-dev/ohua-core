@@ -2,16 +2,15 @@ module Ohua.DFLang.Verify
     ( verify
     ) where
 
-import Control.Monad.Error.Class hiding (Error)
-import Data.Foldable
+import Protolude
+
 import qualified Data.HashMap.Strict as HM
-import Data.Monoid
 import Lens.Micro.Platform
+
 import Ohua.DFLang.Lang
 import qualified Ohua.DFLang.Refs as Refs
 import Ohua.Types
 import Ohua.Util
-import Ohua.Util.Str (showS)
 
 verify ::
        forall m. MonadError Error m
@@ -29,11 +28,11 @@ checkBuiltinArities e =
             Just arity
                 | arity /= length callArguments ->
                     throwErrorS $
-                    "Wrong arity for builtin operator " <> showS functionRef <>
+                    "Wrong arity for builtin operator " <> show functionRef <>
                     " expected " <>
-                    showS arity <>
+                    show arity <>
                     " got " <>
-                    showS (length callArguments) <>
+                    show (length callArguments) <>
                     "."
             _ -> pure ()
   where

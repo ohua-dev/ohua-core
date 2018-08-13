@@ -16,19 +16,21 @@
 -- This source code is licensed under the terms described in the associated LICENSE.TXT file
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE CPP #-}
-module Ohua.Serialize.JSON (encode, eitherDecode) where
 
 #include "compat.h"
+
+module Ohua.Serialize.JSON (encode, eitherDecode) where
+
+import Protolude
 
 import Data.Aeson
 import Data.Aeson.Types
 import Data.List
-import Data.Maybe
+import Control.Monad (fail)
+
 import Ohua.DFGraph
 import Ohua.Types hiding (Options)
-import qualified Ohua.Util.Str as Str
-import Control.Monad
-
+import Ohua.Util
 
 
 baseOptions :: Options
@@ -42,25 +44,25 @@ sourceOptions = baseOptions
     { constructorTagModifier = \case
         "LocalSource" -> "local"
         "EnvSource" -> "env"
-        _ -> error "This is only intended for use with something of type `Source`"
+        _ -> panicS "This is only intended for use with something of type `Source`"
     , sumEncoding = TaggedObject "type" "val"
     }
 
 operatorOptions :: Options
 operatorOptions = baseOptions
     { fieldLabelModifier =
-        fieldLabelModifier baseOptions . fromMaybe (error "no prefix") . stripPrefix "operator"
+        fieldLabelModifier baseOptions . fromMaybe (panicS "no prefix") . stripPrefix "operator"
     }
 
 qualBindOptions :: Options
 qualBindOptions = baseOptions
     { fieldLabelModifier =
-        fieldLabelModifier baseOptions . fromMaybe (error "no prefix") . stripPrefix "qb"
+        fieldLabelModifier baseOptions . fromMaybe (panicS "no prefix") . stripPrefix "qb"
     }
 
 
 makeInJSON :: Make t => SourceType t -> Parser t
-makeInJSON = either (fail . Str.toString) pure . make
+makeInJSON = either (fail . toS) pure . make
 
 unwrapToEncoding :: (Unwrap t, ToJSON (SourceType t)) => t -> Encoding
 unwrapToEncoding = toEncoding . unwrap
@@ -72,10 +74,6 @@ makeParseJSON :: (Make t, FromJSON (SourceType t)) => Value -> Parser t
 makeParseJSON = makeInJSON <=< parseJSON
 
 
-instance ToJSON Str.Str where
-    toJSON = toJSON . Str.toString
-    toEncoding = toEncoding . Str.toString
-instance FromJSON Str.Str where parseJSON = fmap Str.fromString . parseJSON
 instance ToJSON Operator where
     toEncoding = genericToEncoding operatorOptions
     toJSON = genericToJSON operatorOptions

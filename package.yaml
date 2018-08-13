@@ -1,5 +1,5 @@
 name: ohua-core
-version: '0.7.2'
+version: '0.2.0'
 synopsis: Fundamental, platform independent functionality of the ohua compiler.
 description: |
   Components for compiling a portable dataflow graph from an expression based language.
@@ -30,6 +30,7 @@ dependencies:
 - bytestring
 - deepseq
 - data-default-class
+- protolude
 default-extensions:
 - OverloadedStrings
 - OverloadedLists
@@ -55,8 +56,9 @@ default-extensions:
 - RecordWildCards
 - ConstraintKinds
 - StandaloneDeriving
+- NoImplicitPrelude
 when:
-  - condition: impl(ghc >= 8.2.0)   
+  - condition: impl(ghc >= 8.2.0)
     ghc-options:
       - -Wall
       - -Wcompat
@@ -98,7 +100,6 @@ library:
   - Ohua.Constants.HostExpr
   - Ohua.Serialize.JSON
   - Ohua.Util
-  - Ohua.Util.Str
   - Ohua.Unit
   - Ohua.Test.DFGraph
   dependencies:
@@ -115,6 +116,8 @@ library:
   - comonad
   - uniplate
   - fgl
+  - monad-logger
+  - fast-logger
   include-dirs:
     cbits
   when:

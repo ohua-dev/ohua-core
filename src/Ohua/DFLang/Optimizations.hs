@@ -10,6 +10,7 @@
 -- This source code is licensed under the terms described in the associated LICENSE.TXT file
 module Ohua.DFLang.Optimizations where
 
+import Protolude
 
 import           Ohua.DFLang.Lang
 import           Ohua.Monad

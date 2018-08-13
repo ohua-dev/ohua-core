@@ -11,6 +11,7 @@
 {-# LANGUAGE CPP                  #-}
 {-# LANGUAGE Rank2Types           #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# OPTIONS_GHC -fno-warn-deprecations #-}
 
 #include "compat.h"
 
@@ -22,6 +23,7 @@ module Ohua.Util
     , Prism'
     , prism
     , prism'
+    , panicS
     , assertM
     , assertE
     , mapLeft
@@ -37,19 +39,15 @@ module Ohua.Util
     , callStack
     , callStackToStr
     , throwErrorS
-    , (<&>)
     ) where
 
-import           Control.DeepSeq
-import           Control.Exception
-import           Control.Monad.Except
-import           Control.Monad.Writer
-import qualified Data.Text            as T
-import           Lens.Micro
-import           System.IO
-import           System.IO.Unsafe
-import           Data.String
-import           GHC.Stack
+import Protolude
+
+import Control.Exception
+import Control.Monad.Writer
+import Data.String
+import qualified Data.Text as T
+import Lens.Micro hiding ((<&>))
 
 SEMIGROUP_COMPAT_IMPORT
 
@@ -64,15 +62,15 @@ type Prism' a b = Prism a a b b
 
 -- | Create a 'Prism' from a getter and a setter.
 prism :: (b -> t) -> (s -> Either t a) -> Prism s t a b
-prism make get f thing =
-    case get thing of
+prism make getter f thing =
+    case getter thing of
         Left thing' -> pure thing'
         Right b     -> make <$> f b
 
 
 -- | Create a 'Prism'' from a getter and a setter.
 prism' :: (b -> a) -> (a -> Maybe b) -> Prism' a b
-prism' make get = prism make (\s -> maybe (Left s) Right $ get s)
+prism' make getter = prism make (\s -> maybe (Left s) Right $ getter s)
 
 
 -- | Throw an 'error' if the condition is not met. The difference to
@@ -105,16 +103,6 @@ class ShowT a where
 instance {-# OVERLAPPABLE #-} Show a => ShowT a where
     showT = T.pack . show
 
--- | Same as @trace@ from @Debug.Trace@.
-trace :: String -> a -> a
-trace msg a = unsafePerformIO (hPutStrLn stderr msg >> pure a)
-{-# NOINLINE trace #-}
-
-
--- | Same as @traceShowId@ from @Debug.Trace@.
-traceShowId :: Show a => a -> a
-traceShowId a = trace (show a) a
-
 
 -- | Force the evaluation of the value and then print a message to stdout.
 forceAndReport :: (MonadIO m, NFData a) => String -> a -> m ()
@@ -132,7 +120,7 @@ forceTraceReport msg val = val `deepseq` trace msg (pure ())
 -- type does not actually support numeric operations.
 intentionally_not_implemented :: a
 intentionally_not_implemented =
-    error "This is intentionally not implemented, don't use it!"
+    panic "This is intentionally not implemented, don't use it!"
 
 
 
@@ -148,7 +136,7 @@ instance SG.Semigroup (Mutator a) where
 #endif
 
 instance Monoid (Mutator a) where
-  mempty = Mutator id
+  mempty = Mutator identity
 
 #if BASE_HAS_SEMIGROUP
   mappend = (SG.<>)
@@ -187,8 +175,7 @@ throwErrorS msg = throwError $ msg <> "\n" <> fromString cs
   where
     cs = callStackToStr callStack
 
-#if !MICROLENS_HAS_FLIP_FMAP
--- | If microlens does not export this operator this does. Same as, and implemented as, @'flip' 'fmap'@.
-(<&>) :: Functor f => f a -> (a -> b) -> f b
-(<&>) = flip fmap
-#endif
+panicS :: HasCallStack => Text -> a
+panicS msg = panic $ msg <> "\n" <> cs
+  where
+    cs = toS $ callStackToStr callStack

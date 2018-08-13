@@ -31,7 +31,7 @@ module Ohua.Types
     , _Recursive
     , HostExpr
     , Options
-    , State
+    , OhuaState
     , Environment
     , Error
     , nameGenerator
@@ -64,27 +64,24 @@ module Ohua.Types
     , UnsafeMake(unsafeMake)
     ) where
 
+import Protolude
+
 import Control.Comonad
-import Control.DeepSeq
-import Control.Monad.Error.Class hiding (Error)
+-- import Control.Monad.Error.Class hiding (Error)
 import Data.Bifoldable
-import Data.Bifunctor
 import Data.Bitraversable
 import Data.Default.Class
 import Data.Foldable as F
 import Data.Functor.Foldable as RS hiding (fold)
 import Data.Generics.Uniplate.Direct
 import qualified Data.HashSet as HS
-import Data.Hashable
 import Data.String
+import qualified Data.Text as T
 import qualified Data.Vector as V
 import GHC.Exts
-import GHC.Generics
-import Lens.Micro
+import Lens.Micro hiding ((<&>))
 import Ohua.LensClasses
 import Ohua.Util
-import qualified Ohua.Util.Str as Str
-import Ohua.Util.Str ((<>))
 
 
 #include "compat.h"
@@ -108,7 +105,7 @@ class Make t where
 
 -- | Same as 'make' but instead throws an exception
 makeThrow :: Make t => SourceType t -> t
-makeThrow = either (error . Str.toString) id . make
+makeThrow = either panic identity . make
 
 -- | Convert a value @t@ back to its source type @t@.
 class Unwrap t where
@@ -121,12 +118,9 @@ class UnsafeMake t where
 -- | The numeric id of a function call site
 newtype FnId =
     FnId Int
-    deriving (Eq, Ord, Generic, Enum, Num, NFData, Hashable)
+    deriving (Eq, Ord, Generic, Enum, Num, NFData, Hashable, Show)
 
 type instance SourceType FnId = Int
-
-instance Show FnId where
-    show = show . unwrap
 
 instance UnsafeMake FnId where
     unsafeMake = FnId
@@ -135,7 +129,7 @@ instance Make FnId where
     make i
         | i < 0 =
             throwError $
-            "Function id must be larger than 0, was " <> Str.showS i
+            "Function id must be larger than 0, was " <> show i
         | otherwise = pure $ unsafeMake i
 
 instance Unwrap FnId where
@@ -143,16 +137,14 @@ instance Unwrap FnId where
 
 -- | A binding name
 newtype Binding =
-    Binding Str.Str
-    deriving (Eq, Hashable, Generic, Ord, Monoid, NFData)
+    Binding Text
+    deriving (Eq, Hashable, Generic, Ord, Monoid, NFData, Show)
 
 #if BASE_HAS_SEMIGROUP
 deriving instance SG.Semigroup Binding
 #endif
 
-instance Show Binding where show = show . unwrap
-
-type instance SourceType Binding = Str.Str
+type instance SourceType Binding = Text
 
 instance Make Binding where
     make "" = throwError "Binding cannot be empty"
@@ -165,15 +157,12 @@ instance Unwrap Binding where
     unwrap (Binding b) = b
 
 instance IsString Binding where
-    fromString = makeThrow . Str.fromString
+    fromString = makeThrow . toS
 
 -- | Hierarchical reference to a namespace
 newtype NSRef =
     NSRef (V.Vector Binding)
-    deriving (Eq, Generic, NFData, Ord)
-
-instance Show NSRef where
-    show = Str.toString . Str.intercalate "." . map unwrap . unwrap
+    deriving (Eq, Generic, NFData, Ord, Show)
 
 instance IsList NSRef where
   type Item NSRef = Binding
@@ -201,10 +190,7 @@ instance Hashable NSRef where
 data QualifiedBinding = QualifiedBinding
     { qbNamespace :: NSRef
     , qbName      :: Binding
-    } deriving (Eq, Generic, Ord)
-
-instance Show QualifiedBinding where
-    show (QualifiedBinding ns n) = show ns ++ "/" ++ Str.toString (unwrap n)
+    } deriving (Eq, Generic, Ord, Show)
 
 instance Hashable QualifiedBinding where
     hashWithSalt s (QualifiedBinding a b) = hashWithSalt s (a, b)
@@ -215,7 +201,7 @@ instance NFData QualifiedBinding where
 instance IsString QualifiedBinding where
     fromString s = case fromString s of
         Qual q -> q
-        _      -> error "unqualified binding"
+        _      -> panic "unqualified binding"
 
 -- | Utility type for parsing. Denotes a binding which may or may not
 -- be qualified.
@@ -229,31 +215,31 @@ instance Hashable SomeBinding where
     hashWithSalt s (Qual b)   = hashWithSalt s (1 :: Int, b)
 
 instance IsString SomeBinding where
-    fromString = either (error . Str.toString) id . symbolFromString
+    fromString = either panic identity . symbolFromString . toS
 
 -- | Attempt to parse a string into either a simple binding or a
 -- qualified binding.  Assumes a form "name.space/value" for qualified
 -- bindings.
-symbolFromString :: MonadError Error m => String -> m SomeBinding
+symbolFromString :: MonadError Error m => Text -> m SomeBinding
 symbolFromString s
-    | Str.null s = throwError "Symbols cannot be empty"
+    | T.null s = throwError "Symbols cannot be empty"
     | otherwise =
-        case Str.break (== '/') s of
+        case T.break (== '/') s of
             (symNs, slashName)
-                | Str.null symNs -> throwError "Unexpected '/' at start"
-                | Str.null slashName ->
-                    pure $ Unqual $ Binding (Str.fromString symNs)
-                | Just ('/', symName) <- Str.uncons slashName ->
-                    if | '/' `Str.elem` symName ->
+                | T.null symNs -> throwError "Unexpected '/' at start"
+                | T.null slashName ->
+                    Unqual <$> make symNs
+                | Just ('/', symName) <- T.uncons slashName ->
+                    if | (== '/') `T.find` symName /= Nothing ->
                            throwError "Too many '/' delimiters found."
-                       | Str.null symName -> throwError "Name cannot be empty"
+                       | T.null symName -> throwError "Name cannot be empty"
                        | otherwise ->
                            do ns <-
                                   make =<<
                                   mapM
                                       make
-                                      (Str.split (== '.') (fromString symNs))
-                              bnd <- make $ fromString symName
+                                      (T.split (== '.') symNs)
+                              bnd <- make symName
                               pure $ Qual $ QualifiedBinding ns bnd
             _ -> throwError "Leading slash expected after `break`"
 
@@ -271,14 +257,9 @@ data AbstractAssignment binding
     = Direct !binding
     | Recursive !binding
     | Destructure ![binding]
-    deriving (Eq, Functor, Traversable, F.Foldable)
+    deriving (Eq, Functor, Traversable, F.Foldable, Show)
 
 type Assignment = AbstractAssignment Binding
-
-instance Show binding => Show (AbstractAssignment binding) where
-    show (Direct b) = show b
-    show (Destructure b) = show b
-    show (Recursive b) = "(rec) " ++ show b
 
 instance IsString Assignment where
     fromString = Direct . fromString
@@ -287,7 +268,7 @@ instance IsList Assignment where
     type Item Assignment = Binding
     fromList = Destructure
     toList (Destructure l) = l
-    toList _ = error "Direct return is not a list"
+    toList _ = panic "Direct return is not a list"
 
 instance ExtractBindings Assignment
 
@@ -322,10 +303,7 @@ _Recursive =
 -- | Numerical reference to a spliced expression from the host environment.
 newtype HostExpr = HostExpr
     { unwrapHostExpr :: Int
-    } deriving (Eq, Ord, Generic)
-
-instance Show HostExpr where
-    show = show . unwrap
+    } deriving (Eq, Ord, Generic, Show)
 
 -- Only exists to allow literal integers to be interpreted as host expressions
 instance Num HostExpr where
@@ -354,7 +332,7 @@ instance Make HostExpr where
 instance Unwrap HostExpr where
     unwrap (HostExpr i) = i
 
-type Error = Str.Str
+type Error = Text
 
 data Options =
     Options !(Maybe QualifiedBinding)
@@ -369,13 +347,13 @@ instance Default Options where
             False -- for no we always disable this option
 
 -- | State of the ohua compiler monad.
-data State envExpr = State !NameGenerator !FnId !(V.Vector envExpr)
+data OhuaState envExpr = OhuaState !NameGenerator !FnId !(V.Vector envExpr)
 
-type instance SourceType (State envExpr) =
+type instance SourceType (OhuaState envExpr) =
      (NameGenerator, FnId, V.Vector envExpr)
 
-instance Make (State envExpr) where
-    make (ng, fnid, exprs) = pure $ State ng fnid exprs
+instance Make (OhuaState envExpr) where
+    make (ng, fnid, exprs) = pure $ OhuaState ng fnid exprs
 
 -- | The read only compiler environment
 newtype Environment = Environment Options
@@ -383,17 +361,17 @@ newtype Environment = Environment Options
 instance Default Environment where
     def = Environment def
 
-nameGenerator :: Lens' (State envExpr) NameGenerator
-nameGenerator f (State gen counter envExprs) =
-    f gen <&> \ng -> State ng counter envExprs
+nameGenerator :: Lens' (OhuaState envExpr) NameGenerator
+nameGenerator f (OhuaState gen counter envExprs) =
+    f gen <&> \ng -> OhuaState ng counter envExprs
 
-idCounter :: Lens' (State envExpr) FnId
-idCounter f (State gen counter envExprs) =
-    f counter <&> \c -> State gen c envExprs
+idCounter :: Lens' (OhuaState envExpr) FnId
+idCounter f (OhuaState gen counter envExprs) =
+    f counter <&> \c -> OhuaState gen c envExprs
 
 envExpressions ::
-       Lens (State envExpr) (State envExpr') (V.Vector envExpr) (V.Vector envExpr')
-envExpressions f (State gen counter envExprs) = State gen counter <$> f envExprs
+       Lens (OhuaState envExpr) (OhuaState envExpr') (V.Vector envExpr) (V.Vector envExpr')
+envExpressions f (OhuaState gen counter envExprs) = OhuaState gen counter <$> f envExprs
 
 -- | Stateful name generator
 data NameGenerator = NameGenerator !(HS.HashSet Binding) [Binding]
@@ -458,7 +436,7 @@ instance Bitraversable Annotated where
     bitraverse f g (Annotated ann val) = Annotated <$> f ann <*> g val
 
 instance Functor (Annotated ann) where
-    fmap = bimap id
+    fmap = bimap identity
 
 instance F.Foldable (Annotated ann) where
     foldr = bifoldr (flip const)
@@ -554,7 +532,7 @@ instance Bifunctor TyVar where
     bimap f _ (TyCon c) = TyCon (f c)
     bimap _ g (TyVar v) = TyVar (g v)
 
-instance Functor (TyVar a) where fmap = bimap id
+instance Functor (TyVar a) where fmap = bimap identity
 
 -- | Typical instantiation of a @TyVar@
 type SomeTyVar = TyVar SomeBinding SomeBinding

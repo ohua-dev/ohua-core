@@ -1,39 +1,25 @@
-{-# LANGUAGE NamedFieldPuns #-}
 module Ohua.Test.DFGraph where
 
-import Control.Arrow
-import Data.Foldable
+import Protolude
+
 import Data.Function
 import Data.Graph.Inductive.Graph
 import Data.Graph.Inductive.PatriciaTree
 import qualified Data.IntMap.Strict as IntMap
-import Data.Maybe
-import Debug.Trace
+
 import Ohua.DFGraph
 import Ohua.Types
+import Ohua.Util
 
 
 newtype OhuaGrGraph = OhuaGrGraph { unGr :: Gr QualifiedBinding OhuaGrEdgeLabel }
-  deriving Eq
+  deriving (Eq, Show)
 
 
 data OhuaGrEdgeLabel = OhuaGrEdgeLabel
     { sourceIndex :: !Int
     , targetIndex :: !Int
-    } deriving (Eq, Ord)
-
-instance Show OhuaGrEdgeLabel where
-    show OhuaGrEdgeLabel{sourceIndex, targetIndex} =
-        "{ srcIdx = " ++ show sourceIndex ++
-        ", targetIdx = " ++ show targetIndex ++
-        "}"
-
-instance Show OhuaGrGraph where
-    show = prettify . unGr
-
-
-traceGr :: OhuaGrGraph -> OhuaGrGraph
-traceGr g = trace (prettify $ unGr g) g
+    } deriving (Eq, Ord, Show)
 
 
 -- To handle env args i generate one new node which is source for all env args.
@@ -114,5 +100,4 @@ matchGraph gr1 gr2 = go (nodes gr1) [] [] mempty
       where
         ns = first newName <$> labNodes gr
         es = map (\(a, b, c) -> (newName a, newName b, c)) (labEdges gr)
-        newName node = fromMaybe (error $ "Invariant broken: missing mapping for node " ++ show node) $ IntMap.lookup node mapping
-
+        newName node = fromMaybe (panicS $ "Invariant broken: missing mapping for node " <> show node) $ IntMap.lookup node mapping

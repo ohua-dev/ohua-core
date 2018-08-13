@@ -1,7 +1,13 @@
-{-# LANGUAGE NamedFieldPuns #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-
 module Ohua.DFLang.TailRec where
+
+import Protolude
+
+import Control.Exception
+import Control.Monad.Writer
+import qualified Data.HashMap.Strict as HM
+import qualified Data.HashSet as HS
+import Data.Sequence (Seq, (<|), (|>))
+import qualified Data.Sequence as S
 
 import Ohua.ALang.Lang
 import Ohua.ALang.Refs as ALangRefs
@@ -10,19 +16,7 @@ import qualified Ohua.DFLang.Refs as Refs
 import Ohua.DFLang.Util
 import Ohua.Monad
 import Ohua.Types
-
-import Control.Exception
-import Control.Monad.Except
-import Control.Monad.Writer
-
-import Data.Foldable
-import qualified Data.HashMap.Strict as HM
-import qualified Data.HashSet as HS
-import Data.Maybe
-import Data.Sequence (Seq, (<|), (|>))
-import qualified Data.Sequence as S
 import Ohua.Util
-import qualified Ohua.Util.Str as Str
 
 -- the call in ALang is still (recur algoRef args).
 -- it needs to become (recur conditionOutput algoInArgs recurArgs).
@@ -39,14 +33,8 @@ recursionLowering ::
     -> DFExpr
     -> m RecursiveLambdaSpec
 --recursionLowering binding = (transformRecursiveTailCall
-recursionLowering lambdaFormals dfExpr0 = do
-    result <-
-        transformRecursiveTailCall lambdaFormals $
-        trace ("Lambda expression:\n" ++ show dfExpr0) dfExpr0
-    return $
-        trace
-            ("-----\ngenerated tailrec transformation:\n" ++ show result)
-            result
+recursionLowering lambdaFormals dfExpr0 =
+    transformRecursiveTailCall lambdaFormals dfExpr0
 
 transformRecursiveTailCall ::
        (MonadError Error m, MonadGenId m, MonadGenBnd m)
@@ -55,7 +43,7 @@ transformRecursiveTailCall ::
     -> m RecursiveLambdaSpec
 transformRecursiveTailCall lambdaFormals exprs =
     handleRecursiveTailCall lambdaFormals exprs $
-    trace "its me" $ findExpr Refs.recur $ letExprs exprs
+    findExpr Refs.recur $ letExprs exprs
 
 handleRecursiveTailCall ::
        (MonadError Error m, MonadGenBnd m, MonadGenId m)
@@ -64,7 +52,7 @@ handleRecursiveTailCall ::
     -> Maybe LetExpr
     -> m RecursiveLambdaSpec
 handleRecursiveTailCall _ dfExpr0 Nothing =
-    failWith $ "could not find recur in DFExpr:\n" <> Str.showS dfExpr0
+    failWith $ "could not find recur in DFExpr:\n" <> show dfExpr0
 handleRecursiveTailCall lambdaFormals dfExpr0 (Just recurFn) = do
     let dfExprs = letExprs dfExpr0
     -- helpers
@@ -72,32 +60,32 @@ handleRecursiveTailCall lambdaFormals dfExpr0 (Just recurFn) = do
             case x of
                 Direct b -> b
                 _ ->
-                    error $
-                    "invariant broken: '" ++ e ++ "' always gives direct output"
+                    panicS $
+                    "invariant broken: '" <> e <> "' always gives direct output"
     let unMaybe fid =
             fromMaybe
-                (error $
-                 "Invariant broken: should have found something but got Nothing! " ++
-                 fid)
+                (panicS $
+                 "Invariant broken: should have found something but got Nothing! " <>
+                 show fid)
     let unDFVar x =
             case x of
                 DFVar b -> b
                 _ ->
-                    error $
-                    "invariant broken: should be DFVar but was: " ++ show x
+                    panicS $
+                    "invariant broken: should be DFVar but was: " <> show x
     -- get the condition result
     let usages =
             findUsages (unAssignment "recur" (returnAssignment recurFn)) dfExprs
     let switchFn =
-            unMaybe "switch does not use recur output" $
+            unMaybe ("switch does not use recur output" :: Text) $
             find ((== Refs.select) . functionRef) usages
     -- let conditionOutput :: DFVar
     let conditionOutput =
             case switchFn of
                 (LetExpr _ _ _ (c:_) _) -> c
                 _ ->
-                    error
-                        "invariant broken: recur is assumed to be the final call on a 'then' or 'else' branch."
+                    panicS
+                        ("invariant broken: recur is assumed to be the final call on a 'then' or 'else' branch." :: Text)
     -- the switch is not needed anymore because the only output comes
     -- from the termination branch
     let minusSwitchExprs = S.filter (/= switchFn) dfExprs
@@ -110,9 +98,10 @@ handleRecursiveTailCall lambdaFormals dfExpr0 (Just recurFn) = do
                 , DFVar $ unAssignment "recur" $ returnAssignment recurFn
                 ]
     let terminationBranch =
-            head $
-            HS.toList $
-            assert (1 == HS.size terminationBranchOut) terminationBranchOut
+            case head $ HS.toList terminationBranchOut of
+                Nothing ->
+                    panicS "Invariant broken, empty termination branch out"
+                Just outp -> outp
     let switchRetBnd = unAssignment "switch" switchRet
     let rewiredTOutExps =
             flip renameWith minusSwitchExprs $
@@ -148,7 +137,7 @@ handleRecursiveTailCall lambdaFormals dfExpr0 (Just recurFn) = do
                 (Direct algoInVarsArrayRet)
                 Refs.array
                 (map (DFVar .
-                      unMaybe "formal args" .
+                      unMaybe ("formal args" :: Text) .
                       flip HM.lookup lambdaInToRecurInVars)
                      lambdaInVars)
                 Nothing
@@ -172,9 +161,7 @@ handleRecursiveTailCall lambdaFormals dfExpr0 (Just recurFn) = do
                 Nothing
     return $
         RecursiveLambdaSpec lambdaFormals lambdaInToRecurInVars $
-        flip
-            DFExpr
-            (trace ("new return var: " ++ show newLambdaRetVar) newLambdaRetVar) $
+        flip DFExpr newLambdaRetVar $
         algoInVarsArray <|
         (S.filter (/= recurFn) rewiredTOutExps |> recurInVarsArray |>
          updatedRecurExpr)
@@ -196,21 +183,17 @@ lowerRecAlgoCall lowerDefault actuals RecursiveLambdaSpec { lambdaFormalsToAlgoI
     mapM_
         (\(x, y) -> do
              newId <- generateId
-             (tell . traceShowId) =<< mkIdFn newId x y) $
-        zip actuals $
-        map Direct $
-        trace ("input formals: " ++ show algoInInputFormals) algoInInputFormals
+             tell =<< mkIdFn newId x y) $
+        zip actuals $ map Direct algoInInputFormals
         -- recreate the body and 'tell' it to the writer
     tell $ letExprs dfExpr
         -- output side
     newId <- generateId
-    return $
-        trace ("output side: " ++ show (returnVar dfExpr)) $
-        (ALangRefs.id, newId, [Var $ Local $ returnVar dfExpr])
+    return (ALangRefs.id, newId, [Var $ Local $ returnVar dfExpr])
   where
     mkIdFn fnId i o = lowerDefault ALangRefs.id fnId o [i]
     algoInInputFormals =
         map
-            (fromMaybe (error "Invariant broken") .
+            (fromMaybe (panic "Invariant broken") .
              flip HM.lookup lambdaFormalsToAlgoIn)
             formalInputs

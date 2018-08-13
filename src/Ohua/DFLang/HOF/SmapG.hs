@@ -5,21 +5,20 @@
 -- License     : EPL-1.0
 -- Maintainer  : dev@justus.science, sebastian.ertel@gmail.com
 -- Stability   : experimental
--- 
+--
 -- This source code is licensed under the terms described in the associated LICENSE.TXT file
 
 module Ohua.DFLang.HOF.SmapG (SmapGFn, scopeVars) where
 
-import Control.Monad.Except
-import Control.Monad.State
+import Protolude
+
+import qualified Ohua.ALang.Refs as ARefs
 import Ohua.DFLang.HOF
 import Ohua.DFLang.Lang
 import qualified Ohua.DFLang.Refs as Refs
 import Ohua.Monad
 import Ohua.Types
-import Ohua.Util.Str (showS)
-import Data.Monoid
-import qualified Ohua.ALang.Refs as ARefs
+import Ohua.Util
 
 
 data SmapGFn = SmapGFn
@@ -49,9 +48,9 @@ scopeVars scopeSource freeVars = do
 instance HigherOrderFunction SmapGFn where
     name = tagFnName ARefs.smapG
     parseCallAndInitState [LamArg lam, Variable v] =
-        pure $ SmapGFn v lam undefined
+        pure $ SmapGFn v lam $ panicS "Do not evaluate this"
     parseCallAndInitState a =
-        throwError $ "Unexpected number/type of arguments to smap" <> showS a
+        throwError $ "Unexpected number/type of arguments to smap" <> show a
     createContextEntry = do
         SmapGFn {collSource, smapLambda} <- get
         smapId <- generateId
@@ -74,7 +73,7 @@ instance HigherOrderFunction SmapGFn where
                   (Just triggerArcBnd)
             ]
     createContextExit (Destructure d) =
-        throwError $ "Smap result cannot be destructured: " <> showS d
+        throwError $ "Smap result cannot be destructured: " <> show d
     createContextExit assignment = do
         collectId <- generateId
         SmapGFn {triggerArc, smapLambda} <- get

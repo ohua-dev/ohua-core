@@ -9,12 +9,10 @@
 -- This source code is licensed under the terms described in the associated LICENSE.TXT file
 module Ohua.DFGraph where
 
+import Protolude
 
-import           Control.DeepSeq
-import           Data.Foldable
 import qualified Data.HashMap.Strict as HM
-import           Data.Maybe
-import           GHC.Generics
+
 import           Ohua.DFLang.Lang
 import           Ohua.Types
 
@@ -83,14 +81,14 @@ toGraph (DFExpr lets r) = OutGraph ops grArcs (getSource r)
                   case returnAssignment l of
                       Direct v -> [(v, -1)]
                       Destructure vars -> zip vars [0 ..]
-                      g -> error $ "Found unsupported assignment: " ++ show g
+                      g -> panic $ "Found unsupported assignment: " <> show g
             ]
     grArcs = concatMap toArc (toList lets)
     getSource v =
         fromMaybe
-            (error $
-             "Undefined Binding: DFVar " ++
-             show v ++ " defined vars: " ++ show sources) $
+            (panic $
+             "Undefined Binding: DFVar " <>
+             show v <> " defined vars: " <> show sources) $
         HM.lookup v sources
     toArc l =
         [ Arc t $
@@ -98,7 +96,7 @@ toGraph (DFExpr lets r) = OutGraph ops grArcs (getSource r)
             DFVar v -> LocalSource $ getSource v
             DFEnvVar envExpr -> EnvSource envExpr
         | (arg, idx) <-
-              maybe id ((:) . (, -1) . DFVar) (contextArg l)
+              maybe identity ((:) . (, -1) . DFVar) (contextArg l)
                   -- prepend (ctxBinding, -1) if there is a context arc
                $
               zip (callArguments l) [0 ..]
@@ -108,4 +106,3 @@ toGraph (DFExpr lets r) = OutGraph ops grArcs (getSource r)
 
 spliceEnv :: (Int -> a) -> OutGraph -> AbstractOutGraph a
 spliceEnv lookupExpr = fmap f where f i = lookupExpr $ unwrap i
-

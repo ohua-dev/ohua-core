@@ -1,9 +1,9 @@
 module Ohua.DFLang.Util where
 
-import Data.Foldable
+import Protolude
+
 import qualified Data.HashMap.Strict as HM
 import qualified Data.HashSet as HS
-import Data.Maybe
 import Data.Sequence
 
 import Ohua.DFLang.Lang

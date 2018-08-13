@@ -10,6 +10,8 @@
 -- This source code is licensed under the terms described in the associated LICENSE.TXT file
 module Ohua.ALang.Util where
 
+import Protolude
+
 import           Data.Functor.Foldable
 import           Ohua.ALang.Lang
 import           Ohua.Types

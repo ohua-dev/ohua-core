@@ -10,8 +10,10 @@
 
 module Ohua.DFLang.HOF.Seq where
 
-import Control.Monad.State
+import Protolude
+
 import Data.Sequence as S
+
 import qualified Ohua.ALang.Refs as ARefs
 import Ohua.DFLang.HOF
 import Ohua.DFLang.Lang

@@ -20,12 +20,17 @@ module Ohua.Monad
     , initNameGen
     ) where
 
-import           Control.Monad.Except
-import           Lens.Micro
-import           Ohua.Internal.Logging
-import           Ohua.Internal.Monad
-import           Ohua.Types
+import Protolude
 
+import Control.Monad.Logger
+import System.Log.FastLogger (fromLogStr)
+import Lens.Micro
+
+import Ohua.Internal.Monad
+import Ohua.Types
+
+runSilentLoggingT :: LoggingT m a -> m a
+runSilentLoggingT = flip runLoggingT $ \_ _ _ _ -> pure ()
 
 -- | Alias for backwards compatibility with old `MonadOhua` interface
 failWith :: MonadError Error m => Error -> m a
@@ -34,3 +39,8 @@ failWith = throwError
 
 fromEnv :: (MonadReadEnvironment m, Functor m) => Lens' Environment a -> m a
 fromEnv l = (^. l) <$> getEnvironment
+
+runHandleLoggingT :: Handle -> LoggingT m a -> m a
+runHandleLoggingT h = (`runLoggingT` output)
+  where
+    output loc src level msg = hPutStr h $ fromLogStr $ defaultLogStr loc src level msg

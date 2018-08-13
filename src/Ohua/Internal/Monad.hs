@@ -14,10 +14,11 @@
 
 module Ohua.Internal.Monad where
 
+import Protolude
+
 import Control.Monad.Except
 import qualified Control.Monad.RWS.Lazy
 import Control.Monad.RWS.Strict hiding (fail)
-import Control.Monad.Reader
 import qualified Control.Monad.State.Lazy
 import qualified Control.Monad.State.Strict
 import Control.Monad.Writer
@@ -25,13 +26,13 @@ import Data.Default.Class
 import qualified Data.HashSet as HS
 import qualified Data.Vector as V
 import Lens.Micro.Platform
+import qualified Data.Text as T
+import Control.Monad.Logger
 import Ohua.ALang.Lang
-import Ohua.Internal.Logging
 import Ohua.Types as Ty
-import qualified Ohua.Util.Str as Str
 
+import Unsafe (unsafeHead)
 
-import Control.DeepSeq
 
 -- The compiler monad.
 -- Encapsulates the state necessary to generate bindings
@@ -40,7 +41,7 @@ import Control.DeepSeq
 -- be turned off and be replaced by an exception, as such errors should technically not occur
 -- there
 newtype OhuaM env a = OhuaM
-    { runOhuaM :: RWST Environment () (Ty.State env) (ExceptT Error (LoggingT IO)) a
+    { runOhuaM :: RWST Environment () (OhuaState env) (ExceptT Error (LoggingT IO)) a
     } deriving ( Functor
                , Applicative
                , Monad
@@ -78,7 +79,7 @@ generateBindingFromGenerator g = (h, g')
     (h, t) =
         case dropWhile (`HS.member` taken) (g ^. simpleNameList) of
             (x:xs) -> (x, xs)
-            [] -> error "Simple names is empty, this should be impossible"
+            [] -> panic "Simple names is empty, this should be impossible"
     g' = g & simpleNameList .~ t & takenNames %~ HS.insert h
 
 generateBindingFromGeneratorWith ::
@@ -89,9 +90,9 @@ generateBindingFromGeneratorWith prefixBnd g = (h, g')
     taken = g ^. takenNames
     prefix' = prefix <> "_"
     h =
-        head $
+        unsafeHead $
         dropWhile (`HS.member` taken) $
-        map (makeThrow . (prefix' <>) . Str.showS) ([0 ..] :: [Int])
+        map (makeThrow . (prefix' <>) . show) ([0 ..] :: [Int])
     g' = g & takenNames %~ HS.insert h
 
 generateBindingIn :: MonadState s m => Lens' s NameGenerator -> m Binding
@@ -325,7 +326,7 @@ initNameGen :: MonadError Error m => HS.HashSet Binding -> m NameGenerator
 initNameGen taken =
     make
         ( taken
-        , [ makeThrow $ Str.fromString $ char : maybe [] show num
+        , [ makeThrow $ char `T.cons` maybe [] show num
           | num <- Nothing : map Just [(0 :: Integer) ..]
           , char <- ['a' .. 'z']
           ])

@@ -10,11 +10,13 @@
 -- This source code is licensed under the terms described in the associated LICENSE.TXT file
 module Ohua.ALang.Optimizations where
 
+import Protolude
+
+import Data.Functor.Foldable
 
 import Ohua.ALang.Lang
 import Ohua.Types
 import qualified Ohua.ALang.Refs as Refs
-import Data.Functor.Foldable
 
 
 

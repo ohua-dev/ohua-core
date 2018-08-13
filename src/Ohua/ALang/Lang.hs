@@ -96,13 +96,12 @@ module Ohua.ALang.Lang
   , mapBnds, mapRefs, removeTyAnns
   ) where
 
-import Control.DeepSeq
+import Protolude hiding (Symbol)
+
 import Data.Foldable as F
 import Data.Functor.Foldable as RS
-import Data.Functor.Identity
 import Data.Generics.Uniplate.Direct
 import Data.String
-import GHC.Generics
 import Lens.Micro ((^.),Lens)
 import Ohua.LensClasses
 import Ohua.Types

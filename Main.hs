@@ -1,6 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -fno-warn-unused-binds #-}
 
+import Protolude
+
 import           Ohua.ALang.Lang
 import           Ohua.Types
 
@@ -46,9 +48,10 @@ expr4 =
         "x"
 
 expr5 =
-    Apply (Lambda (Direct "c") (Var (Sf "com.ohua.lang/smap-io-fun" Nothing))) (Lambda (Direct "c") (Var (Sf  "com.ohua.lang/pcollect" Nothing)))
+    Apply
+        (Lambda (Direct "c") (Var (Sf "com.ohua.lang/smap-io-fun" Nothing)))
+        (Lambda (Direct "c") (Var (Sf "com.ohua.lang/pcollect" Nothing)))
 
 
 main :: IO ()
 main = return ()
-

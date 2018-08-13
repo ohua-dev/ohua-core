@@ -1,33 +1,28 @@
-{-# LANGUAGE FlexibleInstances    #-}
-{-# LANGUAGE TypeSynonymInstances #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE CPP #-}
 module Ohua.Types.Arbitrary where
 
-import Control.Monad
-import Data.Either
+import Protolude hiding (Symbol)
+
 import qualified Data.Text as T
+import Test.QuickCheck
+
 import Ohua.ALang.Lang
 import Ohua.DFGraph
 import Ohua.Types
-import qualified Ohua.Util.Str as Str
-import Test.QuickCheck
+import Ohua.Util
 
 
-#if !MIN_VERSION_base(4,10,0)
 fromRight :: b -> Either a b -> b
 fromRight _ (Right b) = b
 fromRight def _ = def
-#endif
 
 
-genFromMake :: (Make t, Arbitrary (SourceType t)) => Gen t
+genFromMake :: (HasCallStack, Make t, Arbitrary (SourceType t)) => Gen t
 genFromMake =
-    fmap (fromRight $ error "impossible") $
+    fmap (fromRight $ panicS "impossible") $
     (make <$> arbitrary) `suchThat` isRight
 
-instance Arbitrary Str.Str where
-    arbitrary = Str.fromString <$> arbitrary
 instance Arbitrary T.Text where
     arbitrary = T.pack <$> arbitrary
 instance Arbitrary Operator where

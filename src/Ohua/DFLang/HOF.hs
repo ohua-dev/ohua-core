@@ -28,10 +28,10 @@ module Ohua.DFLang.HOF
     , WHOF(..)
     ) where
 
-import Control.Monad.State
-import Data.Proxy
-import Data.Sequence
+import Protolude
+
 import Data.String
+
 import Ohua.DFLang.Lang
 import Ohua.Monad
 import Ohua.Types

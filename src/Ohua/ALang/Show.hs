@@ -15,15 +15,12 @@
 
 module Ohua.ALang.Show where
 
+import Protolude hiding ((<>))
+
 import Data.Functor.Foldable
 import Ohua.ALang.Lang
 import Ohua.Types
-import Ohua.Util.Str (toString)
 import Text.PrettyPrint.Boxes
-
-#if PRELUDE_EXPORTS_MAPPEND_OPERATOR
-import Prelude hiding ((<>))
-#endif
 
 renderExpr :: Expression -> Box
 renderExpr = fst . cata worker
@@ -49,6 +46,6 @@ renderExpr = fst . cata worker
     showAssign (Direct b) = showBnd b
     showAssign (Destructure bs) =
         "[" <> punctuateH left ", " (map showBnd bs) <> "]"
-    showAssign (Recursive _) = error "implement show for recursive bindings"
-    showBnd = text . toString . unwrap
+    showAssign (Recursive _) = panic "implement show for recursive bindings"
+    showBnd = text . toS . unwrap
     showQualBnd = text . show

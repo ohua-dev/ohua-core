@@ -1,9 +1,9 @@
-{-# LANGUAGE OverloadedLists #-}
 module Ohua.ParseTools.Refs where
 
+import Protolude
 
-import           Ohua.ALang.Lang
-import           Ohua.Types
+import Ohua.ALang.Lang
+import Ohua.Types
 
 
 ohuaLangNS :: NSRef

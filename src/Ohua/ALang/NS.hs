@@ -8,6 +8,8 @@ module Ohua.ALang.NS
     , HasDecls(decls)
     ) where
 
+import Protolude
+
 import qualified Data.HashMap.Strict as HM
 import Lens.Micro
 import Ohua.LensClasses

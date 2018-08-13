@@ -12,25 +12,22 @@
 {-# LANGUAGE RecordWildCards #-}
 module Ohua.Compile where
 
+import Protolude
 
-import           Control.DeepSeq
-import           Control.Monad.Except
-import           Data.Default.Class
-import qualified Data.HashMap.Strict       as HM
-import           Data.Monoid               ((<>))
-import           Data.Text                 (Text)
-import           Ohua.ALang.Lang
-import           Ohua.ALang.Optimizations
-import           Ohua.ALang.Passes
-import           Ohua.ALang.Passes.SSA
-import           Ohua.DFGraph
-import           Ohua.DFLang.Lang
-import           Ohua.DFLang.Optimizations
-import           Ohua.DFLang.Passes
+import Data.Default.Class
+import qualified Data.HashMap.Strict as HM
+
+import Ohua.ALang.Lang
+import Ohua.ALang.Optimizations
+import Ohua.ALang.Passes
+import Ohua.ALang.Passes.SSA
+import Ohua.DFGraph
+import Ohua.DFLang.Lang
+import Ohua.DFLang.Optimizations
+import Ohua.DFLang.Passes
 import qualified Ohua.DFLang.Verify
-import           Ohua.Monad
-import           Ohua.Types
-import qualified Ohua.Util.Str             as Str
+import Ohua.Monad
+import Ohua.Types
 
 
 data CustomPasses env = CustomPasses
@@ -101,12 +98,12 @@ checkHigherOrderFunctionSupport (Let _ e rest) = do
   where
     checkNestedExpr (Apply f arg) = do
         supportsHOF <- checkNestedExpr f
-        when (isLambda arg && not supportsHOF) $ failWith $ "Lambdas may only be input to higher order functions, not " <> Str.showS f
+        when (isLambda arg && not supportsHOF) $ failWith $ "Lambdas may only be input to higher order functions, not " <> show f
         pure True
     checkNestedExpr (Var (Sf n _)) = pure $ HM.member n hofNames
     checkNestedExpr (Var _) = pure False
-    checkNestedExpr a = failWith $ "Expected var or apply expr, got " <> Str.showS a
+    checkNestedExpr a = failWith $ "Expected var or apply expr, got " <> show a
     isLambda (Lambda _ _) = True
     isLambda _            = False
 checkHigherOrderFunctionSupport (Var _) = pure ()
-checkHigherOrderFunctionSupport a = failWith $ "Expected let or var, got " <> Str.showS a
+checkHigherOrderFunctionSupport a = failWith $ "Expected let or var, got " <> show a

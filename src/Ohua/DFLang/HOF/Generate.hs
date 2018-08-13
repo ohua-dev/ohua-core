@@ -1,15 +1,16 @@
 module Ohua.DFLang.HOF.Generate (GenFn) where
 
-import Control.Monad.State
+import Protolude
+
 import qualified Ohua.ALang.Refs as ARefs
+import qualified Ohua.Constants.HostExpr as HEConst
 import Ohua.DFLang.HOF
+import Ohua.DFLang.HOF.SmapG
 import Ohua.DFLang.Lang
 import qualified Ohua.DFLang.Refs as Refs
-import qualified Ohua.Constants.HostExpr as HEConst
 import Ohua.Monad
 import Ohua.Types
-import Ohua.DFLang.HOF.SmapG
-import Ohua.Util.Str ((<>), showS)
+import Ohua.Util
 
 
 data GenFn = GenFn
@@ -20,7 +21,7 @@ data GenFn = GenFn
 
 instance HigherOrderFunction GenFn where
     name = tagFnName ARefs.generate
-    parseCallAndInitState [LamArg g] = pure $ GenFn g undefined
+    parseCallAndInitState [LamArg g] = pure $ GenFn g $ panicS "Pulse binding is uninitialized"
     parseCallAndInitState _ =
         failWith "Wrong number/type of argument to generate"
     createContextEntry = do
@@ -60,7 +61,7 @@ instance HigherOrderFunction GenFn where
             ]
     createContextExit a =
         throwError $
-        "generator assignment must be to one direct binding: " <> showS a
+        "generator assignment must be to one direct binding: " <> show a
     scopeFreeVariables _ freeVars = do
         GenFn {pulse} <- get
         (scopeExpr, varMap) <- scopeVars pulse freeVars

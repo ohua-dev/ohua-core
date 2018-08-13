@@ -12,18 +12,15 @@
 
 module Ohua.ALang.Passes.SSA where
 
-import Control.Monad.Except
-import Control.Monad.Reader
-import Control.Monad.State
+import Protolude
+
 import Data.Functor.Foldable
 import qualified Data.HashMap.Strict as HM
 import qualified Data.HashSet as HS
-import Data.Maybe (fromMaybe)
-import Data.Monoid
+
 import Ohua.ALang.Lang
 import Ohua.Monad
 import Ohua.Types
-import qualified Ohua.Util.Str as Str
 
 type LocalScope = HM.HashMap Binding Binding
 
@@ -112,4 +109,4 @@ isSSA =
 checkSSA :: MonadOhua envExpr m => Expression -> m ()
 checkSSA = maybe (return ()) (throwError . mkMsg) . isSSA
   where
-    mkMsg bnd = "Redefinition of binding " <> Str.showS bnd
+    mkMsg bnd = "Redefinition of binding " <> show bnd
