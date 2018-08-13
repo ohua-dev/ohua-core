@@ -8,15 +8,14 @@
 -- Portability : portable
 
 -- This source code is licensed under the terms described in the associated LICENSE.TXT file
-{-# LANGUAGE CPP                  #-}
-{-# LANGUAGE Rank2Types           #-}
+{-# LANGUAGE CPP, ConstraintKinds #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -fno-warn-deprecations #-}
 
 #include "compat.h"
 
 #if !NEW_CALLSTACK_API
-{-# LANGUAGE ImplicitParams, ConstraintKinds #-}
+{-# LANGUAGE ImplicitParams#-}
 #endif
 module Ohua.Util
     ( Prism
@@ -40,6 +39,7 @@ module Ohua.Util
     , callStackToStr
     , throwErrorS
     , (<&>)
+    , SemigroupConstraint
     ) where
 
 import Protolude
@@ -52,6 +52,13 @@ import Lens.Micro hiding ((<&>))
 
 #if !NEW_CALLSTACK_API
 import GHC.Stack
+#endif
+
+#if PROTOLUDE_HAS_WEIRD_MAPPEND_OPERATOR
+import qualified Data.Semigroup as SG
+#define MAPPEND_OP SG.<>
+#else
+#define MAPPEND_OP <>
 #endif
 
 -- | Similar to prisms from lens, but implemented with traversals.
@@ -137,7 +144,7 @@ instance Semigroup (Mutator a) where
 
 instance Monoid (Mutator a) where
   mempty = Mutator identity
-  mappend = (<>)
+  mappend = (MAPPEND_OP)
 
 
 -- | Append a function to a chain in a writer.
@@ -163,9 +170,15 @@ callStackToStr = prettyCallStack
 callStackToStr = showCallStack
 #endif
 
+type SemigroupConstraint f =
+#if PROTOLUDE_HAS_WEIRD_MAPPEND_OPERATOR
+  Monoid f
+#else
+  Semigroup f
+#endif
 
 -- | Throw a canonical compiler error with a callstack appended.
-throwErrorS :: (HasCallStack, MonadError s m, IsString s, Semigroup s) => s -> m a
+throwErrorS :: (HasCallStack, MonadError s m, IsString s, SemigroupConstraint s) => s -> m a
 throwErrorS msg = throwError $ msg <> "\n" <> fromString cs
   where
     cs = callStackToStr callStack

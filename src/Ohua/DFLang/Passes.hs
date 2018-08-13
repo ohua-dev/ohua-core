@@ -194,7 +194,7 @@ lowerLambdaExpr a _ =
     show a
 
 tieContext0 ::
-       (Monad m, Functor f, Semigroup (f LetExpr), Foldable f)
+       (Monad m, Functor f, SemigroupConstraint (f LetExpr), Foldable f)
     => m (Maybe (f LetExpr, Binding))
     -> f LetExpr
     -> m (f LetExpr)

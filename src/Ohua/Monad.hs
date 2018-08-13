@@ -1,4 +1,7 @@
 {-# LANGUAGE CPP #-}
+
+#include "compat.h"
+
 module Ohua.Monad
     ( OhuaM, runFromExpr, runFromBindings
     , MonadGenId(generateId, resetIdCounter)
