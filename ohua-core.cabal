@@ -2,15 +2,17 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: e64536c40dbd4af6167ce75d0bfdc8d3e343ebe5077505ae11af2d479c093c43
+-- hash: 30f4e68b7161cc87d360262c6e4f0505d129915ce6fe83f07c13db78e030e573
 
 name:           ohua-core
 version:        0.2.0
 synopsis:       Fundamental, platform independent functionality of the ohua compiler.
 description:    Components for compiling a portable dataflow graph from an expression based language.
                 Performs tasks such as rewriting, lowering and optimisations.
-                Resuling graphs can be executed by any runtime, regardles of platform or laguage
+                Resuling graphs can be executed by any runtime, regardles of platform or language
                 that implements the ohua core operators and execution semantics.
+                .
+                For the standalone executable compiler see https://github.com/ohua-dev/ohuac
 category:       Concurrency
 homepage:       https://ohua-dev.github.io/ohua
 bug-reports:    https://github.com/ohua-dev/ohua-core/issues
@@ -195,7 +197,6 @@ test-suite ohua-tests
       DFLowering
       Ohua.Types.Arbitrary
       PassesSpec
-      StrTest
       TestAesonConvert
       TestALangUtils
       Paths_ohua_core
