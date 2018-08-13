@@ -7,7 +7,7 @@ For more information about the ohua compiler suite, goals, function etc visit th
 The core library comprises the fundamental and platform independent parts used in each instance of the ohua compiler
 such as the [EDSL for the JVM](https://github.com/ohua-dev/ohua-jvm-integration) and the [standalone ohua compiler](https://github.com/ohua-dev/ohuac).
 
-In its essence the ohua core transforms an expression based language called ALang, which is short for "algorithm language" 
+In its essence the ohua core transforms an expression based language called ALang, which is short for "algorithm language"
 into a dataflow graph which can be executed by any runtime that implements the ohua exeution semantics on any platform
 capable of implementing the ohua core operators.
 Tha tasks performed by the compiler are
@@ -17,3 +17,9 @@ Tha tasks performed by the compiler are
 - performing generic optimisations
 
 Furthermore the compiler defines a set of hooks for adding custom manipulations to the compilation pipeline.
+
+## Code formatting
+
+The default formatting for code is done using the `hindent` library, the
+configuration file `.hindent.yaml` can be found at the project root.
+
