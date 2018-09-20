@@ -26,7 +26,7 @@ dependencies:
 - mtl
 - aeson # >= 1.0.0.0
 - microlens
-- microlens-platform
+#- microlens-platform
 - microlens-mtl
 - containers
 - bytestring

@@ -5,7 +5,6 @@ module Ohua.DFLang.Verify
 import Protolude
 
 import qualified Data.HashMap.Strict as HM
-import Lens.Micro.Platform
 
 import Ohua.DFLang.Lang
 import qualified Ohua.DFLang.Refs as Refs
@@ -24,7 +23,7 @@ verify = sequence_ . sequenceA checks
 checkBuiltinArities :: MonadError Error m => DFExpr -> m ()
 checkBuiltinArities e =
     for_ (letExprs e) $ \LetExpr {functionRef, callArguments} ->
-        case builtinOps ^? ix functionRef of
+        case HM.lookup functionRef builtinOps of
             Just arity
                 | arity /= length callArguments ->
                     throwErrorS $

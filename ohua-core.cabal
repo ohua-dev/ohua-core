@@ -2,7 +2,7 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 2831be35c073f6e376bec75762becc631305a274e1816c7961dde3a1246e500e
+-- hash: 28e872254c5ec7ce73ced0830b0fd2c6a423191c06e87ad09ed51dfef65934a1
 
 name:           ohua-core
 version:        0.2.0
@@ -57,7 +57,6 @@ library
     , hashable
     , microlens
     , microlens-mtl
-    , microlens-platform
     , monad-control
     , monad-logger
     , monad-loops
@@ -128,7 +127,6 @@ executable ohua-test-exec
     , deepseq
     , microlens
     , microlens-mtl
-    , microlens-platform
     , mtl
     , ohua-core
     , protolude
@@ -155,7 +153,6 @@ executable test-graph-gen
     , deepseq
     , microlens
     , microlens-mtl
-    , microlens-platform
     , mtl
     , ohua-core
     , protolude
@@ -185,7 +182,6 @@ test-suite ohua-tests
     , hspec
     , microlens
     , microlens-mtl
-    , microlens-platform
     , mtl
     , ohua-core
     , protolude

@@ -25,7 +25,9 @@ import Control.Monad.Writer (WriterT)
 import Data.Default.Class
 import qualified Data.HashSet as HS
 import qualified Data.Vector as V
-import Lens.Micro.Platform hiding ((&))
+import Lens.Micro
+import Lens.Micro.Mtl
+--import Lens.Micro.Platform hiding ((&))
 import qualified Data.Text as T
 import Control.Monad.Logger
 import Ohua.ALang.Lang
@@ -196,7 +198,7 @@ class HasEnvExpr m =>
     lookupEnvExpr = lift . lookupEnvExpr
 
 instance MonadReadEnvExpr (OhuaM env) where
-    lookupEnvExpr i = OhuaM $ preuse (envExpressions . ix (unwrap i))
+    lookupEnvExpr i = OhuaM $ (V.!? unwrap i) <$> use envExpressions
 
 instance (MonadReadEnvExpr m, Monad m) => MonadReadEnvExpr (ReaderT e m)
 
