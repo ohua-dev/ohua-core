@@ -2,6 +2,7 @@ module Ohua.Unit where
 
 import Protolude
 
+import Ohua.Types
 import Ohua.ALang.Lang
 import Ohua.Constants.HostExpr as HEConst
 import Ohua.DFLang.Lang
@@ -20,6 +21,14 @@ unitSym = Env HEConst.unit
 unitExpr :: AExpr s ResolvedSymbol
 unitExpr = Var unitSym
 
+unitBinding :: Binding
+unitBinding = unsafeMake "()"
+
+someUnitSymbol :: SomeBinding
+someUnitSymbol = Unqual unitBinding
+
+someUnitExpr :: AExpr s SomeBinding
+someUnitExpr = Var someUnitSymbol
 
 dfVarUnit :: DFVar
 dfVarUnit = DFEnvVar HEConst.unit

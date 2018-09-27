@@ -21,6 +21,7 @@ import qualified Data.HashSet as HS
 import Data.Sequence (Seq)
 
 import Ohua.ALang.Lang
+import Ohua.ALang.PPrint
 import Ohua.DFLang.HOF as HOF
 import Ohua.DFLang.HOF.If
 import Ohua.DFLang.HOF.Seq
@@ -102,12 +103,14 @@ handleDefinitionalExpr ::
     -> Expression
     -> LetRecT m Binding
     -> LetRecT m Binding
-handleDefinitionalExpr assign (Lambda arg expr) cont
+handleDefinitionalExpr assign exp@(Lambda arg expr) cont
     -- TODO handle lambdas with multiple arguments -> this requires
     -- some ALang transformation to always get the form Lambda a
     -- Lambda b ...
  = do
     handleTailRec <- fromEnv (options . transformRecursiveFunctions)
+    logDebugN $ "Detected recursive function:"
+    logDebugN $ quickRender $ Lambda assign exp
     unless handleTailRec $
         failWith
             "Handling recursive functions is not enabled, if you want to enable this experimental feature set `transformRecursiveFunctions` to true in the options passed to the compiler."

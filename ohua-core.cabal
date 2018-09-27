@@ -2,7 +2,7 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 28e872254c5ec7ce73ced0830b0fd2c6a423191c06e87ad09ed51dfef65934a1
+-- hash: bec3cf6c93fce95a1ae88a1707727a68c780fb2d4c2778035931512430e778ee
 
 name:           ohua-core
 version:        0.2.0
@@ -61,6 +61,7 @@ library
     , monad-logger
     , monad-loops
     , mtl
+    , prettyprinter
     , protolude
     , recursion-schemes
     , text
@@ -83,6 +84,7 @@ library
       Ohua.ALang.Refs
       Ohua.ALang.NS
       Ohua.ALang.Show
+      Ohua.ALang.PPrint
       Ohua.ALang.Passes
       Ohua.ALang.Passes.SSA
       Ohua.ALang.Passes.TailRec

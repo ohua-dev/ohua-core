@@ -187,6 +187,11 @@ data QualifiedBinding = QualifiedBinding
     , qbName      :: Binding
     } deriving (Eq, Generic, Ord, Show)
 
+instance HasNamespace QualifiedBinding NSRef where
+    namespace f s = (\ns' -> s {qbNamespace = ns'}) <$> f (qbNamespace s)
+instance HasName QualifiedBinding Binding where
+    name f s = (\n' -> s {qbName = n'}) <$> f (qbName s)
+
 instance Hashable QualifiedBinding where
     hashWithSalt s (QualifiedBinding a b) = hashWithSalt s (a, b)
 
