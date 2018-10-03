@@ -1,8 +1,7 @@
 module Ohua.DFLang.TailRec where
 
-import Protolude
+import Ohua.Prelude
 
-import Control.Exception
 import Control.Monad.Writer (MonadWriter, tell)
 import qualified Data.HashMap.Strict as HM
 import qualified Data.HashSet as HS
@@ -14,9 +13,6 @@ import Ohua.ALang.Refs as ALangRefs
 import Ohua.DFLang.Lang
 import qualified Ohua.DFLang.Refs as Refs
 import Ohua.DFLang.Util
-import Ohua.Monad
-import Ohua.Types
-import Ohua.Util
 
 -- the call in ALang is still (recur algoRef args).
 -- it needs to become (recur conditionOutput algoInArgs recurArgs).
@@ -60,18 +56,18 @@ handleRecursiveTailCall lambdaFormals dfExpr0 (Just recurFn) = do
             case x of
                 Direct b -> b
                 _ ->
-                    panicS $
+                    error $
                     "invariant broken: '" <> e <> "' always gives direct output"
     let unMaybe fid =
             fromMaybe
-                (panicS $
+                (error $
                  "Invariant broken: should have found something but got Nothing! " <>
                  show fid)
     let unDFVar x =
             case x of
                 DFVar b -> b
                 _ ->
-                    panicS $
+                    error $
                     "invariant broken: should be DFVar but was: " <> show x
     -- get the condition result
     let usages =
@@ -84,7 +80,7 @@ handleRecursiveTailCall lambdaFormals dfExpr0 (Just recurFn) = do
             case switchFn of
                 (LetExpr _ _ _ (c:_) _) -> c
                 _ ->
-                    panicS
+                    error
                         ("invariant broken: recur is assumed to be the final call on a 'then' or 'else' branch." :: Text)
     -- the switch is not needed anymore because the only output comes
     -- from the termination branch
@@ -98,10 +94,10 @@ handleRecursiveTailCall lambdaFormals dfExpr0 (Just recurFn) = do
                 , DFVar $ unAssignment "recur" $ returnAssignment recurFn
                 ]
     let terminationBranch =
-            case head $ HS.toList terminationBranchOut of
-                Nothing ->
-                    panicS "Invariant broken, empty termination branch out"
+            case safeHead $ HS.toList terminationBranchOut of
                 Just outp -> outp
+                _ ->
+                    error "Invariant broken, empty termination branch out"
     let switchRetBnd = unAssignment "switch" switchRet
     let rewiredTOutExps =
             flip renameWith minusSwitchExprs $
@@ -194,6 +190,6 @@ lowerRecAlgoCall lowerDefault actuals RecursiveLambdaSpec { lambdaFormalsToAlgoI
     mkIdFn fnId i o = lowerDefault ALangRefs.id fnId o [i]
     algoInInputFormals =
         map
-            (fromMaybe (panic "Invariant broken") .
+            (fromMaybe (error "Invariant broken") .
              flip HM.lookup lambdaFormalsToAlgoIn)
             formalInputs

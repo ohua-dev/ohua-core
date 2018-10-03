@@ -5,13 +5,12 @@
 {-# LANGUAGE NoOverloadedLists #-}
 module Ohua.DFGraph.Show where
 
-import Protolude
+import Ohua.Prelude
 
 import qualified Data.Text as T
 import Text.PrettyPrint.Boxes
 
 import Ohua.DFGraph
-import Ohua.Types (unwrap)
 
 -- | TODO show return arc
 asTable :: OutGraph -> T.Text

@@ -8,12 +8,9 @@ module Ohua.ALang.NS
     , HasDecls(decls)
     ) where
 
-import Protolude
+import Ohua.Prelude
 
 import qualified Data.HashMap.Strict as HM
-import Lens.Micro
-import Ohua.LensClasses
-import Ohua.Types
 
 data FunAnn tyExpr = FunAnn
     { argTypes :: [tyExpr]

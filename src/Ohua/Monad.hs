@@ -23,16 +23,12 @@ module Ohua.Monad
     , initNameGen
     ) where
 
-import Protolude
-
-#if !PROTOLUDE_EXPORTS_hPutStr
-import Data.ByteString (hPutStr)
-#endif
+import Universum
 
 import Control.Monad.Logger
 import System.Log.FastLogger (fromLogStr)
-import Lens.Micro
-import Lens.Micro.Mtl (view)
+import Control.Monad.Error.Class (MonadError, throwError, catchError)
+import Data.ByteString (hPutStr)
 
 import Ohua.Internal.Monad
 import Ohua.Types

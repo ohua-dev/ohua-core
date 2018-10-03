@@ -1,13 +1,12 @@
 module Ohua.DFLang.Util where
 
-import Protolude
+import Ohua.Prelude
 
 import qualified Data.HashMap.Strict as HM
 import qualified Data.HashSet as HS
 import Data.Sequence
 
 import Ohua.DFLang.Lang
-import Ohua.Types
 
 -- | Find the usages of a binding
 findUsages :: Binding -> Seq LetExpr -> [LetExpr]
@@ -27,16 +26,16 @@ findExpr :: DFFnRef -> Seq LetExpr -> Maybe LetExpr
 findExpr fnRef = find ((== fnRef) . functionRef)
 
 -- | Find all locally bound variables.
-findBoundVars :: (Functor f, Foldable f) => f LetExpr -> HS.HashSet Binding
-findBoundVars = HS.fromList . fold . fmap (extractBindings . returnAssignment)
+findBoundVars :: (Container c, Element c ~ LetExpr) => c -> HS.HashSet Binding
+findBoundVars = HS.fromList . concatMap (extractBindings . returnAssignment) . toList
 
 -- | Find the free variables inside a set of expressions (i.e. a lambda expression).
-findFreeVars :: (Functor f, Foldable f) => f LetExpr -> HS.HashSet Binding
+findFreeVars :: (Container c, Element c ~ LetExpr) => c -> HS.HashSet Binding
 findFreeVars exprs = flip findFreeVars0 exprs $ findBoundVars exprs
 
 findFreeVars0 ::
-       Foldable f => HS.HashSet Binding -> f LetExpr -> HS.HashSet Binding
-findFreeVars0 boundVars = HS.fromList . concatMap (mapMaybe f . callArguments)
+       (Container c, Element c ~ LetExpr) => HS.HashSet Binding -> c -> HS.HashSet Binding
+findFreeVars0 boundVars = HS.fromList . foldMap (mapMaybe f . callArguments)
   where
     f (DFVar b)
         | not (HS.member b boundVars) = Just b

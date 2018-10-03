@@ -10,7 +10,7 @@
 -- This source code is licensed under the terms described in the associated LICENSE.TXT file
 module Ohua.LensClasses where
 
-import           Lens.Micro
+import           Universum
 
 class HasIdField s a | s -> a where idField :: Lens' s a
 class HasName s a | s -> a where name :: Lens' s a
@@ -22,7 +22,7 @@ class HasOutVar s a | s -> a where outVar :: Lens' s a
 class HasGraph s a | s -> a where graph :: Lens' s a
 class HasBindingSupplier s a | s -> a where bindingSupplier :: Lens' s a
 class HasIdSupplier s a | s -> a where idSupplier :: Lens' s a
-class HasOther s a | s -> a where other :: Lens' s a
+--class HasOther s a | s -> a where other :: Lens' s a
 class HasNamespace s a | s -> a where namespace :: Lens' s a
 class HasValue s t a b | s -> a, t -> b, s b -> t where value :: Lens s t a b
 class HasAnnotation s t a b | s -> a, t -> b, s b -> t where annotation :: Lens s t a b

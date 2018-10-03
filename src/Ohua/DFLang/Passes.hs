@@ -12,13 +12,13 @@
 --
 module Ohua.DFLang.Passes where
 
-import Protolude
+import Ohua.Prelude
 
-import Control.Arrow
 import Control.Monad.Writer (MonadWriter, tell, runWriterT)
 import qualified Data.HashMap.Strict as HM
 import qualified Data.HashSet as HS
 import Data.Sequence (Seq)
+import Control.Monad (msum)
 
 import Ohua.ALang.Lang
 import Ohua.ALang.PPrint
@@ -32,9 +32,6 @@ import Ohua.DFLang.Lang (DFExpr(..), DFFnRef(..), DFVar(..), LetExpr(..))
 import qualified Ohua.DFLang.Refs as Refs
 import Ohua.DFLang.TailRec (lowerRecAlgoCall, recursionLowering)
 import Ohua.DFLang.Util
-import Ohua.Monad
-import Ohua.Types
-import Ohua.Util
 
 type Pass m
      = QualifiedBinding -> FnId -> Assignment -> [Expression] -> m (Seq LetExpr)
@@ -53,7 +50,7 @@ logState =
     ask >>= logDebugN . ("Current state: " <>) . show . HM.keys . unLetRec
 
 -- | Check that a sequence of let expressions does not redefine bindings.
-checkSSA :: (Foldable f, MonadOhua envExpr m) => f LetExpr -> m ()
+checkSSA :: (Container c, Element c ~ LetExpr, MonadOhua envExpr m) => c -> m ()
 checkSSA = flip evalStateT mempty . mapM_ go
   where
     go le = do
@@ -78,7 +75,7 @@ checkSSAExpr (DFExpr l _) = checkSSA l
 -- 'checkProgramValidity'.
 lowerALang :: MonadOhua envExpr m => Expression -> m DFExpr
 lowerALang expr = do
-    logDebugN $ "Lowering alang expr: " <> showT expr
+    logDebugN $ "Lowering alang expr: " <> quickRender expr
     (var, exprs) <- runWriterT $ runReaderT (lowerToDF expr) (LetRec mempty)
     return $ DFExpr exprs var
 
@@ -135,7 +132,7 @@ handleDefinitionalExpr assign l@(Apply _ _) cont = do
     (fn, fnId, args) <- handleApplyExpr l
     case HM.lookup fn hofNames of
         Just (WHOF (_ :: Proxy p)) ->
-            lift $ lowerHOF (name :: TaggedFnName p) assign args
+            lift $ lowerHOF (hofName :: TaggedFnName p) assign args
         Nothing -> lift $ tell =<< lowerDefault fn fnId assign args
     cont
 handleDefinitionalExpr _ e _ =
@@ -197,10 +194,10 @@ lowerLambdaExpr a _ =
     show a
 
 tieContext0 ::
-       (Monad m, Functor f, SemigroupConstraint (f LetExpr), Foldable f)
-    => m (Maybe (f LetExpr, Binding))
-    -> f LetExpr
-    -> m (f LetExpr)
+       (Monad m, Functor f, SemigroupConstraint (f LetExpr), f LetExpr ~ c, Container c, Element c ~ LetExpr)
+    => m (Maybe (c, Binding))
+    -> c
+    -> m c
 tieContext0 initExpr lets
     | all hasLocalArcs lets = pure lets
     | otherwise =
@@ -280,4 +277,4 @@ hofs =
 hofNames :: HM.HashMap QualifiedBinding WHOF
 hofNames = HM.fromList $ map (extractName &&& identity) hofs
   where
-    extractName (WHOF (_ :: Proxy p)) = unTagFnName $ (name :: TaggedFnName p)
+    extractName (WHOF (_ :: Proxy p)) = unTagFnName (hofName :: TaggedFnName p)

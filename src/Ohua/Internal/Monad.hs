@@ -14,9 +14,10 @@
 
 module Ohua.Internal.Monad where
 
-import Protolude
+import Universum
 
 import Control.Monad.Except
+import Control.Monad.Logger
 import qualified Control.Monad.RWS.Lazy
 import Control.Monad.RWS.Strict (RWST, evalRWST)
 import qualified Control.Monad.State.Lazy
@@ -24,16 +25,12 @@ import qualified Control.Monad.State.Strict
 import Control.Monad.Writer (WriterT)
 import Data.Default.Class
 import qualified Data.HashSet as HS
-import qualified Data.Vector as V
-import Lens.Micro
-import Lens.Micro.Mtl
---import Lens.Micro.Platform hiding ((&))
 import qualified Data.Text as T
-import Control.Monad.Logger
-import Ohua.ALang.Lang
-import Ohua.Types as Ty
+import qualified Data.Vector as V
+import Lens.Micro.Mtl
 
-import Unsafe (unsafeHead)
+import Ohua.Types as Ty
+import Ohua.ALang.Lang
 
 
 -- The compiler monad.
@@ -81,7 +78,7 @@ generateBindingFromGenerator g = (h, g')
     (h, t) =
         case dropWhile (`HS.member` taken) (g ^. simpleNameList) of
             (x:xs) -> (x, xs)
-            [] -> panic "Simple names is empty, this should be impossible"
+            [] -> error "Simple names is empty, this should be impossible"
     g' = g & simpleNameList .~ t & takenNames %~ HS.insert h
 
 generateBindingFromGeneratorWith ::
@@ -91,8 +88,8 @@ generateBindingFromGeneratorWith prefixBnd g = (h, g')
     prefix = unwrap prefixBnd
     taken = g ^. takenNames
     prefix' = prefix <> "_"
-    h =
-        unsafeHead $
+    h = fromMaybe (error "IMPOSSIBLE") $
+        safeHead $
         dropWhile (`HS.member` taken) $
         map (makeThrow . (prefix' <>) . show) ([0 ..] :: [Int])
     g' = g & takenNames %~ HS.insert h

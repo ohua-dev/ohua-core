@@ -1,15 +1,12 @@
 module Ohua.Test.DFGraph where
 
-import Protolude
+import Ohua.Prelude
 
-import Data.Function
 import Data.Graph.Inductive.Graph
 import Data.Graph.Inductive.PatriciaTree
 import qualified Data.IntMap.Strict as IntMap
 
 import Ohua.DFGraph
-import Ohua.Types
-import Ohua.Util
 
 
 newtype OhuaGrGraph = OhuaGrGraph { unGr :: Gr QualifiedBinding OhuaGrEdgeLabel }
@@ -65,10 +62,10 @@ plusEither _ b                = b
 emptyEither :: Either IsoFailData b
 emptyEither = Left (mempty, Nothing)
 
-sumEither :: Foldable f => f (Either IsoFailData b) -> Either IsoFailData b
+sumEither :: (Container c, Element c ~ Either IsoFailData b) => c -> Either IsoFailData b
 sumEither = foldl' plusEither emptyEither
 
-mapsEither :: Foldable f => (a -> Either IsoFailData b) -> f a -> Either IsoFailData b
+mapsEither :: Container c => (Element c -> Either IsoFailData b) -> c -> Either IsoFailData b
 mapsEither f = foldl' (\a b -> plusEither a (f b)) emptyEither
 
 matchGraph :: (Eq a, Ord b) => Gr a b -> Gr a b -> Either IsoFailData IsoMap
@@ -100,4 +97,4 @@ matchGraph gr1 gr2 = go (nodes gr1) [] [] mempty
       where
         ns = first newName <$> labNodes gr
         es = map (\(a, b, c) -> (newName a, newName b, c)) (labEdges gr)
-        newName node = fromMaybe (panicS $ "Invariant broken: missing mapping for node " <> show node) $ IntMap.lookup node mapping
+        newName node = fromMaybe (error $ "Invariant broken: missing mapping for node " <> show node) $ IntMap.lookup node mapping

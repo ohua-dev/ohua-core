@@ -67,25 +67,23 @@ module Ohua.Types
     , UnsafeMake(unsafeMake)
     ) where
 
-import Protolude
+import Universum
 
 import Control.Comonad
+import Control.Monad.Error.Class (MonadError, throwError)
 import Data.Bifoldable
 import Data.Bitraversable
 import Data.Default.Class
-import Data.Foldable as F
+import Data.Foldable as F (Foldable, foldr)
 import Data.Functor.Foldable as RS hiding (fold)
 import Data.Generics.Uniplate.Direct
 import qualified Data.HashSet as HS
-import Data.String
 import qualified Data.Text as T
 import qualified Data.Vector as V
 import GHC.Exts
-import Lens.Micro hiding ((<&>))
+
 import Ohua.LensClasses
 import Ohua.Util
-
-IMPORT_HASHABLE
 
 type family SourceType t
 
@@ -102,7 +100,7 @@ class Make t where
 
 -- | Same as 'make' but instead throws an exception
 makeThrow :: Make t => SourceType t -> t
-makeThrow = either panic identity . make
+makeThrow = either error identity . make
 
 -- | Convert a value @t@ back to its source type @t@.
 class Unwrap t where
@@ -152,7 +150,7 @@ instance Unwrap Binding where
     unwrap (Binding b) = b
 
 instance IsString Binding where
-    fromString = makeThrow . toS
+    fromString = makeThrow . toText
 
 -- | Hierarchical reference to a namespace
 newtype NSRef =
@@ -201,7 +199,7 @@ instance NFData QualifiedBinding where
 instance IsString QualifiedBinding where
     fromString s = case fromString s of
         Qual q -> q
-        _      -> panic "unqualified binding"
+        _      -> error "unqualified binding"
 
 -- | Utility type for parsing. Denotes a binding which may or may not
 -- be qualified.
@@ -215,7 +213,7 @@ instance Hashable SomeBinding where
     hashWithSalt s (Qual b)   = hashWithSalt s (1 :: Int, b)
 
 instance IsString SomeBinding where
-    fromString = either panic identity . symbolFromString . toS
+    fromString = either error identity . symbolFromString . toText
 
 -- | Attempt to parse a string into either a simple binding or a
 -- qualified binding.  Assumes a form "name.space/value" for qualified
@@ -226,13 +224,13 @@ symbolFromString s
     | otherwise =
         case T.break (== '/') s of
             (symNs, slashName)
-                | T.null symNs -> throwError "Unexpected '/' at start"
+                | T.null symNs -> throwError $ "An unqualified name cannot start with a '/': " <> show s
                 | T.null slashName ->
                     Unqual <$> make symNs
                 | Just ('/', symName) <- T.uncons slashName ->
                     if | (== '/') `T.find` symName /= Nothing ->
-                           throwError "Too many '/' delimiters found."
-                       | T.null symName -> throwError "Name cannot be empty"
+                           throwError $ "Too many '/' delimiters found in the binding " <> show s
+                       | T.null symName -> throwError $ "Name cannot be empty in the binding " <> show s
                        | otherwise ->
                            do ns <-
                                   make =<<
@@ -241,11 +239,11 @@ symbolFromString s
                                       (T.split (== '.') symNs)
                               bnd <- make symName
                               pure $ Qual $ QualifiedBinding ns bnd
-            _ -> throwError "Leading slash expected after `break`"
+            _ -> throwError $ "Leading slash expected after `break` in the binding " <> show s
 
 class ExtractBindings a where
     extractBindings :: a -> [Binding]
-    default extractBindings :: (F.Foldable f, f b ~ a, ExtractBindings b) => a -> [Binding]
+    default extractBindings :: (Container a, ExtractBindings (Element a)) => a -> [Binding]
     extractBindings = foldMap extractBindings
 
 instance ExtractBindings a => ExtractBindings [a]
@@ -259,6 +257,8 @@ data AbstractAssignment binding
     | Destructure ![binding]
     deriving (Eq, Functor, Traversable, F.Foldable, Show)
 
+instance Container (AbstractAssignment binding)
+
 type Assignment = AbstractAssignment Binding
 
 instance IsString Assignment where
@@ -268,7 +268,7 @@ instance IsList Assignment where
     type Item Assignment = Binding
     fromList = Destructure
     toList (Destructure l) = l
-    toList _ = panic "Direct return is not a list"
+    toList _ = error "Direct return is not a list"
 
 instance ExtractBindings Assignment
 
@@ -326,7 +326,7 @@ instance UnsafeMake HostExpr where
 
 instance Make HostExpr where
     make i
-        | i < 0 = throwError $ "HostExpr cannot be < 0"
+        | i < 0 = throwErrorS $ "HostExpr cannot be < 0"
         | otherwise = pure $ unsafeMake i
 
 instance Unwrap HostExpr where

@@ -12,15 +12,13 @@
 
 module Ohua.ALang.Passes.SSA where
 
-import Protolude
+import Ohua.Prelude
 
 import Data.Functor.Foldable
 import qualified Data.HashMap.Strict as HM
 import qualified Data.HashSet as HS
 
 import Ohua.ALang.Lang
-import Ohua.Monad
-import Ohua.Types
 
 type LocalScope = HM.HashMap Binding Binding
 
@@ -68,11 +66,11 @@ ssa :: (MonadOhua envExpr m, MonadReader LocalScope m)
 ssa =
     cata $ \case
         VarF (Local bnd) -> Var . Local <$> ssaResolve bnd
-        LambdaF arguments body ->
-            handleAssignment arguments $ \assign -> Lambda assign <$> body
-        LetF assignment value body ->
+        LambdaF args body ->
+            handleAssignment args $ \assign -> Lambda assign <$> body
+        LetF assignment val body ->
             handleAssignment assignment $ \assign ->
-                Let assign <$> value <*> body
+                Let assign <$> val <*> body
         e -> embed <$> sequence e
 
 -- As you can see the destructuring makes writing some stuff quite

@@ -2,25 +2,18 @@
 {-# LANGUAGE CPP #-}
 module Ohua.Types.Arbitrary where
 
-import Protolude hiding (Symbol)
+import Ohua.Prelude
 
 import qualified Data.Text as T
 import Test.QuickCheck
 
 import Ohua.ALang.Lang
 import Ohua.DFGraph
-import Ohua.Types
-import Ohua.Util
-
-
-fromRight :: b -> Either a b -> b
-fromRight _ (Right b) = b
-fromRight def _ = def
 
 
 genFromMake :: (HasCallStack, Make t, Arbitrary (SourceType t)) => Gen t
 genFromMake =
-    fmap (fromRight $ panicS "impossible") $
+    fmap (fromRight $ error "impossible") $
     (make <$> arbitrary) `suchThat` isRight
 
 instance Arbitrary T.Text where

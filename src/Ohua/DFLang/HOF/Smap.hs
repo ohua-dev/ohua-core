@@ -13,11 +13,7 @@
 
 module Ohua.DFLang.HOF.Smap where
 
-import Protolude
-
-#if !PROTOLUDE_EXPORTS_unzip
-import Data.List (unzip)
-#endif
+import Ohua.Prelude
 
 import qualified Data.Sequence as S
 
@@ -25,9 +21,6 @@ import qualified Ohua.ALang.Refs as ARefs
 import Ohua.DFLang.HOF
 import Ohua.DFLang.Lang
 import qualified Ohua.DFLang.Refs as Refs
-import Ohua.Monad
-import Ohua.Types
-import Ohua.Util
 
 
 data SmapFn = SmapFn
@@ -37,9 +30,9 @@ data SmapFn = SmapFn
     }
 
 instance HigherOrderFunction SmapFn where
-    name = tagFnName ARefs.smap
+    hofName = tagFnName ARefs.smap
     parseCallAndInitState [LamArg lam, Variable v] =
-        return $ SmapFn v lam (panicS "size uninitialized")
+        return $ SmapFn v lam (error "size uninitialized")
     parseCallAndInitState a =
         throwError $ "Unexpected number/type of arguments to smap" <> show a
     createContextEntry = do
@@ -117,5 +110,5 @@ instance HigherOrderFunction SmapFn where
         pure $ Just ([ctxOp], ctxSource)
       where
         elemSource =
-            fromMaybe (panicS "Begin assignment should have one argument") $ head $
+            fromMaybe (error "Begin assignment should have one argument") $ safeHead $
             extractBindings $ beginAssignment lam

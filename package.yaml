@@ -26,13 +26,12 @@ dependencies:
 - mtl
 - aeson # >= 1.0.0.0
 - microlens
-#- microlens-platform
 - microlens-mtl
 - containers
 - bytestring
 - deepseq
 - data-default-class
-- protolude
+- universum >= 1.0
 default-extensions:
 - OverloadedStrings
 - OverloadedLists
@@ -75,6 +74,7 @@ library:
   - Ohua.Types
   - Ohua.LensClasses
   - Ohua.Monad
+  - Ohua.Prelude
   - Ohua.ParseTools.Refs
   - Ohua.ALang.Lang
   - Ohua.ALang.Refs
@@ -116,6 +116,7 @@ library:
   - monad-logger
   - fast-logger
   - prettyprinter
+  - safe-exceptions
   include-dirs:
     cbits
   when:

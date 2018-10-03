@@ -1,6 +1,6 @@
 module Ohua.DFLang.HOF.Generate (GenFn) where
 
-import Protolude
+import Ohua.Prelude
 
 import qualified Ohua.ALang.Refs as ARefs
 import qualified Ohua.Constants.HostExpr as HEConst
@@ -8,9 +8,6 @@ import Ohua.DFLang.HOF
 import Ohua.DFLang.HOF.SmapG
 import Ohua.DFLang.Lang
 import qualified Ohua.DFLang.Refs as Refs
-import Ohua.Monad
-import Ohua.Types
-import Ohua.Util
 
 
 data GenFn = GenFn
@@ -20,8 +17,8 @@ data GenFn = GenFn
 
 
 instance HigherOrderFunction GenFn where
-    name = tagFnName ARefs.generate
-    parseCallAndInitState [LamArg g] = pure $ GenFn g $ panicS "Pulse binding is uninitialized"
+    hofName = tagFnName ARefs.generate
+    parseCallAndInitState [LamArg g] = pure $ GenFn g $ error "Pulse binding is uninitialized"
     parseCallAndInitState _ =
         failWith "Wrong number/type of argument to generate"
     createContextEntry = do

@@ -19,9 +19,8 @@
 
 module PassesSpec (passesSpec) where
 
-import Protolude
+import Ohua.Prelude
 
-import Data.Default.Class
 import qualified Data.Text as T
 import Test.Hspec
 import Test.QuickCheck
@@ -32,10 +31,7 @@ import Ohua.ALang.Passes
 import Ohua.ALang.Passes.SSA
 import Ohua.ALang.Passes.TailRec
 import qualified Ohua.ALang.Refs as ALangRefs
-import Ohua.Monad
-import Ohua.Types
 import Ohua.Types.Arbitrary ()
-import Ohua.Util
 
 
 

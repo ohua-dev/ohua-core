@@ -1,8 +1,7 @@
 module Ohua.Unit where
 
-import Protolude
+import Ohua.Prelude
 
-import Ohua.Types
 import Ohua.ALang.Lang
 import Ohua.Constants.HostExpr as HEConst
 import Ohua.DFLang.Lang

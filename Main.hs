@@ -1,10 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -fno-warn-unused-binds #-}
 
-import Protolude
+import Ohua.Prelude
 
 import           Ohua.ALang.Lang
-import           Ohua.Types
 
 
 expr, expr0, expr1, expr2, expr3, expr4, expr5 :: Expression

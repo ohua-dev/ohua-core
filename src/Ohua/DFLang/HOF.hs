@@ -28,13 +28,9 @@ module Ohua.DFLang.HOF
     , WHOF(..)
     ) where
 
-import Protolude
-
-import Data.String
+import Ohua.Prelude
 
 import Ohua.DFLang.Lang
-import Ohua.Monad
-import Ohua.Types
 
 -- | A function name tagged with a higher order function instance it belongs to.
 newtype TaggedFnName f = TaggedFnName
@@ -74,7 +70,7 @@ type Renaming = [(Binding, Binding)]
 --      (4) 'contextifyUnboundFunctions' is called once for each lambda present in the arguments
 --      (5) 'createContextExit' is called
 class HigherOrderFunction f where
-    name :: TaggedFnName f
+    hofName :: TaggedFnName f
     -- | Initialize the state for a single lowering from the arguments given to the HOF call
     parseCallAndInitState :: MonadOhua envExpr m => [Argument] -> m f
     -- | Generate the entry node(s) for this HOF context

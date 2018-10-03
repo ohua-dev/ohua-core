@@ -1,4 +1,4 @@
-import Protolude
+import Ohua.Prelude
 
 import           Data.Aeson
 import qualified Data.ByteString.Lazy as L

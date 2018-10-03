@@ -1,7 +1,7 @@
 module TestAesonConvert where
 
+import Ohua.Prelude
 
-import Control.Monad.Error.Class
 import Data.Aeson as A
     ( FromJSON
     , ToJSON
@@ -11,7 +11,6 @@ import Data.Aeson as A
     , toJSON
     )
 
-import Protolude
 
 import qualified Data.Aeson.Types as A
 import Test.Hspec
@@ -20,7 +19,6 @@ import Test.QuickCheck.Property
 
 import Ohua.DFGraph
 import Ohua.Serialize.JSON ()
-import Ohua.Types
 import Ohua.Types.Arbitrary ()
 
 

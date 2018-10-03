@@ -12,9 +12,8 @@
 {-# LANGUAGE RecordWildCards #-}
 module Ohua.Compile where
 
-import Protolude
+import Ohua.Prelude
 
-import Data.Default.Class
 import qualified Data.HashMap.Strict as HM
 
 import Ohua.ALang.Lang
@@ -26,8 +25,6 @@ import Ohua.DFLang.Lang
 import Ohua.DFLang.Optimizations
 import Ohua.DFLang.Passes
 import qualified Ohua.DFLang.Verify
-import Ohua.Monad
-import Ohua.Types
 
 
 data CustomPasses env = CustomPasses

@@ -31,19 +31,20 @@ to the compilation pipeline.
 The default formatting for code is done using the `hindent` library, the
 configuration file `.hindent.yaml` can be found at the project root.
 
-## Notes on Protolude
+## Notes on Universum
 
-I use a `Prelude` replacement called `Protolude` in this project. This has a few
+I use a `Prelude` replacement called `Universum` in this project. This has a few
 minor consequences for how code is written. Most importantly I activate the
 `NoImplicitPrelude` extension by default, thus in every new module written you
-should first do an `import Prelude`.
+should first do an `import Universum` (or `import Prelude` if you *really* like
+`Prelude`).
 
-The following are some notes on using protolude, assembled for your convenience:
+The following are some notes on using `Universum`, assembled for your convenience:
 
-- Protolude does not have `error`
+- `error` from `Universum` uses `Text` rather than `String`
 
-  For errors that should crash the program use `panic` instead, or even better
-  `panicS` from the `Ohua.Util` module, because that also adds a stack trace.
+  This should not be an issue, most value we manipulate in this library are
+  `Text` anyways.
 
 - Trace functions (`trace`, `traceShowId` etc) are in scope by default, but
   raise a warning.
@@ -51,13 +52,12 @@ The following are some notes on using protolude, assembled for your convenience:
   Aka you can use them, but you have to remove them if you want the code to pass
   the CI.
 
-- Protolude uses `Text` rather than `String` by default.
+- Universum uses `Text` rather than `String` by default.
 
   Aka use `<>` (also in scope by default) rather than `++` to concatenate
-  strings. The `toS` function converts between strings, you can use it to get a
-  `ByteString` or a `String`.
+  strings.
 
-- IO is polymorphic
+- some IO is polymorphic
 
   `putStrLn "some string"` will raise an ambiguity error, you'll have to
   annotate the string like so `putStrLn ("some string" :: Text)`
@@ -69,4 +69,4 @@ The following are some notes on using protolude, assembled for your convenience:
 
 
 For more information on protolude check out [the GitHUb
-repository](https://github.com/sdiehl/protolude).
+repository](https://github.com/serokell/universum).

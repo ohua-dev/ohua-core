@@ -10,7 +10,7 @@
 
 module Ohua.DFLang.HOF.Seq where
 
-import Protolude
+import Ohua.Prelude
 
 import Data.Sequence as S
 
@@ -18,8 +18,6 @@ import qualified Ohua.ALang.Refs as ARefs
 import Ohua.DFLang.HOF
 import Ohua.DFLang.Lang
 import qualified Ohua.DFLang.Refs as Refs
-import Ohua.Monad
-import Ohua.Types
 
 data SeqFn = SeqFn
     { before :: Binding
@@ -27,7 +25,7 @@ data SeqFn = SeqFn
     }
 
 instance HigherOrderFunction SeqFn where
-    name = tagFnName ARefs.seq
+    hofName = tagFnName ARefs.seq
     parseCallAndInitState [Variable (DFVar before0), LamArg after] =
         return $ SeqFn before0 after
     parseCallAndInitState _ = failWith "seq not defined for arguments: " -- TODO ++ show arguments

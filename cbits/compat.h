@@ -72,32 +72,3 @@
  * the boxes library defines as well and thus we get a clash in `ALang.Show`.
  */
 #define PRELUDE_EXPORTS_MAPPEND_OPERATOR MIN_VERSION_base(4,11,0)
-
-/**
- * Protolude includes (<&>) since base version 4.11, so before then I redefine
- * it in Ohua.Util.
- */
-#define PROTOLUDE_HAS_FLIP_FMAP MIN_VERSION_protolude(0,2,0)
-
-/**
- * Protolude pre 0.2 does not include Hashable
- */
-#define PROTOLUDE_EXPORTS_HASHABLE MIN_VERSION_protolude(0,2,0)
-
-#if PROTOLUDE_EXPORTS_HASHABLE
-#define IMPORT_HASHABLE
-#else
-#define IMPORT_HASHABLE import Data.Hashable
-#endif
-
-#define PROTOLUDE_EXPORTS_hPutStr MIN_VERSION_protolude(0,2,0)
-
-#define PROTOLUDE_EXPORTS_unzip MIN_VERSION_protolude(0,2,0)
-
-#define PROTOLUDE_HAS_WEIRD_MAPPEND_OPERATOR MIN_VERSION_protolude(0,2,0) && !MIN_VERSION_protolude(0,3,0)
-
-#if PROTOLUDE_HAS_WEIRD_MAPPEND_OPERATOR
-#define SEMIGROUP_CONSTRAINT Monoid
-#else
-#define SEMIGROUP_CONSTRAINT Semigroup
-#endif

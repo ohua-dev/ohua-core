@@ -22,7 +22,6 @@ module Ohua.Util
     , Prism'
     , prism
     , prism'
-    , panicS
     , assertM
     , assertE
     , mapLeft
@@ -42,23 +41,15 @@ module Ohua.Util
     , SemigroupConstraint
     ) where
 
-import Protolude
+import Universum
 
-import Control.Exception
 import Control.Monad.Writer (MonadWriter, tell)
-import Data.String
+import Control.Monad.Error.Class
+import Control.Exception.Safe
 import qualified Data.Text as T
-import Lens.Micro hiding ((<&>))
 
 #if !NEW_CALLSTACK_API
 import GHC.Stack
-#endif
-
-#if PROTOLUDE_HAS_WEIRD_MAPPEND_OPERATOR
-import qualified Data.Semigroup as SG
-#define MAPPEND_OP SG.<>
-#else
-#define MAPPEND_OP <>
 #endif
 
 -- | Similar to prisms from lens, but implemented with traversals.
@@ -129,7 +120,7 @@ forceTraceReport msg val = val `deepseq` trace msg (pure ())
 -- type does not actually support numeric operations.
 intentionally_not_implemented :: a
 intentionally_not_implemented =
-    panic "This is intentionally not implemented, don't use it!"
+    error "This is intentionally not implemented, don't use it!"
 
 
 
@@ -144,7 +135,7 @@ instance Semigroup (Mutator a) where
 
 instance Monoid (Mutator a) where
   mempty = Mutator identity
-  mappend = (MAPPEND_OP)
+  mappend = (<>)
 
 
 -- | Append a function to a chain in a writer.
@@ -170,25 +161,10 @@ callStackToStr = prettyCallStack
 callStackToStr = showCallStack
 #endif
 
-type SemigroupConstraint f =
-#if PROTOLUDE_HAS_WEIRD_MAPPEND_OPERATOR
-  Monoid f
-#else
-  Semigroup f
-#endif
+type SemigroupConstraint f = Monoid f
 
 -- | Throw a canonical compiler error with a callstack appended.
 throwErrorS :: (HasCallStack, MonadError s m, IsString s, SemigroupConstraint s) => s -> m a
 throwErrorS msg = throwError $ msg <> "\n" <> fromString cs
   where
     cs = callStackToStr callStack
-
-panicS :: HasCallStack => Text -> a
-panicS msg = panic $ msg <> "\n" <> cs
-  where
-    cs = toS $ callStackToStr callStack
-
-#if !PROTOLUDE_HAS_FLIP_FMAP
-(<&>) :: Functor f => f a -> (a -> b) -> f b
-(<&>) = flip map
-#endif

@@ -1,9 +1,8 @@
 module Ohua.ParseTools.Refs where
 
-import Protolude
+import Ohua.Prelude
 
 import Ohua.ALang.Lang
-import Ohua.Types
 
 
 ohuaLangNS :: NSRef
@@ -11,7 +10,7 @@ ohuaLangNS = makeThrow ["ohua", "lang"]
 
 
 mkQualVar :: NSRef -> Binding -> Expr SomeBinding
-mkQualVar ns name = Var $ Qual $ QualifiedBinding ns name
+mkQualVar ns name0 = Var $ Qual $ QualifiedBinding ns name0
 
 
 mkOhuaLangRef :: Binding -> Expr SomeBinding

@@ -19,16 +19,9 @@
 
 module Ohua.DFLang.Lang where
 
-import Protolude
+import Ohua.Prelude
 
-import Data.Foldable (toList)
-import Data.String
 import qualified Data.Text as T
-
-import Ohua.Types
-import Ohua.Util
-
-IMPORT_HASHABLE
 
 -- | A sequence of let statements with a terminating binding to be used as return value
 data DFExpr = DFExpr

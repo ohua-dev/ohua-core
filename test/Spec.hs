@@ -1,5 +1,5 @@
 
-import Protolude
+import Ohua.Prelude
 
 -- import qualified ALangVerify
 import qualified DFLowering

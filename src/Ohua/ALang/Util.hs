@@ -10,11 +10,10 @@
 -- This source code is licensed under the terms described in the associated LICENSE.TXT file
 module Ohua.ALang.Util where
 
-import Protolude
+import Ohua.Prelude
 
 import           Data.Functor.Foldable
 import           Ohua.ALang.Lang
-import           Ohua.Types
 
 
 substitute :: Binding -> Expression -> Expression -> Expression

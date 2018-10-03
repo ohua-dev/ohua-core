@@ -10,15 +10,12 @@
 
 module Ohua.DFLang.HOF.SmapG (SmapGFn, scopeVars) where
 
-import Protolude
+import Ohua.Prelude
 
 import qualified Ohua.ALang.Refs as ARefs
 import Ohua.DFLang.HOF
 import Ohua.DFLang.Lang
 import qualified Ohua.DFLang.Refs as Refs
-import Ohua.Monad
-import Ohua.Types
-import Ohua.Util
 
 
 data SmapGFn = SmapGFn
@@ -46,9 +43,9 @@ scopeVars scopeSource freeVars = do
 
 
 instance HigherOrderFunction SmapGFn where
-    name = tagFnName ARefs.smapG
+    hofName = tagFnName ARefs.smapG
     parseCallAndInitState [LamArg lam, Variable v] =
-        pure $ SmapGFn v lam $ panicS "Do not evaluate this"
+        pure $ SmapGFn v lam $ error "Do not evaluate this"
     parseCallAndInitState a =
         throwError $ "Unexpected number/type of arguments to smap" <> show a
     createContextEntry = do

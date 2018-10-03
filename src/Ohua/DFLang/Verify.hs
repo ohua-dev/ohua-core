@@ -2,14 +2,12 @@ module Ohua.DFLang.Verify
     ( verify
     ) where
 
-import Protolude
+import Ohua.Prelude
 
 import qualified Data.HashMap.Strict as HM
 
 import Ohua.DFLang.Lang
 import qualified Ohua.DFLang.Refs as Refs
-import Ohua.Types
-import Ohua.Util
 
 verify ::
        forall m. MonadError Error m

@@ -2,14 +2,13 @@
 
 module Ohua.ALang.Passes.TailRec where
 
-import Protolude
+import Ohua.Prelude
 
 import Control.Monad.Writer
 import Data.Functor.Foldable
 import qualified Data.HashSet as HS
 
 import Ohua.ALang.Lang
-import Ohua.Types
 
 
 
@@ -37,7 +36,7 @@ markRecursiveBindings = fst . runWriter . cata go
             if isUsed
                 then case assign of
                          Direct bnd -> Let (Recursive bnd) e' <$> b
-                         _ -> panic "Cannot use destrutured binding recursively"
+                         _ -> error "Cannot use destrutured binding recursively"
                 else Let assign e' <$> b
     go (VarF val@(Local bnd)) = tell (HS.singleton bnd) >> pure (Var val)
     go e@(LambdaF assign _) = shadowAssign assign $ embed <$> sequence e
@@ -45,7 +44,7 @@ markRecursiveBindings = fst . runWriter . cata go
     shadowAssign (Direct b) = censor (HS.delete b)
     shadowAssign (Destructure bnds) = censor (`HS.difference` HS.fromList bnds)
     shadowAssign (Recursive _) =
-        panic "TODO implement `shadowAssign` for `Recursive`"
+        error "TODO implement `shadowAssign` for `Recursive`"
 
 findRecCall ::
        Expression -> HS.HashSet Binding -> (HS.HashSet Binding, Expression)

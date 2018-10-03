@@ -10,12 +10,11 @@
 -- This source code is licensed under the terms described in the associated LICENSE.TXT file
 module Ohua.ALang.Optimizations where
 
-import Protolude
+import Ohua.Prelude
 
 import Data.Functor.Foldable
 
 import Ohua.ALang.Lang
-import Ohua.Types
 import qualified Ohua.ALang.Refs as Refs
 
 
@@ -30,4 +29,4 @@ removeId =
     para $ \case
         LetF bnd@(Direct _) (Var (Sf func _) `Apply` somevalue, _) (rest, _)
             | func == Refs.id -> Let bnd somevalue rest
-        other -> embed $ snd <$> other
+        other0 -> embed $ snd <$> other0

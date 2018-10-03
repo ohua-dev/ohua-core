@@ -14,14 +14,12 @@ module Ohua.DFLang.HOF.If
     ( IfFn
     ) where
 
-import Protolude
+import Ohua.Prelude
 
 import qualified Ohua.ALang.Refs as ARefs
 import Ohua.DFLang.HOF
 import Ohua.DFLang.Lang
 import qualified Ohua.DFLang.Refs as Refs
-import Ohua.Monad
-import Ohua.Types
 
 data IfFn = IfFn
     { conditionVariable :: !DFVar
@@ -50,14 +48,14 @@ scopeVars scopeSource freeVars = do
 checkAssignment ::
        (Show a, MonadError Error m) => Text -> AbstractAssignment a -> m a
 checkAssignment _ (Direct b) = pure b
-checkAssignment branch other =
+checkAssignment branch otherBranch =
     throwError $
     "if HOF transform expects one direct assignment for `" <> branch <>
     "` branch, got " <>
-    show other
+    show otherBranch
 
 instance HigherOrderFunction IfFn where
-    name = tagFnName ARefs.ifThenElse
+    hofName = tagFnName ARefs.ifThenElse
     parseCallAndInitState [Variable v, LamArg thenBr@(Lam {beginAssignment = Direct ret}), LamArg elseBr] =
         pure $ IfFn v thenBr elseBr ret
     parseCallAndInitState args =

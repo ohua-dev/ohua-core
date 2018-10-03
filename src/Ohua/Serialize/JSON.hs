@@ -21,16 +21,13 @@
 
 module Ohua.Serialize.JSON (encode, eitherDecode) where
 
-import Protolude
+import Ohua.Prelude hiding (Options)
 
 import Data.Aeson
 import Data.Aeson.Types
 import Data.List
-import Control.Monad (fail)
 
 import Ohua.DFGraph
-import Ohua.Types hiding (Options)
-import Ohua.Util
 
 
 baseOptions :: Options
@@ -44,25 +41,25 @@ sourceOptions = baseOptions
     { constructorTagModifier = \case
         "LocalSource" -> "local"
         "EnvSource" -> "env"
-        _ -> panicS "This is only intended for use with something of type `Source`"
+        _ -> error "This is only intended for use with something of type `Source`"
     , sumEncoding = TaggedObject "type" "val"
     }
 
 operatorOptions :: Options
 operatorOptions = baseOptions
     { fieldLabelModifier =
-        fieldLabelModifier baseOptions . fromMaybe (panicS "no prefix") . stripPrefix "operator"
+        fieldLabelModifier baseOptions . fromMaybe (error "no prefix") . stripPrefix "operator"
     }
 
 qualBindOptions :: Options
 qualBindOptions = baseOptions
     { fieldLabelModifier =
-        fieldLabelModifier baseOptions . fromMaybe (panicS "no prefix") . stripPrefix "qb"
+        fieldLabelModifier baseOptions . fromMaybe (error "no prefix") . stripPrefix "qb"
     }
 
 
 makeInJSON :: Make t => SourceType t -> Parser t
-makeInJSON = either (fail . toS) pure . make
+makeInJSON = either (fail . toString) pure . make
 
 unwrapToEncoding :: (Unwrap t, ToJSON (SourceType t)) => t -> Encoding
 unwrapToEncoding = toEncoding . unwrap

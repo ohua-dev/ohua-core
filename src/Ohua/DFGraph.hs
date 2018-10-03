@@ -9,12 +9,11 @@
 -- This source code is licensed under the terms described in the associated LICENSE.TXT file
 module Ohua.DFGraph where
 
-import Protolude
+import Ohua.Prelude
 
 import qualified Data.HashMap.Strict as HM
 
 import           Ohua.DFLang.Lang
-import           Ohua.Types
 
 data Operator = Operator
     { operatorId   :: !FnId
@@ -81,12 +80,12 @@ toGraph (DFExpr lets r) = OutGraph ops grArcs (getSource r)
                   case returnAssignment l of
                       Direct v -> [(v, -1)]
                       Destructure vars -> zip vars [0 ..]
-                      g -> panic $ "Found unsupported assignment: " <> show g
+                      g -> error $ "Found unsupported assignment: " <> show g
             ]
     grArcs = concatMap toArc (toList lets)
     getSource v =
         fromMaybe
-            (panic $
+            (error $
              "Undefined Binding: DFVar " <>
              show v <> " defined vars: " <> show sources) $
         HM.lookup v sources

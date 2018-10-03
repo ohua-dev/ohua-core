@@ -21,7 +21,7 @@
 
 module Ohua.ALang.Passes where
 
-import Protolude
+import Ohua.Prelude
 
 import Control.Monad.RWS.Lazy (evalRWST)
 import Control.Monad.Writer (runWriter, listen, tell)
@@ -31,8 +31,6 @@ import qualified Data.HashSet as HS
 
 import Ohua.ALang.Lang
 import qualified Ohua.ALang.Refs as Refs
-import Ohua.Monad
-import Ohua.Types
 
 
 -- | Inline all references to lambdas.
@@ -128,7 +126,7 @@ inlineReassignments = flip runReader HM.empty . cata go
                     Destructure _ ->
                         Let assign (Apply (Var (Sf Refs.id Nothing)) v) <$> body
                     Recursive _ ->
-                        panic
+                        error
                             "TODO implement inlining reassignments for recursive bindings"
             v -> Let assign v <$> body
     go (VarF val@(Local bnd)) = asks (fromMaybe (Var val) . HM.lookup bnd)
@@ -212,7 +210,7 @@ removeCurrying e = fst <$> evalRWST (para inlinePartials e) mempty ()
                 v@(Var (Local bnd')) ->
                     asks (HM.lookup bnd') >>=
                     maybe (pure v) (\e' -> tell (HS.singleton bnd') >> pure e')
-                other -> pure other
+                other0 -> pure other0
         (body', touched) <- listen $ local (HM.insert bnd val') body
         pure $
             if bnd `HS.member` touched
@@ -350,7 +348,7 @@ compressEnvExpressions compress = either pure compress' <=< go
         case v of
             Env e -> Right $ Var $ Right e
             Local l -> Right $ Var $ Left l
-            other -> Left $ Var other
+            other0 -> Left $ Var other0
     go (Apply e1 e2) = do
         e1' <- go e1
         e2' <- go e2

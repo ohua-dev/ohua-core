@@ -8,20 +8,17 @@ module Ohua.ALang.PPrint
     , quickRender
     ) where
 
-import Protolude hiding (Symbol)
+import Ohua.Prelude
 
 import Data.Functor.Foldable
 import Data.Text.Prettyprint.Doc
 import Data.Text.Prettyprint.Doc.Render.Text
-import Lens.Micro
 import qualified Data.HashMap.Strict as HM
 
 import Ohua.ALang.Lang
 import Ohua.ALang.NS
-import Ohua.Unit
-import Ohua.Types
-import Ohua.LensClasses
 import Ohua.Constants.HostExpr as HEConst
+import Ohua.Unit
 
 prettyAExpr ::
        (bndType -> Doc a)

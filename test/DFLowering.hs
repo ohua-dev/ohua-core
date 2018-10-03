@@ -5,9 +5,8 @@
 
 module DFLowering where
 
-import Protolude hiding (Symbol)
+import Ohua.Prelude
 
-import Data.Default.Class
 import Data.Graph.Inductive.Graph
 import Data.Graph.Inductive.PatriciaTree
 import qualified Data.IntMap.Strict as IntMap
@@ -21,9 +20,7 @@ import Ohua.DFGraph
 import Ohua.DFLang.Lang
 import Ohua.DFLang.Passes
 import qualified Ohua.DFLang.Refs as Refs
-import Ohua.Monad
 import Ohua.Test.DFGraph
-import Ohua.Types
 
 sf :: a -> AExpr bndType (Symbol a)
 sf = Var . flip Sf Nothing
@@ -42,7 +39,7 @@ shouldSatisfyRet action predicate = action >>= (`shouldSatisfy` predicate)
 
 runLowering :: Expression -> IO DFExpr
 runLowering =
-    fmap (either panic identity) .
+    fmap (either error identity) .
     runSilentLoggingT . runFromExpr def lowerALang
 
 -- | IMPORTANT: Both source and target expression must be in SSA form

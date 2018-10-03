@@ -96,15 +96,14 @@ module Ohua.ALang.Lang
   , mapBnds, mapRefs, removeTyAnns
   ) where
 
-import Protolude hiding (Symbol)
+import Universum
 
 import Data.Foldable as F
 import Data.Functor.Foldable as RS
 import Data.Generics.Uniplate.Direct
-import Data.String
-import Lens.Micro ((^.),Lens)
-import Ohua.LensClasses
+
 import Ohua.Types
+import Ohua.LensClasses
 
 #include "compat.h"
 
@@ -207,6 +206,8 @@ data AExprF bndType refType a
     | LambdaF (AbstractAssignment bndType)
               a -- ^ Anonymous function definition
     deriving (Functor, F.Foldable, Traversable, Show, Eq)
+
+instance Container (AExprF bndType refType a)
 
 type instance Base (AExpr bndType refType) = AExprF bndType refType
 
