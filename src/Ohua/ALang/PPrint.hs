@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 module Ohua.ALang.PPrint
     ( Pretty(pretty)
     , prettyAExpr
@@ -28,9 +29,9 @@ prettyAExpr ::
     -> ((bndType -> Doc a) -> AbstractAssignment bndType -> Doc a)
     -> AExpr bndType refType
     -> Doc a
-prettyAExpr prettyBnd prettyRef prettyAssign = fst . cata worker
+prettyAExpr prettyBnd prettyRef prettyAbstractAssign0 = fst . cata worker
   where
-    prettyAssign = prettyAbstractAssignment prettyBnd
+    prettyAssign = prettyAbstractAssign0 prettyBnd
     parenthesize (e, True) = parens e
     parenthesize (e, False) = e
     noParens = (, False)
@@ -114,10 +115,10 @@ prettyNS prettyDecl ns =
               , prettyImports (ns ^. sfImports)
               , "symbols:"
               , indent 2 $
-                vsep $
-                map
-                    (\(name, impl) -> sep [pretty name <+> "=", indent 2 $ prettyDecl impl])
-                    (HM.toList $ ns ^. decls)
+                vsep
+                    [ sep [pretty symName <+> "=", indent 2 $ prettyDecl impl]
+                    | (symName, impl) <- HM.toList $ ns ^. decls
+                    ]
               ]
         ]
   where
