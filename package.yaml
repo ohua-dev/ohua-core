@@ -79,7 +79,6 @@ library:
   - Ohua.ALang.Lang
   - Ohua.ALang.Refs
   - Ohua.ALang.NS
-  - Ohua.ALang.Show
   - Ohua.ALang.PPrint
   - Ohua.ALang.Passes
   - Ohua.ALang.Passes.SSA
