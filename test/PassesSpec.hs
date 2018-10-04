@@ -93,7 +93,7 @@ prop_passes input =
                         Left err ->
                             failed
                                 { P.reason =
-                                      toS $
+                                      toString $
                                       T.unlines
                                           [ err
                                           , "Input:"

@@ -1,6 +1,3 @@
-{-# LANGUAGE NamedFieldPuns #-}
-{-# LANGUAGE OverloadedLists #-}
-{-# LANGUAGE StandaloneDeriving #-}
 {-# OPTIONS_GHC -fno-warn-orphans -fno-warn-missing-methods #-}
 
 module DFLowering where
@@ -11,7 +8,6 @@ import Data.Graph.Inductive.Graph
 import Data.Graph.Inductive.PatriciaTree
 import qualified Data.IntMap.Strict as IntMap
 import qualified Data.IntSet as IntSet
-import Data.String
 import Test.Hspec
 
 import Ohua.ALang.Lang
@@ -257,7 +253,7 @@ matchAndReport gr1 gr2
  =
     case matchGraph gr1 gr2 of
         Right _ -> return ()
-        Left (largest, keys) ->
+        Left (largest, keys0) ->
             let selectedGr1Nodes = IntMap.elems largest
                 selectedGr2Nodes = IntMap.keys largest
                 unselectedGr1Nodes =
@@ -270,16 +266,16 @@ matchAndReport gr1 gr2
                     filter
                         (not . flip IntSet.member (IntMap.keysSet largest) . fst)
                         (labNodes gr2)
-             in expectationFailure $
+             in expectationFailure $ toString $
                 unlines
                     [ "Graphs weren't isomorphic."
                     , "The largest match was between"
                     , ""
-                    , prettify (subgraph selectedGr1Nodes gr1)
+                    , prettify0 (subgraph selectedGr1Nodes gr1)
                     , ""
                     , "and"
                     , ""
-                    , prettify (subgraph selectedGr2Nodes gr2)
+                    , prettify0 (subgraph selectedGr2Nodes gr2)
                     , ""
                     , "I could not match the nodes"
                     , ""
@@ -288,7 +284,7 @@ matchAndReport gr1 gr2
                     , "with"
                     , ""
                     , show $ unselectedGr2Nodes
-                    , case keys of
+                    , case keys0 of
                           Nothing -> ""
                           Just (_, x) ->
                               unlines
@@ -305,3 +301,5 @@ matchAndReport gr1 gr2
                                   , show unselectedGr2Nodes
                                   ]
                     ]
+  where
+    prettify0 = toText . prettify
