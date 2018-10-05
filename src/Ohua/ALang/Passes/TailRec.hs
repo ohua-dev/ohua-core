@@ -46,6 +46,7 @@ markRecursiveBindings = fst . runWriter . cata go
     shadowAssign (Recursive _) =
         error "TODO implement `shadowAssign` for `Recursive`"
 
+-- FIXME use State monad!
 findRecCall ::
        Expression -> HS.HashSet Binding -> (HS.HashSet Binding, Expression)
 findRecCall (Let (Direct a) expr inExpr) algosInScope
@@ -63,7 +64,7 @@ findRecCall (Let a expr inExpr) algosInScope =
 findRecCall (Apply (Var (Local binding)) a) algosInScope
     | HS.member binding algosInScope
      -- no recursion here because if the expression is correct then these can be only nested APPLY statements
-     = (HS.insert binding HS.empty, Apply "ohua.lang/recur" a)
+     = (HS.insert binding HS.empty, Apply "ohua.lang/scope" a)
 findRecCall (Apply a b) algosInScope =
     let (aFound, aExpr) = findRecCall a algosInScope
         (bFound, bExpr) = findRecCall b algosInScope
