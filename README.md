@@ -26,12 +26,28 @@ the compiler are
 Furthermore the compiler defines a set of hooks for adding custom manipulations
 to the compilation pipeline.
 
-## Code formatting
+
+## Information for Developers
+
+### Documentation
+
+The official, verbose documentation is on
+[readthedocs](https://ohua.readthedocs.org).
+
+In addition many of the parts of the compiler library are documented with the
+documentation tool [haddock](https://haskell.org/haddock).
+
+To get a browsable documentation locally use `stack hoogle -- serve --local`.
+This will build the documentation for both the core, as well as its
+dependencies and start a server locally on port `8080`. There you can search for
+functions, types, modules and libraries and browse their documentation.
+
+### Code formatting
 
 The default formatting for code is done using the `hindent` library, the
 configuration file `.hindent.yaml` can be found at the project root.
 
-## Notes on Universum
+### Notes on Universum
 
 I use a `Prelude` replacement called `Universum` in this project. This has a few
 minor consequences for how code is written. Most importantly I activate the
