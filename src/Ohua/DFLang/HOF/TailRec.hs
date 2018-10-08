@@ -9,18 +9,31 @@ import Data.Sequence (Seq, (<|), (|>))
 import qualified Data.Sequence as S
 
 import Ohua.ALang.Lang
-import Ohua.ALang.Refs as ALangRefs
+import Ohua.ALang.Refs as ARefs
 import Ohua.DFLang.Lang
 import qualified Ohua.DFLang.Refs as Refs
 import Ohua.DFLang.Util
 
--- the call in ALang is still (recur algoRef args).
--- it needs to become (recur conditionOutput algoInArgs recurArgs).
-data RecursiveLambdaSpec = RecursiveLambdaSpec
+data RecursiveLambda = RecursiveLambda
     { formalInputs :: [Binding] -- as defined by the expression
     , lambdaFormalsToAlgoIn :: HM.HashMap Binding Binding
     , dfExpr :: DFExpr
     } deriving (Show)
+
+instance HigherOrderFunction RecursiveLambda where
+  hofName = tagFnName ARefs.recur
+
+  parseCallAndInitState [LamArg lam : vars] = undefined
+  parseCallAndInitState a = throwError $ "Unexpected number/type of arguments to recur" <> show a
+
+  createContextEntry = undefined
+
+  createContextExit assignment = undefined
+
+  scopeFreeVariables bindings freeVars = undefined
+
+  contextifyUnboundFunctions lambda = undefined
+
 
 -- | Executed to generate the recursive lambda expression.
 recursionLowering ::

@@ -25,6 +25,11 @@ smapFun = DFFunction "ohua.lang/smapFun"
 id :: DFFnRef
 id = EmbedSf Refs.id
 
+true :: DFFnRef
+true = EmbedSf Refs.true
+
+false :: DFFnRef
+false = EmbedSf Refs.false
 
 bool :: DFFnRef
 bool = EmbedSf Refs.bool
@@ -71,17 +76,17 @@ smapGFun = DFFunction "ohua.lang/smapGFun"
 collectG :: DFFnRef
 collectG = DFFunction "ohua.lang/collectG"
 
-
+-- TODO Why do we need this?
 repeat :: DFFnRef
 repeat = DFFunction "ohua.lang/repeat"
 
-
+-- TODO Why do we need this?
 isJust :: DFFnRef
 isJust = EmbedSf "ohua.lang/isJust"
 
-
+-- FIXME I don't think we needs this as of now.
 ndMerge :: DFFnRef
-ndMerge = DFFunction "ohua.lang/mdMerge"
+ndMerge = DFFunction "ohua.lang/ndMerge"
 
 
 toGen :: DFFnRef
