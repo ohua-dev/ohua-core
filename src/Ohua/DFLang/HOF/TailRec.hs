@@ -39,4 +39,5 @@ instance HigherOrderFunction RecursiveLambda where
            ]
 
   scopeFreeVariables bindings freeVars = return ([],[]) -- TODO
+
   contextifyUnboundFunctions lambda = return Nothing -- TODO
