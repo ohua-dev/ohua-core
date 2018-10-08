@@ -65,7 +65,8 @@ import Ohua.ALang.Lang
 -- Phase 3: (Performed on the expression in ALang-normalized form (ANF)!)
 -- Rewrite the code (for a call) such that:
 --
--- let g = recur (\x1 ... xn -> ...
+-- let g = recur (\x -> let (x1 ... xn) = x
+--                             ...
 --                             let y1 = ....
 --                             ...
 --                             let yn = ...
@@ -147,7 +148,7 @@ hoferize (Lambda a e) = Lambda a <$> hoferize e
 hoferize v@(Var _) = return v
 
 -- Phase 3:
-rewrite :: MonadError Error m => Expression -> m Expression
+rewrite :: MonadGenBnd m, MonadError Error m => Expression -> m Expression
 rewrite e | isRecurHofCall e = rewriteCallExpr e
 rewrite (Let v expr inExpr) = Let v <$> rewrite expr <*> rewrite inExpr
 rewrite (Apply a b) = Apply <$> rewrite a <*> rewrite b
@@ -158,15 +159,17 @@ isRecurHofCall (Apply (Var (Sf "ohua.lang/recur_hof" _)) _) = True
 isRecurHofCall (Apply e@(Apply _ _) _) = isRecurHofCall e
 isRecurHofCall _ = False
 
-rewriteCallExpr :: MonadError Error m => Expression -> m Expression
+rewriteCallExpr :: MonadGenBnd m, MonadError Error m => Expression -> m Expression
 rewriteCallExpr e =
   let [(Var (Sf "ohua.lang/recur_hof")):[lamExpr:initialArgs]] = convertApplyToList e
   let arrayfiedArgs = fromApplyToList [(Var (Sf "ohua.lang/array"))] ++ initialArgs
   lamExpr' <- rewriteLambdaExpr lamExpr
   return $ Apply (Apply (Var (Sf "ohua.lang/recur")) lamExpr') arrayfiedArgs
 
-rewriteLambdaExpr :: MonadError Error m => Expression -> m Expression
-rewriteLambdaExpr (Lambda vars expr) = return $ Lambda vars $ rewriteLastCond expr
+rewriteLambdaExpr :: MonadGenBnd m, MonadError Error m => Expression -> m Expression
+rewriteLambdaExpr (Lambda vars expr) = do
+  x <- generateBinding
+  return $ Lambda x $ Let (Destructure vars) x $ rewriteLastCond expr
   where
     rewriteLastCond (Let v e o@(Var _)) = return $ Let v (rewriteCond e) o
     rewriteLastCond (Let v e ie) = return $ Let v e $ rewriteLastCond ie
