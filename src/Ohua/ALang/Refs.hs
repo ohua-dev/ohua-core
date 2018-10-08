@@ -24,6 +24,12 @@ array = "ohua.lang/array"
 smap :: QualifiedBinding
 smap = "ohua.lang/smap"
 
+true :: DFFnQualifiedBindingRef
+true = "ohua.lang/true"
+
+false :: QualifiedBinding
+false = "ohua.lang/false"
+
 bool :: QualifiedBinding
 bool = "ohua.lang/bool"
 

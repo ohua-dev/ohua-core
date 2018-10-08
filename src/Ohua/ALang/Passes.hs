@@ -303,7 +303,7 @@ normalize e =
     ensureAtLeastOneCall
     -- we repeat this step until a fix point is reached.
     -- this is necessary as lambdas may be input to lambdas,
-    -- which means after inlining them we may ba able again to
+    -- which means after inlining them we may be able again to
     -- inline a ref and then inline the lambda.
     -- I doubt this will ever do more than two or three iterations,
     -- but to make sure it accepts every valid program this is necessary.

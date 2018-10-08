@@ -202,7 +202,7 @@ data AExprF bndType refType a
     = VarF refType -- ^ A reference to a value
     | LetF (AbstractAssignment bndType)
            a
-           a -- ^ Binding of a value to one ore more identifiers
+           a -- ^ Binding of a value to one or more identifiers
     | ApplyF a
              a -- ^ Function application
     | LambdaF (AbstractAssignment bndType)
