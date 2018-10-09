@@ -33,16 +33,16 @@ data FunAnn tyExpr = FunAnn
 type Imports = [(NSRef, [Binding])]
 
 type Feature = Text
-data Pragma
-    = Feature Feature
+data Pragma =
+    Feature Feature
     deriving (Generic, Show, Eq, Ord)
 
 parsePragma :: MonadError Error m => Text -> m Pragma
 parsePragma t =
-  case words t of
-      ["feature", f] -> pure $ Feature f
-      (x:_) -> throwError $ "Unknown Pragma \'"<>x<>"\'"
-      [] -> throwError $ "Pragma cannot be empty"
+    case words t of
+        ["feature", f] -> pure $ Feature f
+        (x:_) -> throwError $ "Unknown Pragma \'" <> x <> "\'"
+        [] -> throwError $ "Pragma cannot be empty"
 
 -- | A namespace as defined by the ohua API. It has a name, a list of
 -- dependencies and aliasings and some defined expressions (currently
@@ -51,13 +51,16 @@ parsePragma t =
 -- Because the layout of the namespace itself is considered unstable use lenses
 -- instead to interact with namespaces. To create new namespaces first create an
 -- empty one with 'emptyNamespace' and then populate it using lenses.
+--
+-- Note that the "Eq" instance here is mainly meant for testing purposes and
+-- should otherwise not be relied upon.
 data Namespace decl =
     Namespace NSRef -- name
-               [Pragma]
-               Imports -- algo imports
-               Imports -- sf imports
-               (HM.HashMap Binding decl) -- declarations
-  deriving (Generic, Show)
+              [Pragma]
+              Imports -- algo imports
+              Imports -- sf imports
+              (HM.HashMap Binding decl) -- declarations
+    deriving (Generic, Show, Eq)
 
 emptyNamespace :: NSRef -> Namespace decl
 emptyNamespace name0 = Namespace name0 [] [] [] mempty
