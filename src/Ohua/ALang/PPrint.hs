@@ -29,16 +29,16 @@ prettyAExpr ::
 prettyAExpr prettyBnd prettyRef prettyAbstractAssign0 = fst . cata worker
   where
     prettyAssign = prettyAbstractAssign0 prettyBnd
-    parenthesize (e, True) = parens e
-    parenthesize (e, False) = e
-    noParens = (, False)
-    needParens = (, True)
+    parenthesize prec1 (e, prec0) | prec0 > prec1 = parens e
+                                  | otherwise = e
+    noParens = (, 0)
+    needParens prec = (, prec)
     discardParens = fst
     worker =
         \case
             VarF bnd -> noParens $ prettyRef bnd
             LetF assign expr cont ->
-                needParens $
+                needParens 3 $
                 sep
                     [ "let" <+>
                       align (sep
@@ -48,9 +48,9 @@ prettyAExpr prettyBnd prettyRef prettyAbstractAssign0 = fst . cata worker
                     , "in" <+> align (discardParens cont)
                     ]
             ApplyF fun arg ->
-                needParens $ sep [discardParens fun, parenthesize arg]
+                needParens 1 $ sep [parenthesize 1 fun, parenthesize 0 arg]
             LambdaF assign body ->
-                needParens $
+                needParens 2 $
                 sep
                     [ "λ" <+> prettyAssign assign <+> "->"
                     , hang 2 $ discardParens body
@@ -102,30 +102,18 @@ quickRender =
 
 prettyNS :: (decl -> Doc a) -> Namespace decl -> Doc a
 prettyNS prettyDecl ns =
-    vsep
-        [ "namespace" <+> pretty (ns ^. name)
-        , indent 2 $
-          vsep
-              [ "algo imports:"
-              , prettyImports (ns ^. algoImports)
-              , "sf imports:"
-              , prettyImports (ns ^. sfImports)
-              , "symbols:"
-              , indent 2 $
-                vsep
-                    [ sep [pretty symName <+> "=", indent 2 $ prettyDecl impl]
-                    | (symName, impl) <- HM.toList $ ns ^. decls
-                    ]
-              ]
-        ]
+    vsep $
+    ("module" <+> pretty (ns ^. name)) :
+    "" :
+    map (prettyImport "algo") (ns ^. algoImports) <>
+    map (prettyImport "sf") (ns ^. sfImports) <>
+    intersperse line (map prettyDecl0 (HM.toList $ ns ^. decls))
   where
-    prettyImports =
-        indent 2 .
-        vsep .
-        map
-            (\(nsref, bnds) ->
-                 fillBreak 10 (pretty nsref) <+>
-                 align (fillSep $ map pretty bnds))
+    prettyImport ty (nsref, bnds) =
+        "import" <+> ty <+> fillBreak 10 (pretty nsref) <+>
+        tupled (map pretty bnds)
+    prettyDecl0 (bnd, expr) =
+        "let" <+> pretty bnd <+> "=" <+> prettyDecl expr <> ";;"
 
 instance Pretty decl => Pretty (Namespace decl) where
     pretty = prettyNS pretty
