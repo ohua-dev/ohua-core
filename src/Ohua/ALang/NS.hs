@@ -28,13 +28,14 @@ import qualified Data.HashMap.Strict as HM
 data FunAnn tyExpr = FunAnn
     { argTypes :: [tyExpr]
     , retType :: tyExpr
-    } deriving (Show, Eq, Functor, Foldable, Traversable)
+    } deriving (Show, Eq, Functor, Foldable, Traversable, Generic)
 
 type Imports = [(NSRef, [Binding])]
 
 type Feature = Text
 data Pragma
     = Feature Feature
+    deriving (Generic, Show, Eq, Ord)
 
 parsePragma :: MonadError Error m => Text -> m Pragma
 parsePragma t =
@@ -56,6 +57,7 @@ data Namespace decl =
                Imports -- algo imports
                Imports -- sf imports
                (HM.HashMap Binding decl) -- declarations
+  deriving (Generic, Show)
 
 emptyNamespace :: NSRef -> Namespace decl
 emptyNamespace name0 = Namespace name0 [] [] [] mempty
