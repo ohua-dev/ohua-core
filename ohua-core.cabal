@@ -100,7 +100,6 @@ library
       Ohua.DFLang.Util
       Ohua.DFLang.HOF
       Ohua.DFLang.Passes
-      Ohua.DFLang.TailRec
       Ohua.DFLang.Optimizations
       Ohua.DFGraph
       Ohua.DFGraph.Show
@@ -118,6 +117,7 @@ library
       Ohua.DFLang.HOF.Seq
       Ohua.DFLang.HOF.Smap
       Ohua.DFLang.HOF.SmapG
+      Ohua.DFLang.HOF.TailRec
       Ohua.DFLang.Verify
       Ohua.Internal.Monad
       Paths_ohua_core

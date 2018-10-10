@@ -9,6 +9,7 @@ import Data.Functor.Foldable
 import qualified Data.HashSet as HS
 
 import Ohua.ALang.Lang
+import Ohua.Unit
 
 -- Design:
 -- ============
@@ -104,7 +105,7 @@ import Ohua.ALang.Lang
 
 -- Phase 1:
 findTailRecs :: Expression -> Expression
-findTailRecs = snd . flip runStateT $ findRecCall $ RecTracking False HS.empty
+findTailRecs = snd . (flip findRecCall HS.empty)
 
 findRecCall :: Expression -> HS.HashSet Binding -> (HS.HashSet Binding, Expression)
 findRecCall (Let (Direct a) expr inExpr) algosInScope
@@ -136,11 +137,11 @@ findRecCall (Lambda a e) algosInScope =
             else (eFound, Lambda a eExpr)
 
 -- Phase 2:
-hoferize :: MonadGenBnd m => Expression -> m Expression
+hoferize :: (Monad m, MonadGenBnd m) => Expression -> m Expression
 hoferize (Let (Recursive f) expr inExpr) = do
   f' <- generateBindingWith f
   return $ Let (Direct f') expr
-              $ Let (Direct f) (Apply (Var (Sf "ohua.lang/recur_hof" Nothing)) f')
+              $ Let (Direct f) (Apply (Var (Sf "ohua.lang/recur_hof" Nothing)) (Var (Local f')))
                     inExpr
 hoferize (Let v expr inExpr) = Let v <$> hoferize expr <*> hoferize inExpr
 hoferize (Apply a b) = Apply <$> hoferize a <*> hoferize b
@@ -148,60 +149,68 @@ hoferize (Lambda a e) = Lambda a <$> hoferize e
 hoferize v@(Var _) = return v
 
 -- Phase 3:
-rewrite :: MonadGenBnd m, MonadError Error m => Expression -> m Expression
+rewrite :: (MonadGenBnd m, MonadError Error m) => Expression -> m Expression
 rewrite e | isRecurHofCall e = rewriteCallExpr e
 rewrite (Let v expr inExpr) = Let v <$> rewrite expr <*> rewrite inExpr
 rewrite (Apply a b) = Apply <$> rewrite a <*> rewrite b
-rewrite (Lambda a e) = Lambda a <$> rewrite b
+rewrite (Lambda a e) = Lambda a <$> rewrite e
 rewrite v@(Var _) = return v
 
 isRecurHofCall (Apply (Var (Sf "ohua.lang/recur_hof" _)) _) = True
 isRecurHofCall (Apply e@(Apply _ _) _) = isRecurHofCall e
 isRecurHofCall _ = False
 
-rewriteCallExpr :: MonadGenBnd m, MonadError Error m => Expression -> m Expression
-rewriteCallExpr e =
-  let [(Var (Sf "ohua.lang/recur_hof")):[lamExpr:initialArgs]] = convertApplyToList e
-  let arrayfiedArgs = fromApplyToList [(Var (Sf "ohua.lang/array"))] ++ initialArgs
+rewriteCallExpr :: (MonadGenBnd m, MonadError Error m) => Expression -> m Expression
+rewriteCallExpr e = do
+  let ( (Var (Sf "ohua.lang/recur_hof" _)) : (lamExpr : initialArgs) ) = fromApplyToList e
+  let arrayfiedArgs = fromListToApply (Sf "ohua.lang/array" Nothing) initialArgs
   lamExpr' <- rewriteLambdaExpr lamExpr
-  return $ Apply (Apply (Var (Sf "ohua.lang/recur")) lamExpr') arrayfiedArgs
+  return $ Apply (Apply (Var (Sf "ohua.lang/recur" Nothing)) lamExpr') arrayfiedArgs
 
-rewriteLambdaExpr :: MonadGenBnd m, MonadError Error m => Expression -> m Expression
+rewriteLambdaExpr :: (MonadGenBnd m, MonadError Error m) => Expression -> m Expression
 rewriteLambdaExpr (Lambda vars expr) = do
   x <- generateBinding
-  return $ Lambda x $ Let (Destructure vars) x $ rewriteLastCond expr
+  expr' <- rewriteLastCond expr
+  return $ Lambda (Direct x) $ Let (Destructure (extractBindings vars)) (Var (Local x)) expr'
   where
-    rewriteLastCond (Let v e o@(Var _)) = return $ Let v (rewriteCond e) o
-    rewriteLastCond (Let v e ie) = return $ Let v e $ rewriteLastCond ie
+    rewriteLastCond :: (MonadGenBnd m, MonadError Error m) => Expression -> m Expression
+    rewriteLastCond (Let v e o@(Var _)) = (\e' -> Let v e' o) <$> rewriteCond e
+    rewriteLastCond (Let v e ie) = Let v e <$> rewriteLastCond ie
 
-    rewriteCond (Apply (Apply c@(Apply (Var (Sf "ohua.lang/if")) cond) (Lambda a trueB)) (Lambda b falseB)) =
-      return (Apply (Apply c (Lambda a $ rewriteBranch trueB)) (Lambda b rewriteBranch falseB))
+    rewriteCond :: (MonadGenBnd m, MonadError Error m) => Expression -> m Expression
+    rewriteCond (Apply (Apply c@(Apply (Var (Sf "ohua.lang/if" Nothing)) cond)
+                                       (Lambda a trueB))
+                                       (Lambda b falseB)) = do
+      trueB'  <- rewriteBranch trueB
+      falseB' <- rewriteBranch falseB
+      return $ Apply (Apply c (Lambda a trueB')) (Lambda b falseB')
     rewriteCond _ = error "invariant broken: recursive function does not have the proper structure."
 
-    rewriteBranch (Let v e@(Apply (Var (Sf "ohua.lang/id")) _) o) = return $ Let v (rewriteTerminationBranch e) o
-    rewriteBranch (Let v e o) = return $ Let v (rewriteRecursionBranch e $ fromApplyToList e) o
+    rewriteBranch :: (MonadGenBnd m, MonadError Error m) => Expression -> m Expression
+    rewriteBranch (Let v e@(Apply (Var (Sf "ohua.lang/id" Nothing)) _) o) = return $ Let v (rewriteTerminationBranch e) o
+    rewriteBranch (Let v e o) = (\e' -> Let v e' o) <$> (rewriteRecursionBranch e $ fromApplyToList e)
 
-    rewriteTerminationBranch e = return
-      (Apply (Apply (Var (Sf "ohua.lang/mkTuple"))
-                    (Apply (Var (Sf "ohua.lang/false")) Nothing))
+    rewriteTerminationBranch e =
+      (Apply (Apply (Var (Sf "ohua.lang/mkTuple" Nothing))
+                    (Apply (Var (Sf "ohua.lang/false" Nothing)) unitExpr ))
               e)
 
-    rewriteRecursionBranch e [(Var (Sf "ohua.lang/recur")): vars] = return
-      (Apply (Apply (Var (Sf "ohua.lang/mkTuple"))
-                    (Apply (Var (Sf "ohua.lang/true")) Nothing))
-                    replaceFn (Sf "ohua.lang/array") e)
+    rewriteRecursionBranch e ( (Var (Sf "ohua.lang/recur" _)) : vars ) = return
+      (Apply (Apply (Var (Sf "ohua.lang/mkTuple" Nothing))
+                    (Apply (Var (Sf "ohua.lang/true" Nothing)) unitExpr ))
+              $ replaceFn (Sf "ohua.lang/array" Nothing) e)
                   -- fromListToApply (Sf "ohua.lang/array") $ reverse vars)
-    rewriteRecursionBranch _ = error "invariant broken"
+    rewriteRecursionBranch _ _ = error "invariant broken"
 rewriteLambdaExpr _ = error "invariant broken"
 
-replaceFn fn (Apply (Var (Sf _)) v) = Apply f v
+replaceFn fn (Apply (Var (Sf _ _)) v) = Apply (Var fn) v
 replaceFn fn (Apply f v) = Apply (replaceFn fn f) v
 
-fromListToApply f [v:[]] = Apply (Var f) v
-fromListToApply f [v:vs] = Apply (fromListToApply f vs) v
+fromListToApply f (v:[]) = Apply (Var f) v
+fromListToApply f (v:vs) = Apply (fromListToApply f vs) v
 
 fromApplyToList (Apply f@(Var _) v) = [f, v]
-fromApplyToList (Apply a b) = convertApplyToList a ++ [b]
+fromApplyToList (Apply a b) = fromApplyToList a ++ [b]
 
 --  ==== Implementation ends here
 

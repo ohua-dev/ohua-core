@@ -30,24 +30,11 @@ import Ohua.DFLang.HOF.SmapG
 import Ohua.DFLang.HOF.Generate
 import Ohua.DFLang.Lang (DFExpr(..), DFFnRef(..), DFVar(..), LetExpr(..))
 import qualified Ohua.DFLang.Refs as Refs
--- import Ohua.DFLang.TailRec (lowerRecAlgoCall, recursionLowering)
 import Ohua.DFLang.Util
 
 type Pass m
      = QualifiedBinding -> FnId -> Assignment -> [Expression] -> m (Seq LetExpr)
 
---data AlgoSpec m = AlgoSpec { formalInputVars :: [Binding],
---                             dfExpr :: m DFExpr }
--- newtype LetRec = LetRec
---     { unLetRec :: HM.HashMap Binding (Assignment, Expression, Binding)
---     }
---
--- type LetRecT m a = ReaderT LetRec m a
-
-
-logState :: MonadLogger m => m ()
-logState =
-    ask >>= logDebugN . ("Current state: " <>) . show . HM.keys . unLetRec
 
 -- | Check that a sequence of let expressions does not redefine bindings.
 checkSSA :: (Container c, Element c ~ LetExpr, MonadOhua envExpr m) => c -> m ()
@@ -88,7 +75,6 @@ lowerToDF (Var (Local bnd)) = pure bnd
 lowerToDF (Var v) = failWith $ "Non local return binding: " <> show v
 lowerToDF (Let assign expr rest) = do
     logDebugN "Lowering Let -->"
-    logState
     handleDefinitionalExpr assign expr continuation
   where
     continuation = lowerToDF rest
@@ -100,40 +86,12 @@ handleDefinitionalExpr ::
     -> Expression
     -> m Binding
     -> m Binding
--- handleDefinitionalExpr assign exp0@(Lambda arg expr) cont
---     -- TODO handle lambdas with multiple arguments -> this requires
---     -- some ALang transformation to always get the form Lambda a
---     -- Lambda b ...
---  = do
---     handleTailRec <- fromEnv (options . transformRecursiveFunctions)
---     logDebugN $ "Detected recursive function:"
---     logDebugN $ quickRender $ Lambda assign exp0
---     unless handleTailRec $
---         failWith
---             "Handling recursive functions is not enabled, if you want to enable this experimental feature set `transformRecursiveFunctions` to true in the options passed to the compiler."
---     b <-
---         case assign of
---             Recursive b' -> pure b'
---             x ->
---                 failWith $
---                 "Invariant broken. Assignment should be a 'letrec' but was: " <>
---                 show x
---     singleArg <-
---         case arg of
---             Direct b' -> pure b'
---             x ->
---                 failWith $
---                 "Invariant broken. Assignment should be a 'Direct' but was: " <>
---                 show x
---     -- execute the rest of the traversal (the continuation) in the new
---     -- LetRecT environment
---     local (LetRec . HM.insert b (assign, expr, singleArg) . unLetRec) cont
 handleDefinitionalExpr assign l@(Apply _ _) cont = do
     (fn, fnId, args) <- handleApplyExpr l
     case HM.lookup fn hofNames of
         Just (WHOF (_ :: Proxy p)) ->
-            lift $ lowerHOF (hofName :: TaggedFnName p) assign args
-        Nothing -> lift $ tell =<< lowerDefault fn fnId assign args
+            lowerHOF (hofName :: TaggedFnName p) assign args
+        Nothing -> tell =<< lowerDefault fn fnId assign args
     cont
 handleDefinitionalExpr _ e _ =
     failWith $
@@ -153,21 +111,15 @@ lowerDefault fn fnId assign args =
 -- function and the nested arguments as a list.  Also generates a new
 -- function id for the inner function should it not have one yet.
 handleApplyExpr ::
-       (MonadOhua env m, MonadWriter (Seq LetExpr) m)
+       (MonadOhua env m)
     => Expression
     -> m (QualifiedBinding, FnId, [Expression])
-handleApplyExpr l@(Apply _ _) = ask >>= go l [] . unLetRec
+handleApplyExpr l@(Apply _ _) = go l []
   where
-    go ve@(Var v) args recAlgos =
+    go ve@(Var v) args =
         case v of
             Sf fn fnId -> (fn, , args) <$> maybe generateId return fnId
-            Local bnd
-                | Just (assign, expr, singleArg) <- HM.lookup bnd recAlgos ->
-                    lowerLambdaExpr assign expr
-                    -- >>=
-                    -- recursionLowering [singleArg] >>=
-                    -- lowerRecAlgoCall lowerDefault args
-                | otherwise ->
+            Local _ ->
                     fromEnv (options . callLocalFunction) >>= \case
                         Nothing ->
                             failWith
@@ -179,20 +131,12 @@ handleApplyExpr l@(Apply _ _) = ask >>= go l [] . unLetRec
                         failWith
                             "Calling environment functions is not supported in this adapter"
                     Just fn -> (fn, , ve : args) <$> generateId
-    go (Apply fn arg) args recAlgos = go fn (arg : args) recAlgos
-    go x _ _ = failWith $ "Expected Apply or Var but got: " <> show x
+    go (Apply fn arg) args = go fn (arg : args)
+    go x _ = failWith $ "Expected Apply or Var but got: " <> show x
 handleApplyExpr (Var (Sf fn fnId)) = (fn, , []) <$> maybe generateId return fnId
                                                                                  -- what is this?
 handleApplyExpr g = failWith $ "Expected apply but got: " <> show g
 
--- | Analyze a lambda expression. Since we perform lambda inlining,
--- this can only be a letrec.
-lowerLambdaExpr :: MonadOhua env m => Assignment -> Expression -> m DFExpr
-lowerLambdaExpr (Recursive _) expr = lowerALang expr
-lowerLambdaExpr a _ =
-    failWith $
-    "Expression was not inlined but assignment is not a 'letrec': " <>
-    show a
 
 tieContext0 ::
        (Monad m, Functor f, SemigroupConstraint (f LetExpr), f LetExpr ~ c, Container c, Element c ~ LetExpr)
