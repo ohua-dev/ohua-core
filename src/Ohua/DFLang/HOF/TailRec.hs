@@ -1,25 +1,24 @@
-module Ohua.DFLang.TailRec where
+module Ohua.DFLang.HOF.TailRec where
 
 import Ohua.Prelude
 
-import Control.Monad.Writer (MonadWriter, tell)
-import qualified Data.HashMap.Strict as HM
-import qualified Data.HashSet as HS
-import Data.Sequence (Seq, (<|), (|>))
-import qualified Data.Sequence as S
+-- import Control.Monad.Writer (MonadWriter, tell)
+-- import qualified Data.HashMap.Strict as HM
+-- import qualified Data.HashSet as HS
+-- import Data.Sequence (Seq, (<|), (|>))
+-- import qualified Data.Sequence as S
 
-import Ohua.ALang.Lang
 import Ohua.ALang.Refs as ARefs
 import Ohua.DFLang.Lang
 import qualified Ohua.DFLang.Refs as Refs
-import Ohua.DFLang.Util
+import Ohua.DFLang.HOF
 
 data Recur = Recur
-    { recursion :: Lambda
+    { recursion :: Lambda,
       initialArgs :: DFVar -- packaged in a []
     } deriving (Show)
 
-instance HigherOrderFunction RecursiveLambda where
+instance HigherOrderFunction Recur where
   hofName = tagFnName ARefs.recur
 
   parseCallAndInitState [LamArg lam, Variable v] = return $ Recur lam v
@@ -29,13 +28,14 @@ instance HigherOrderFunction RecursiveLambda where
   createContextEntry = return []
 
   createContextExit recurResultVar = do
-    (Recur (Lam lamIn lamOut) initArgs) <- get
+    (Recur (Lam (Direct lamIn) lamOut) initArgs) <- get
     recurId <- generateId
     return [
             LetExpr recurId
-                    (Destructure recurResultVar lamOutput)
+                    (Destructure $ (extractBindings recurResultVar) ++ [lamOut])
                     Refs.recur
                     [initArgs, DFVar lamIn]
+                    Nothing
            ]
 
   scopeFreeVariables bindings freeVars = return ([],[]) -- TODO

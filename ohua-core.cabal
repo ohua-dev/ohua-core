@@ -2,7 +2,7 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: ca61f7b88a83f17ae91bbac19d26e4313b568edfe05b7b08960a012ccf9004ec
+-- hash: 1a5f3555fdabf05a06b74381ae561c54b992eba9005971f75e460e583a35ef29
 
 name:           ohua-core
 version:        0.2.0
@@ -37,6 +37,49 @@ flag debug
   default: False
 
 library
+  exposed-modules:
+      Ohua.Compile
+      Ohua.Types
+      Ohua.LensClasses
+      Ohua.Monad
+      Ohua.Prelude
+      Ohua.ParseTools.Refs
+      Ohua.ALang.Lang
+      Ohua.ALang.Refs
+      Ohua.ALang.NS
+      Ohua.ALang.PPrint
+      Ohua.ALang.Passes
+      Ohua.ALang.Passes.SSA
+      Ohua.ALang.Passes.TailRec
+      Ohua.ALang.Optimizations
+      Ohua.ALang.Util
+      Ohua.DFLang.Lang
+      Ohua.DFLang.Refs
+      Ohua.DFLang.Util
+      Ohua.DFLang.HOF
+      Ohua.DFLang.Passes
+      Ohua.DFLang.PPrint
+      Ohua.DFLang.HOF.TailRec
+      Ohua.DFLang.Optimizations
+      Ohua.DFGraph
+      Ohua.DFGraph.Show
+      Ohua.Constants.HostExpr
+      Ohua.Serialize.JSON
+      Ohua.Stage
+      Ohua.Util
+      Ohua.Unit
+      Ohua.Test.DFGraph
+  other-modules:
+      Ohua.DAGLang.Lang
+      Ohua.DAGLang.Passes
+      Ohua.DFLang.HOF.Generate
+      Ohua.DFLang.HOF.If
+      Ohua.DFLang.HOF.Seq
+      Ohua.DFLang.HOF.Smap
+      Ohua.DFLang.HOF.SmapG
+      Ohua.DFLang.Verify
+      Ohua.Internal.Monad
+      Paths_ohua_core
   hs-source-dirs:
       src
   default-extensions: OverloadedStrings OverloadedLists MultiParamTypeClasses FunctionalDependencies TypeFamilies GADTs FlexibleContexts FlexibleInstances TypeSynonymInstances LambdaCase TupleSections BangPatterns ExplicitForAll ScopedTypeVariables DefaultSignatures DeriveFunctor DeriveFoldable DeriveTraversable DeriveGeneric PatternSynonyms NamedFieldPuns RecordWildCards ConstraintKinds StandaloneDeriving NoImplicitPrelude RankNTypes ViewPatterns
@@ -79,53 +122,12 @@ library
     ghc-options: -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints
   if flag(debug)
     cpp-options: -DDEBUG=1
-  exposed-modules:
-      Ohua.Compile
-      Ohua.Types
-      Ohua.LensClasses
-      Ohua.Monad
-      Ohua.Prelude
-      Ohua.ParseTools.Refs
-      Ohua.ALang.Lang
-      Ohua.ALang.Refs
-      Ohua.ALang.NS
-      Ohua.ALang.PPrint
-      Ohua.ALang.Passes
-      Ohua.ALang.Passes.SSA
-      Ohua.ALang.Passes.TailRec
-      Ohua.ALang.Optimizations
-      Ohua.ALang.Util
-      Ohua.DFLang.Lang
-      Ohua.DFLang.Refs
-      Ohua.DFLang.Util
-      Ohua.DFLang.HOF
-      Ohua.DFLang.Passes
-      Ohua.DFLang.PPrint
-      Ohua.DFLang.TailRec
-      Ohua.DFLang.Optimizations
-      Ohua.DFGraph
-      Ohua.DFGraph.Show
-      Ohua.Constants.HostExpr
-      Ohua.Serialize.JSON
-      Ohua.Stage
-      Ohua.Util
-      Ohua.Unit
-      Ohua.Test.DFGraph
-  other-modules:
-      Ohua.DAGLang.Lang
-      Ohua.DAGLang.Passes
-      Ohua.DFLang.HOF.Generate
-      Ohua.DFLang.HOF.If
-      Ohua.DFLang.HOF.Seq
-      Ohua.DFLang.HOF.Smap
-      Ohua.DFLang.HOF.SmapG
-      Ohua.DFLang.Verify
-      Ohua.Internal.Monad
-      Paths_ohua_core
   default-language: Haskell2010
 
 executable ohua-test-exec
   main-is: Main.hs
+  other-modules:
+      Paths_ohua_core
   default-extensions: OverloadedStrings OverloadedLists MultiParamTypeClasses FunctionalDependencies TypeFamilies GADTs FlexibleContexts FlexibleInstances TypeSynonymInstances LambdaCase TupleSections BangPatterns ExplicitForAll ScopedTypeVariables DefaultSignatures DeriveFunctor DeriveFoldable DeriveTraversable DeriveGeneric PatternSynonyms NamedFieldPuns RecordWildCards ConstraintKinds StandaloneDeriving NoImplicitPrelude RankNTypes ViewPatterns
   build-depends:
       aeson
@@ -142,12 +144,12 @@ executable ohua-test-exec
     , universum >=1.0
   if impl(ghc >= 8.4.0)
     ghc-options: -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints
-  other-modules:
-      Paths_ohua_core
   default-language: Haskell2010
 
 executable test-graph-gen
   main-is: GenJSONGraph.hs
+  other-modules:
+      Ohua.Types.Arbitrary
   hs-source-dirs:
       test
       ./.
@@ -168,13 +170,19 @@ executable test-graph-gen
     , universum >=1.0
   if impl(ghc >= 8.4.0)
     ghc-options: -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints
-  other-modules:
-      Ohua.Types.Arbitrary
   default-language: Haskell2010
 
 test-suite ohua-tests
   type: exitcode-stdio-1.0
   main-is: Spec.hs
+  other-modules:
+      ALangVerify
+      DFLowering
+      Ohua.Types.Arbitrary
+      PassesSpec
+      TestAesonConvert
+      TestALangUtils
+      Paths_ohua_core
   hs-source-dirs:
       test
   default-extensions: OverloadedStrings OverloadedLists MultiParamTypeClasses FunctionalDependencies TypeFamilies GADTs FlexibleContexts FlexibleInstances TypeSynonymInstances LambdaCase TupleSections BangPatterns ExplicitForAll ScopedTypeVariables DefaultSignatures DeriveFunctor DeriveFoldable DeriveTraversable DeriveGeneric PatternSynonyms NamedFieldPuns RecordWildCards ConstraintKinds StandaloneDeriving NoImplicitPrelude RankNTypes ViewPatterns
@@ -197,12 +205,4 @@ test-suite ohua-tests
     , universum >=1.0
   if impl(ghc >= 8.4.0)
     ghc-options: -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints
-  other-modules:
-      ALangVerify
-      DFLowering
-      Ohua.Types.Arbitrary
-      PassesSpec
-      TestAesonConvert
-      TestALangUtils
-      Paths_ohua_core
   default-language: Haskell2010
