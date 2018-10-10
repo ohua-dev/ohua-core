@@ -34,6 +34,9 @@ module Ohua.Types
     , _Recursive
     , HostExpr
     , Options
+    , callEnvExpr
+    , callLocalFunction
+    , transformRecursiveFunctions
     , OhuaState
     , Environment
     , Error
