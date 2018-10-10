@@ -358,11 +358,20 @@ type instance SourceType (OhuaState envExpr) =
 instance Make (OhuaState envExpr) where
     make (ng, fnid, exprs) = pure $ OhuaState ng fnid exprs
 
+type StageName = Text
+type AbortCompilation = Bool
+data DumpCode
+    = Don'tDump
+    | DumpShow
+    | DumpPretty
+    | DumpOther Text
+type StageHandling = StageName -> (AbortCompilation, DumpCode)
+
 -- | The read only compiler environment
-newtype Environment = Environment Options
+newtype Environment = Environment Options StageHandling
 
 instance Default Environment where
-    def = Environment def
+    def = Environment def (const (Don'tDump, True))
 
 nameGenerator :: Lens' (OhuaState envExpr) NameGenerator
 nameGenerator f (OhuaState gen counter envExprs) =
@@ -404,7 +413,10 @@ transformRecursiveFunctions :: Lens' Options Bool
 transformRecursiveFunctions f (Options c l e) = f e <&> Options c l
 
 options :: Lens' Environment Options
-options f (Environment opts) = Environment <$> f opts
+options f (Environment opts s) = (\a -> Environment a s) <$> f opts
+
+stageHandling :: Lens' Environment Options
+stageHandling f (Environment opts s) = Environment opts <$> f s
 
 -- | Generic way of attaching arbitrary, alterable data to some type.
 --
