@@ -19,6 +19,9 @@ module Ohua.ALang.NS
     , sfImports
     , pragmas
     , HasDecls(decls)
+    , Pragma(..)
+    , parsePragma
+    , Feature
     ) where
 
 import Ohua.Prelude
