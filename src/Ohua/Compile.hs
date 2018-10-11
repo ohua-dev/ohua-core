@@ -20,11 +20,12 @@ import Ohua.ALang.Lang
 import Ohua.ALang.Optimizations
 import Ohua.ALang.Passes
 import Ohua.ALang.Passes.SSA
+import Ohua.ALang.Passes.TailRec (loadTailRecPasses)
 import Ohua.DFGraph
-import Ohua.DFLang.Lang
 import Ohua.DFLang.Optimizations
 import Ohua.DFLang.Passes
 import qualified Ohua.DFLang.Verify
+import Ohua.Configuration
 import Ohua.Stage
 
 
@@ -51,7 +52,7 @@ pipeline CustomPasses{..} e = do
     ssaE <- performSSA e
     stage ssaAlang ssaE
     normalizedE <- normalize ssaE
-    stage normalizedAlang normalizedE
+    stage normalizedAlang normalizedE =<< passBeforeNormalize ssaE
 #ifdef DEBUG
     checkProgramValidity normalizedE
     checkHigherOrderFunctionSupport normalizedE
@@ -88,7 +89,8 @@ pipeline CustomPasses{..} e = do
 compile :: (MonadError Error m, MonadLoggerIO m) => Options -> CustomPasses env -> Expression -> m OutGraph
 compile opts passes exprs = do
     logFn <- askLoggerIO
-    either throwError pure =<< liftIO (runLoggingT (runFromExpr opts (pipeline passes) exprs) logFn)
+    let passes' = flip loadTailRecPasses passes $ view enableRecursiveFunctions opts
+    either throwError pure =<< liftIO (runLoggingT (runFromExpr opts (pipeline passes') exprs) logFn)
 
 
 -- | Verify that only higher order fucntions have lambdas as arguments

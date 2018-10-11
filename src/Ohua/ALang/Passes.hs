@@ -32,7 +32,6 @@ import qualified Data.HashSet as HS
 import Ohua.ALang.Lang
 import qualified Ohua.ALang.Refs as Refs
 
-
 -- | Inline all references to lambdas.
 -- Aka `let f = (\a -> E) in f N` -> `(\a -> E) N`
 inlineLambdaRefs :: MonadOhua envExpr m => Expression -> m Expression
