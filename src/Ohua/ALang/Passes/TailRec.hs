@@ -10,6 +10,7 @@ import qualified Data.HashSet as HS
 
 import Ohua.ALang.Lang
 import Ohua.Unit
+import Ohua.Configuration
 
 -- Design:
 -- ============
@@ -103,38 +104,50 @@ import Ohua.Unit
 
 --  ==== Implementation starts here
 
+loadTailRecPasses :: Bool -> CustomPasses env -> CustomPasses env
+loadTailRecPasses False passes@(CustomPasses{ passBeforeNormalize = bn }) = passes { passBeforeNormalize = (bn . findTailRecs False) }
+loadTailRecPasses True passes@(CustomPasses{ passBeforeNormalize = bn,
+                                             passAfterNormalize = an }) = passes { passBeforeNormalize = (\e -> bn =<< (hoferize $ findTailRecs True e)),
+                                                                                   passAfterNormalize  = (\e -> an =<< rewrite e) }
+
 -- Phase 1:
-findTailRecs :: Expression -> Expression
-findTailRecs = snd . (flip findRecCall HS.empty)
+findTailRecs :: Bool -> Expression -> Expression
+findTailRecs enabled = snd . flip runReader enabled . flip findRecCall HS.empty
 
-findRecCall :: Expression -> HS.HashSet Binding -> (HS.HashSet Binding, Expression)
-findRecCall (Let (Direct a) expr inExpr) algosInScope
-    -- did I detect a reference to this binding in the assignment expr?
-    | HS.member a found = (iFound, Let (Recursive a) e iExpr)
-    | otherwise = (HS.union found iFound, Let (Direct a) e iExpr)
-  where
+findRecCall :: Expression -> HS.HashSet Binding -> Reader Bool (HS.HashSet Binding, Expression)
+findRecCall (Let (Direct a) expr inExpr) algosInScope = do
     -- for the assigment expr I add the reference and check the expression for references to the identifier
-    (found, e) = findRecCall expr $ HS.insert a algosInScope
+    (found, e) <- findRecCall expr $ HS.insert a algosInScope
     -- proceed normally into the next expression
-    (iFound, iExpr) = findRecCall inExpr algosInScope
+    (iFound, iExpr) <- findRecCall inExpr algosInScope
+    -- did I detect a reference to this binding in the assignment expr?
+    return $ if HS.member a found
+             then (iFound, Let (Recursive a) e iExpr)
+             else (HS.union found iFound, Let (Direct a) e iExpr)
+  where
 
-findRecCall (Let a expr inExpr) algosInScope =
-    let (iFound, iExpr) = findRecCall inExpr algosInScope
-     in (iFound, Let a expr iExpr)
+findRecCall (Let a expr inExpr) algosInScope = do
+    (iFound, iExpr) <- findRecCall inExpr algosInScope
+    return (iFound, Let a expr iExpr)
 findRecCall (Apply (Var (Local binding)) a) algosInScope
     | HS.member binding algosInScope
      -- no recursion here because if the expression is correct then these can be only nested APPLY statements
-     = (HS.insert binding HS.empty, Apply "ohua.lang/recur" a)
-findRecCall (Apply a b) algosInScope =
-    let (aFound, aExpr) = findRecCall a algosInScope
-        (bFound, bExpr) = findRecCall b algosInScope
-     in (HS.union aFound bFound, Apply aExpr bExpr)
-findRecCall (Var b) _ = (HS.empty, Var b)
-findRecCall (Lambda a e) algosInScope =
-    let (eFound, eExpr) = findRecCall e algosInScope
-     in if HS.size eFound == 0
-            then (eFound, Lambda a eExpr)
-            else (eFound, Lambda a eExpr)
+     = do
+       enabledTR <- ask
+       if enabledTR
+       then return (HS.insert binding HS.empty, Apply "ohua.lang/recur" a)
+       else error $ "Detected recursion although tail recursion support is not enabled!"
+       -- else error $ "Detected recursion (" ++ (show binding) ++ ") although tail recursion support is not enabled!"
+findRecCall (Apply a b) algosInScope = do
+    (aFound, aExpr) <- findRecCall a algosInScope
+    (bFound, bExpr) <- findRecCall b algosInScope
+    return (HS.union aFound bFound, Apply aExpr bExpr)
+findRecCall (Var b) _ = return (HS.empty, Var b)
+findRecCall (Lambda a e) algosInScope = do
+    (eFound, eExpr) <- findRecCall e algosInScope
+    return $ if HS.size eFound == 0
+             then (eFound, Lambda a eExpr)
+             else (eFound, Lambda a eExpr)
 
 -- Phase 2:
 hoferize :: (Monad m, MonadGenBnd m) => Expression -> m Expression

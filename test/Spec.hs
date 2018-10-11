@@ -7,7 +7,7 @@ import           PassesSpec
 import           Test.Hspec
 import qualified TestAesonConvert
 import qualified TestALangUtils
-
+import qualified TailRecSpec
 
 
 main :: IO ()
@@ -20,3 +20,4 @@ main = hspec $ do
     --ALangVerify.currying
     TestALangUtils.spec
     TestAesonConvert.spec
+    TailRecSpec.passesSpec
