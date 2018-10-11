@@ -12,12 +12,12 @@ import qualified TailRecSpec
 
 main :: IO ()
 main = hspec $ do
-    passesSpec
-    DFLowering.generalLowering
-    DFLowering.ifSpec
-    DFLowering.seqSpec
-    DFLowering.smapSpec
-    --ALangVerify.currying
-    TestALangUtils.spec
-    TestAesonConvert.spec
+    -- passesSpec
+    -- DFLowering.generalLowering
+    -- DFLowering.ifSpec
+    -- DFLowering.seqSpec
+    -- DFLowering.smapSpec
+    -- --ALangVerify.currying
+    -- TestALangUtils.spec
+    -- TestAesonConvert.spec
     TailRecSpec.passesSpec
