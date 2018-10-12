@@ -3,7 +3,7 @@ module TailRecSpec (passesSpec) where
 import Ohua.Prelude
 
 import Ohua.ALang.Lang
-import Ohua.ALang.Passes.TailRec (findTailRecs)
+import Ohua.ALang.Passes.TailRec (findTailRecs, hoferize)
 import qualified Ohua.ALang.Refs as ALangRefs
 
 import Test.Hspec
@@ -164,6 +164,24 @@ expectedRecWithCallOnlyOnRecurBranch =
                                   "c"))))
               (Let "y" ("a" `Apply` 95) "y"))
 
+expectedHoferized :: Expression
+expectedHoferized =
+  (Let (Recursive ("a'" :: Binding))
+               (Lambda
+                    "i"
+                    (Let "p"
+                         (("math/-" `Apply` "i") `Apply` 10)
+                         (Let "x"
+                              (("math/<" `Apply` "p") `Apply` 0)
+                              (Let "c"
+                                   (Apply
+                                        (Apply
+                                             (Apply (sf ALangRefs.ifThenElse) "x")
+                                             (Lambda "then" "p"))
+                                             (Lambda "else" ((sf ALangRefs.recur) `Apply` "p")))
+                                   "c"))))
+               (Let "a" ((Var (Sf "recur_hof")) `Apply` "a'")
+                    (Let "y" ("a" `Apply` 95) "y")))
 
 detect_recursion recExpr expectedExpr = findTailRecs True recExpr `shouldBe` expectedExpr
 
@@ -179,5 +197,6 @@ passesSpec = do
       it "recursion correctly structured" $
         detect_recursion recWithCallOnlyOnRecurBranch expectedRecWithCallOnlyOnRecurBranch
 
-  -- describe "Phase 2: hoferizing rec"
-  --     it "hoferizes simple recursion"
+  describe "Phase 2: hoferizing rec"
+      it "hoferizes correct recursion" $
+      hoferize expectedRecWithCallOnlyOnRecurBranch `shouldBe` expectedHoferized
