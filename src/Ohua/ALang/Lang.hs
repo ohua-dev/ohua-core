@@ -66,6 +66,7 @@
 -- interface, and be preferred over unwrapping of the newtypes.
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE DeriveLift #-}
 
 module Ohua.ALang.Lang
   (
@@ -101,6 +102,7 @@ import Universum
 import Data.Foldable as F
 import Data.Functor.Foldable as RS
 import Data.Generics.Uniplate.Direct
+import Language.Haskell.TH.Syntax (Lift)
 
 import Ohua.Types
 import Ohua.LensClasses
@@ -121,7 +123,7 @@ data Symbol a
     | Env !HostExpr -- ^ reference to an environment object. this
                     -- maybe a var or any other term of the host
                     -- language.
-    deriving (Show, Eq, Generic)
+    deriving (Show, Eq, Generic, Lift)
 
 type ResolvedSymbol = Symbol QualifiedBinding
 
@@ -205,7 +207,7 @@ data AExprF bndType refType a
              a -- ^ Function application
     | LambdaF (AbstractAssignment bndType)
               a -- ^ Anonymous function definition
-    deriving (Functor, F.Foldable, Traversable, Show, Eq)
+    deriving (Functor, F.Foldable, Traversable, Show, Eq, Lift)
 
 instance Container (AExprF bndType refType a)
 
@@ -214,7 +216,7 @@ type instance Base (AExpr bndType refType) = AExprF bndType refType
 -- | A type alias which recurses the 'AExprF' type onto itself.
 newtype AExpr bndType refType = AExpr
     { unAExpr :: AExprF bndType refType (AExpr bndType refType)
-    } deriving (Show, Eq)
+    } deriving (Show, Eq, Lift)
 
 instance RS.RECURSION_SCHEMES_RECURSIVE_CLASS (AExpr bndType refType) where
     project = unAExpr
@@ -291,7 +293,7 @@ type Expr refType = AExpr Binding refType
 -- and lambda arguments)
 newtype AnnExpr ann bndType refType = AnnExpr
     { unAnnExpr :: Annotated ann (AExprF bndType refType (AnnExpr ann bndType refType))
-    } deriving (Eq)
+    } deriving (Eq, Lift)
 
 -- | Annotated version of the 'Var' constructor pattern
 pattern AnnVar :: ann -> refType -> AnnExpr ann bndType refType
@@ -347,7 +349,7 @@ instance HasValue (AnnExpr ann bnd ref) (AnnExpr ann bnd' ref') (AExprF bnd ref 
 -- | Base Functor for the 'AnnExpr' type
 newtype AnnExprF ann bndType refType a = AnnExprF
     { unAnnExprF :: Annotated ann (AExprF bndType refType a)
-    } deriving (Functor)
+    } deriving (Functor, Lift)
 
 type instance Base (AnnExpr ann bndType refType) =
      AnnExprF ann bndType refType

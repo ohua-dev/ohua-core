@@ -117,6 +117,8 @@ library:
   - fast-logger
   - prettyprinter
   - safe-exceptions
+  - template-haskell
+  - th-lift-instances
   include-dirs:
     cbits
   when:

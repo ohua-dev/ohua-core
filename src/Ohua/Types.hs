@@ -17,6 +17,7 @@
 {-# LANGUAGE CPP                        #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiWayIf                 #-}
+{-# LANGUAGE DeriveLift #-}
 
 #include "compat.h"
 
@@ -46,9 +47,6 @@ module Ohua.Types
     , NameGenerator
     , simpleNameList
     , takenNames
-    , callEnvExpr
-    , callLocalFunction
-    , transformRecursiveFunctions
     , options
     , Annotated(Annotated)
     , TyExprF(..)
@@ -84,6 +82,8 @@ import qualified Data.HashSet as HS
 import qualified Data.Text as T
 import qualified Data.Vector as V
 import GHC.Exts
+import Language.Haskell.TH.Syntax (Lift)
+import Instances.TH.Lift ()
 
 import Ohua.LensClasses
 import Ohua.Util
@@ -116,7 +116,7 @@ class UnsafeMake t where
 -- | The numeric id of a function call site
 newtype FnId =
     FnId Int
-    deriving (Eq, Ord, Generic, Enum, Num, NFData, Hashable, Show)
+    deriving (Eq, Ord, Generic, Enum, Num, NFData, Hashable, Show, Lift)
 
 type instance SourceType FnId = Int
 
@@ -136,7 +136,7 @@ instance Unwrap FnId where
 -- | A binding name
 newtype Binding =
     Binding Text
-    deriving (Eq, Hashable, Generic, Ord, Monoid, NFData, Show)
+    deriving (Eq, Hashable, Generic, Ord, Monoid, NFData, Show, Lift)
 
 deriving instance Semigroup Binding
 
@@ -158,7 +158,7 @@ instance IsString Binding where
 -- | Hierarchical reference to a namespace
 newtype NSRef =
     NSRef (V.Vector Binding)
-    deriving (Eq, Generic, NFData, Ord, Show)
+    deriving (Eq, Generic, NFData, Ord, Show, Lift)
 
 instance IsList NSRef where
   type Item NSRef = Binding
@@ -186,7 +186,7 @@ instance Hashable NSRef where
 data QualifiedBinding = QualifiedBinding
     { qbNamespace :: NSRef
     , qbName      :: Binding
-    } deriving (Eq, Generic, Ord, Show)
+    } deriving (Eq, Generic, Ord, Show, Lift)
 
 instance HasNamespace QualifiedBinding NSRef where
     namespace f s = (\ns' -> s {qbNamespace = ns'}) <$> f (qbNamespace s)
@@ -209,7 +209,7 @@ instance IsString QualifiedBinding where
 data SomeBinding
     = Unqual Binding
     | Qual QualifiedBinding
-    deriving (Eq, Show)
+    deriving (Eq, Show, Lift)
 
 instance Hashable SomeBinding where
     hashWithSalt s (Unqual b) = hashWithSalt s (0 :: Int, b)
@@ -258,7 +258,7 @@ data AbstractAssignment binding
     = Direct !binding
     | Recursive !binding
     | Destructure ![binding]
-    deriving (Eq, Functor, Traversable, F.Foldable, Show)
+    deriving (Eq, Functor, Traversable, F.Foldable, Show, Lift)
 
 instance Container (AbstractAssignment binding)
 
@@ -306,7 +306,7 @@ _Recursive =
 -- | Numerical reference to a spliced expression from the host environment.
 newtype HostExpr = HostExpr
     { unwrapHostExpr :: Int
-    } deriving (Eq, Ord, Generic, Show)
+    } deriving (Eq, Ord, Generic, Show, Lift)
 
 -- Only exists to allow literal integers to be interpreted as host expressions
 instance Num HostExpr where
@@ -417,7 +417,7 @@ options f (Environment opts) = Environment <$> f opts
 data Annotated annotation value =
     Annotated !annotation
               !value
-    deriving (Eq, Show)
+    deriving (Eq, Show, Lift)
 
 instance (NFData annotation, NFData value) =>
          NFData (Annotated annotation value) where
@@ -461,11 +461,11 @@ instance Comonad (Annotated ann) where
 data TyExprF binding a
     = TyRefF binding -- ^ A primitive referece to a type
     | TyAppF a a -- ^ A type application
-    deriving (Show, Eq, Functor, Traversable, F.Foldable)
+    deriving (Show, Eq, Functor, Traversable, F.Foldable, Lift)
 
 newtype TyExpr binding = TyExpr
     { unTyExpr :: TyExprF binding (TyExpr binding)
-    } deriving (Eq, Show)
+    } deriving (Eq, Show, Lift)
 
 pattern TyRef :: binding -> TyExpr binding
 pattern TyRef b = TyExpr (TyRefF b)
@@ -524,7 +524,7 @@ instance Traversable TyExpr where
 data TyVar tyConRef tyVarRef
     = TyCon tyConRef
     | TyVar tyVarRef
-    deriving (Show, Eq)
+    deriving (Show, Eq, Lift)
 
 instance (NFData tyConRef, NFData tyVarRef) =>
          NFData (TyVar tyConRef tyVarRef) where

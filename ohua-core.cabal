@@ -2,7 +2,7 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 78d858a099c3b18a55dcf5ce4a7613d792573e7a6f628bf28595046d3bc131b6
+-- hash: 3efc71cb04352285315fdacd49c840c2ef49cec0692a7173ed8616e90e831388
 
 name:           ohua-core
 version:        0.2.0
@@ -64,7 +64,9 @@ library
     , prettyprinter
     , recursion-schemes
     , safe-exceptions
+    , template-haskell
     , text
+    , th-lift-instances
     , transformers
     , transformers-base
     , uniplate

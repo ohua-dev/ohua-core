@@ -9,6 +9,7 @@
 -- This source code is licensed under the terms described in the associated LICENSE.TXT file
 --
 --
+{-# LANGUAGE DeriveLift, TemplateHaskell #-}
 module Ohua.ALang.NS
     ( FunAnn(..)
     , Imports
@@ -27,6 +28,8 @@ module Ohua.ALang.NS
 import Ohua.Prelude
 
 import qualified Data.HashMap.Strict as HM
+import qualified Language.Haskell.TH as TH (Exp(VarE, AppE))
+import qualified Language.Haskell.TH.Syntax as TH (Lift, lift)
 
 data FunAnn tyExpr = FunAnn
     { argTypes :: [tyExpr]
@@ -38,7 +41,7 @@ type Imports = [(NSRef, [Binding])]
 type Feature = Text
 data Pragma =
     Feature Feature
-    deriving (Generic, Show, Eq, Ord)
+    deriving (Generic, Show, Eq, Ord, TH.Lift)
 
 parsePragma :: MonadError Error m => Text -> m Pragma
 parsePragma t =
@@ -46,6 +49,11 @@ parsePragma t =
         ["feature", f] -> pure $ Feature f
         (x:_) -> throwError $ "Unknown Pragma \'" <> x <> "\'"
         [] -> throwError $ "Pragma cannot be empty"
+
+instance (TH.Lift k, TH.Lift v) => TH.Lift (HM.HashMap k v) where
+  lift m = do
+    listE <- TH.lift (HM.toList m)
+    pure $ TH.VarE 'HM.fromList `TH.AppE` listE
 
 -- | A namespace as defined by the ohua API. It has a name, a list of
 -- dependencies and aliasings and some defined expressions (currently
@@ -63,7 +71,7 @@ data Namespace decl =
               Imports -- algo imports
               Imports -- sf imports
               (HM.HashMap Binding decl) -- declarations
-    deriving (Generic, Show, Eq)
+    deriving (Generic, Show, Eq, TH.Lift)
 
 emptyNamespace :: NSRef -> Namespace decl
 emptyNamespace name0 = Namespace name0 [] [] [] mempty
