@@ -59,6 +59,7 @@ default-extensions:
 - StandaloneDeriving
 - NoImplicitPrelude
 - RankNTypes
+- ViewPatterns
 when:
   - condition: impl(ghc >= 8.4.0)
     ghc-options:
@@ -107,6 +108,7 @@ library:
   - vector
   - bifunctors
   - recursion-schemes
+  - free
   - boxes
   - transformers-base
   - monad-control

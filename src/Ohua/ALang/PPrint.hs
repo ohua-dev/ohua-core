@@ -15,6 +15,8 @@ import Data.Functor.Foldable
 import Data.Text.Prettyprint.Doc
 import Data.Text.Prettyprint.Doc.Render.Text
 import qualified Data.HashMap.Strict as HM
+import Control.Comonad (extract)
+import Control.Comonad.Trans.Cofree (headF, tailF)
 
 import Ohua.ALang.Lang
 import Ohua.ALang.NS
@@ -27,35 +29,44 @@ prettyAExpr ::
     -> ((bndType -> Doc a) -> AbstractAssignment bndType -> Doc a)
     -> AExpr bndType refType
     -> Doc a
-prettyAExpr prettyBnd prettyRef prettyAbstractAssign0 = fst . cata worker
+prettyAExpr prettyBnd prettyRef prettyAbstractAssign0 = fst . histo worker
   where
     prettyAssign = prettyAbstractAssign0 prettyBnd
-    parenthesize prec1 (e, prec0) | prec0 > prec1 = parens e
-                                  | otherwise = e
+    parenthesize prec1 (e, prec0)
+        | prec0 > prec1 = parens e
+        | otherwise = e
     noParens = (, 0 :: Word)
     needParens prec = (, prec)
     discardParens = fst
     worker =
         \case
             VarF bnd -> noParens $ prettyRef bnd
-            LetF assign expr cont ->
-                needParens 3 $
-                sep
-                    [ "let" <+>
-                      align (sep
-                          [ prettyAssign assign <+> "="
-                          , hang 2 $ discardParens expr
-                          ])
-                    , "in" <+> align (discardParens cont)
-                    ]
-            ApplyF fun arg ->
+            LetF assign expr (extract -> cont) ->
+                let (assigns, e) = collectLambdas expr
+                 in needParens 3 $
+                    sep
+                        [ "let" <+>
+                          align
+                              (sep [ hsep (map prettyAssign $ assign : assigns) <+>
+                                     "="
+                                   , hang 2 $ discardParens e
+                                   ])
+                        , "in" <+> align (discardParens cont)
+                        ]
+            ApplyF (extract -> fun) (extract -> arg) ->
                 needParens 1 $ sep [parenthesize 1 fun, parenthesize 0 arg]
             LambdaF assign body ->
-                needParens 2 $
-                sep
-                    [ "λ" <+> prettyAssign assign <+> "->"
-                    , hang 2 $ discardParens body
-                    ]
+                let (assigns, e) = collectLambdas body
+                 in needParens 2 $
+                    sep
+                        [ "λ" <+>
+                          hsep (map prettyAssign $ assign : assigns) <+> "->"
+                        , hang 2 $ discardParens e
+                        ]
+    collectLambdas =
+        para $ \case
+            (tailF -> LambdaF assign (_, (assigns, e))) -> (assign : assigns, e)
+            (headF -> other) -> ([], other)
 
 prettySymbol :: (a -> Doc ann) -> Symbol a -> Doc ann
 prettySymbol prettySf =

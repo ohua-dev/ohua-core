@@ -2,7 +2,7 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: a782818d5fb045ffc4911bf6fc2830bbbc51ad0afc4e265eda59e02bee895282
+-- hash: e080d0076ccbf57185f89117ef2710be678301b52dcd2d2f5b8965a582d85dc5
 
 name:           ohua-core
 version:        0.2.0
@@ -39,7 +39,7 @@ flag debug
 library
   hs-source-dirs:
       src
-  default-extensions: OverloadedStrings OverloadedLists MultiParamTypeClasses FunctionalDependencies TypeFamilies GADTs FlexibleContexts FlexibleInstances TypeSynonymInstances LambdaCase TupleSections BangPatterns ExplicitForAll ScopedTypeVariables DefaultSignatures DeriveFunctor DeriveFoldable DeriveTraversable DeriveGeneric PatternSynonyms NamedFieldPuns RecordWildCards ConstraintKinds StandaloneDeriving NoImplicitPrelude RankNTypes
+  default-extensions: OverloadedStrings OverloadedLists MultiParamTypeClasses FunctionalDependencies TypeFamilies GADTs FlexibleContexts FlexibleInstances TypeSynonymInstances LambdaCase TupleSections BangPatterns ExplicitForAll ScopedTypeVariables DefaultSignatures DeriveFunctor DeriveFoldable DeriveTraversable DeriveGeneric PatternSynonyms NamedFieldPuns RecordWildCards ConstraintKinds StandaloneDeriving NoImplicitPrelude RankNTypes ViewPatterns
   include-dirs:
       cbits
   build-depends:
@@ -54,6 +54,7 @@ library
     , deepseq
     , fast-logger
     , fgl
+    , free
     , hashable
     , microlens
     , microlens-mtl
@@ -124,7 +125,7 @@ library
 
 executable ohua-test-exec
   main-is: Main.hs
-  default-extensions: OverloadedStrings OverloadedLists MultiParamTypeClasses FunctionalDependencies TypeFamilies GADTs FlexibleContexts FlexibleInstances TypeSynonymInstances LambdaCase TupleSections BangPatterns ExplicitForAll ScopedTypeVariables DefaultSignatures DeriveFunctor DeriveFoldable DeriveTraversable DeriveGeneric PatternSynonyms NamedFieldPuns RecordWildCards ConstraintKinds StandaloneDeriving NoImplicitPrelude RankNTypes
+  default-extensions: OverloadedStrings OverloadedLists MultiParamTypeClasses FunctionalDependencies TypeFamilies GADTs FlexibleContexts FlexibleInstances TypeSynonymInstances LambdaCase TupleSections BangPatterns ExplicitForAll ScopedTypeVariables DefaultSignatures DeriveFunctor DeriveFoldable DeriveTraversable DeriveGeneric PatternSynonyms NamedFieldPuns RecordWildCards ConstraintKinds StandaloneDeriving NoImplicitPrelude RankNTypes ViewPatterns
   build-depends:
       aeson
     , base >=4.8 && <5
@@ -149,7 +150,7 @@ executable test-graph-gen
   hs-source-dirs:
       test
       ./.
-  default-extensions: OverloadedStrings OverloadedLists MultiParamTypeClasses FunctionalDependencies TypeFamilies GADTs FlexibleContexts FlexibleInstances TypeSynonymInstances LambdaCase TupleSections BangPatterns ExplicitForAll ScopedTypeVariables DefaultSignatures DeriveFunctor DeriveFoldable DeriveTraversable DeriveGeneric PatternSynonyms NamedFieldPuns RecordWildCards ConstraintKinds StandaloneDeriving NoImplicitPrelude RankNTypes
+  default-extensions: OverloadedStrings OverloadedLists MultiParamTypeClasses FunctionalDependencies TypeFamilies GADTs FlexibleContexts FlexibleInstances TypeSynonymInstances LambdaCase TupleSections BangPatterns ExplicitForAll ScopedTypeVariables DefaultSignatures DeriveFunctor DeriveFoldable DeriveTraversable DeriveGeneric PatternSynonyms NamedFieldPuns RecordWildCards ConstraintKinds StandaloneDeriving NoImplicitPrelude RankNTypes ViewPatterns
   build-depends:
       QuickCheck
     , aeson
@@ -175,7 +176,7 @@ test-suite ohua-tests
   main-is: Spec.hs
   hs-source-dirs:
       test
-  default-extensions: OverloadedStrings OverloadedLists MultiParamTypeClasses FunctionalDependencies TypeFamilies GADTs FlexibleContexts FlexibleInstances TypeSynonymInstances LambdaCase TupleSections BangPatterns ExplicitForAll ScopedTypeVariables DefaultSignatures DeriveFunctor DeriveFoldable DeriveTraversable DeriveGeneric PatternSynonyms NamedFieldPuns RecordWildCards ConstraintKinds StandaloneDeriving NoImplicitPrelude RankNTypes
+  default-extensions: OverloadedStrings OverloadedLists MultiParamTypeClasses FunctionalDependencies TypeFamilies GADTs FlexibleContexts FlexibleInstances TypeSynonymInstances LambdaCase TupleSections BangPatterns ExplicitForAll ScopedTypeVariables DefaultSignatures DeriveFunctor DeriveFoldable DeriveTraversable DeriveGeneric PatternSynonyms NamedFieldPuns RecordWildCards ConstraintKinds StandaloneDeriving NoImplicitPrelude RankNTypes ViewPatterns
   build-depends:
       QuickCheck
     , aeson
