@@ -10,6 +10,7 @@
 --
 --
 {-# LANGUAGE DeriveLift, TemplateHaskell #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 module Ohua.ALang.NS
     ( FunAnn(..)
     , Imports

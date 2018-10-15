@@ -2,7 +2,7 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 3efc71cb04352285315fdacd49c840c2ef49cec0692a7173ed8616e90e831388
+-- hash: a782818d5fb045ffc4911bf6fc2830bbbc51ad0afc4e265eda59e02bee895282
 
 name:           ohua-core
 version:        0.2.0
@@ -57,6 +57,7 @@ library
     , hashable
     , microlens
     , microlens-mtl
+    , microlens-th
     , monad-control
     , monad-logger
     , monad-loops
@@ -117,6 +118,7 @@ library
       Ohua.DFLang.HOF.SmapG
       Ohua.DFLang.Verify
       Ohua.Internal.Monad
+      Ohua.Stage
       Paths_ohua_core
   default-language: Haskell2010
 

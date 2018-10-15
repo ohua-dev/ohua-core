@@ -18,6 +18,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiWayIf                 #-}
 {-# LANGUAGE DeriveLift #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 #include "compat.h"
 
@@ -34,20 +35,25 @@ module Ohua.Types
     , _Destructure
     , _Recursive
     , HostExpr
+    , Environment
+    , options
     , Options
     , callEnvExpr
     , callLocalFunction
     , transformRecursiveFunctions
-    , OhuaState
-    , Environment
+    , stageHandling
+    , StageHandling
+    , StageName
+    , AbortCompilation
+    , DumpCode(..)
     , Error
+    , OhuaState
     , nameGenerator
     , idCounter
     , envExpressions
     , NameGenerator
     , simpleNameList
     , takenNames
-    , options
     , Annotated(Annotated)
     , TyExprF(..)
 #if GHC_HAS_BUNDLED_PATTERN_SYNONYMS
@@ -84,6 +90,7 @@ import qualified Data.Vector as V
 import GHC.Exts
 import Language.Haskell.TH.Syntax (Lift)
 import Instances.TH.Lift ()
+import Lens.Micro.TH (makeLenses)
 
 import Ohua.LensClasses
 import Ohua.Util
@@ -336,11 +343,21 @@ instance Unwrap HostExpr where
     unwrap (HostExpr i) = i
 
 type Error = Text
+type StageName = Text
+type AbortCompilation = Bool
+data DumpCode
+    = Don'tDump
+    | DumpPretty
+type StageHandling = StageName -> (DumpCode, AbortCompilation)
 
-data Options =
-    Options !(Maybe QualifiedBinding)
-            !(Maybe QualifiedBinding)
-            Bool
+data Options = Options
+    { _callEnvExpr :: !(Maybe QualifiedBinding)
+    , _callLocalFunction :: !(Maybe QualifiedBinding)
+    , _transformRecursiveFunctions :: Bool
+    , _stageHandling :: StageHandling
+    }
+
+makeLenses ''Options
 
 instance Default Options where
     def =
@@ -348,45 +365,15 @@ instance Default Options where
             Nothing
             Nothing
             False -- for no we always disable this option
-
--- | State of the ohua compiler monad.
-data OhuaState envExpr = OhuaState !NameGenerator !FnId !(V.Vector envExpr)
-
-type instance SourceType (OhuaState envExpr) =
-     (NameGenerator, FnId, V.Vector envExpr)
-
-instance Make (OhuaState envExpr) where
-    make (ng, fnid, exprs) = pure $ OhuaState ng fnid exprs
-
-type StageName = Text
-type AbortCompilation = Bool
-data DumpCode
-    = Don'tDump
-    | DumpShow
-    | DumpPretty
-    | DumpOther Text
-type StageHandling = StageName -> (AbortCompilation, DumpCode)
-
--- | The read only compiler environment
-newtype Environment = Environment Options StageHandling
-
-instance Default Environment where
-    def = Environment def (const (Don'tDump, True))
-
-nameGenerator :: Lens' (OhuaState envExpr) NameGenerator
-nameGenerator f (OhuaState gen counter envExprs) =
-    f gen <&> \ng -> OhuaState ng counter envExprs
-
-idCounter :: Lens' (OhuaState envExpr) FnId
-idCounter f (OhuaState gen counter envExprs) =
-    f counter <&> \c -> OhuaState gen c envExprs
-
-envExpressions ::
-       Lens (OhuaState envExpr) (OhuaState envExpr') (V.Vector envExpr) (V.Vector envExpr')
-envExpressions f (OhuaState gen counter envExprs) = OhuaState gen counter <$> f envExprs
+            (const (Don'tDump, False))
 
 -- | Stateful name generator
-data NameGenerator = NameGenerator !(HS.HashSet Binding) [Binding]
+data NameGenerator = NameGenerator
+    { _takenNames :: !(HS.HashSet Binding)
+    , _simpleNameList :: [Binding]
+    }
+
+makeLenses ''NameGenerator
 
 type instance SourceType NameGenerator = (HS.HashSet Binding, [Binding])
 
@@ -396,27 +383,29 @@ instance UnsafeMake NameGenerator where
 instance Make NameGenerator where
     make = pure . unsafeMake
 
+-- | State of the ohua compiler monad.
+data OhuaState envExpr = OhuaState
+    { _nameGenerator :: !NameGenerator
+    , _idCounter :: !FnId
+    , _envExpressions :: !(V.Vector envExpr)
+    }
 
-takenNames :: Lens' NameGenerator (HS.HashSet Binding)
-takenNames f (NameGenerator taken l) = flip NameGenerator l <$> f taken
+makeLenses ''OhuaState
 
-simpleNameList :: Lens' NameGenerator [Binding]
-simpleNameList f (NameGenerator taken l) = NameGenerator taken <$> f l
+type instance SourceType (OhuaState envExpr) =
+     (NameGenerator, FnId, V.Vector envExpr)
 
-callEnvExpr :: Lens' Options (Maybe QualifiedBinding)
-callEnvExpr f (Options c l e) = f c <&> \c' -> Options c' l e
+instance Make (OhuaState envExpr) where
+    make (ng, fnid, exprs) = pure $ OhuaState ng fnid exprs
 
-callLocalFunction :: Lens' Options (Maybe QualifiedBinding)
-callLocalFunction f (Options c l e) = f l <&> \l' -> Options c l' e
 
-transformRecursiveFunctions :: Lens' Options Bool
-transformRecursiveFunctions f (Options c l e) = f e <&> Options c l
+-- | The read only compiler environment
+newtype Environment = Environment { _options :: Options }
 
-options :: Lens' Environment Options
-options f (Environment opts s) = (\a -> Environment a s) <$> f opts
+makeLenses ''Environment
 
-stageHandling :: Lens' Environment Options
-stageHandling f (Environment opts s) = Environment opts <$> f s
+instance Default Environment where
+    def = Environment def
 
 -- | Generic way of attaching arbitrary, alterable data to some type.
 --

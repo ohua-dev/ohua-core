@@ -25,6 +25,7 @@ import Ohua.DFLang.Lang
 import Ohua.DFLang.Optimizations
 import Ohua.DFLang.Passes
 import qualified Ohua.DFLang.Verify
+import Ohua.Stage
 
 
 data CustomPasses env = CustomPasses
@@ -46,8 +47,11 @@ forceLog msg a = a `deepseq` logDebugN msg
 -- | The canonical order of transformations and lowerings performed in a full compilation.
 pipeline :: CustomPasses env -> Expression -> OhuaM env OutGraph
 pipeline CustomPasses{..} e = do
+    stage resolvedAlang e
     ssaE <- performSSA e
+    stage ssaAlang ssaE
     normalizedE <- normalize ssaE
+    stage normalizedAlang normalizedE
 #ifdef DEBUG
     checkProgramValidity normalizedE
     checkHigherOrderFunctionSupport normalizedE

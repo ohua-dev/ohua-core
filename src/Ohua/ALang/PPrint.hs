@@ -6,6 +6,7 @@ module Ohua.ALang.PPrint
     , prettyAbstractAssignment
     , prettyNS
     , quickRender
+    , ohuaDefaultLayoutOpts
     ) where
 
 import Ohua.Prelude
@@ -31,7 +32,7 @@ prettyAExpr prettyBnd prettyRef prettyAbstractAssign0 = fst . cata worker
     prettyAssign = prettyAbstractAssign0 prettyBnd
     parenthesize prec1 (e, prec0) | prec0 > prec1 = parens e
                                   | otherwise = e
-    noParens = (, 0)
+    noParens = (, 0 :: Word)
     needParens prec = (, prec)
     discardParens = fst
     worker =
@@ -93,12 +94,11 @@ prettyAbstractAssignment prettyBnd =
         Destructure bnds -> tupled $ map prettyBnd bnds
         Recursive bnd -> "rec" <+> prettyBnd bnd
 
+ohuaDefaultLayoutOpts :: LayoutOptions
+ohuaDefaultLayoutOpts = defaultLayoutOptions {layoutPageWidth = AvailablePerLine 100 1.0}
+
 quickRender :: Pretty a => a -> Text
-quickRender =
-    renderStrict .
-    layoutSmart
-        (defaultLayoutOptions {layoutPageWidth = AvailablePerLine 100 1.0}) .
-    pretty
+quickRender = renderStrict . layoutSmart ohuaDefaultLayoutOpts . pretty
 
 prettyNS :: (decl -> Doc a) -> Namespace decl -> Doc a
 prettyNS prettyDecl ns =

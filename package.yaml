@@ -119,6 +119,7 @@ library:
   - safe-exceptions
   - template-haskell
   - th-lift-instances
+  - microlens-th
   include-dirs:
     cbits
   when:
