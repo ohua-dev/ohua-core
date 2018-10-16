@@ -77,7 +77,7 @@ module Ohua.Types
 import Universum
 
 import Control.Comonad
-import Control.Monad.Error.Class (MonadError, throwError)
+import Control.Monad.Error.Class (MonadError)
 import Data.Bifoldable
 import Data.Bitraversable
 import Data.Default.Class

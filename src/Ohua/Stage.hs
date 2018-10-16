@@ -29,5 +29,29 @@ ssaAlang = "alang-ssa"
 normalizedAlang :: StageName
 normalizedAlang = "alang-normalized"
 
+customAlangPasses :: StageName
+customAlangPasses = "alang-custom"
+
+optimizedAlang :: StageName
+optimizedAlang = "alang-optimized"
+
+initialDflang :: StageName
+initialDflang = "dflang-initial"
+
+customDflang :: StageName
+customDflang = "dflang-custom"
+
+optimizedDflang :: StageName
+optimizedDflang = "dflang-optimized"
+
 knownStages :: [StageName]
-knownStages = [resolvedAlang, ssaAlang, normalizedAlang]
+knownStages =
+    [ resolvedAlang
+    , ssaAlang
+    , normalizedAlang
+    , customAlangPasses
+    , optimizedAlang
+    , initialDflang
+    , customDflang
+    , optimizedDflang
+    ]

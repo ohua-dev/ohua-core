@@ -12,6 +12,9 @@ prettyDFExpr :: DFExpr -> Doc a
 prettyDFExpr DFExpr {..} =
     vsep $ map prettyLetExpr (toList letExprs) <> [pretty returnVar]
 
+instance Pretty DFExpr where
+    pretty = prettyDFExpr
+
 prettyLetExpr :: LetExpr -> Doc a
 prettyLetExpr LetExpr {..} =
     hsep

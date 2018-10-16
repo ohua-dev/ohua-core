@@ -23,6 +23,7 @@ import Ohua.ALang.Passes.SSA
 import Ohua.DFGraph
 import Ohua.DFLang.Lang
 import Ohua.DFLang.Optimizations
+import Ohua.DFLang.PPrint ()
 import Ohua.DFLang.Passes
 import qualified Ohua.DFLang.Verify
 import Ohua.Stage
@@ -46,38 +47,40 @@ forceLog msg a = a `deepseq` logDebugN msg
 
 -- | The canonical order of transformations and lowerings performed in a full compilation.
 pipeline :: CustomPasses env -> Expression -> OhuaM env OutGraph
-pipeline CustomPasses{..} e = do
+pipeline CustomPasses {..} e = do
     stage resolvedAlang e
+
     ssaE <- performSSA e
     stage ssaAlang ssaE
+
     normalizedE <- normalize ssaE
     stage normalizedAlang normalizedE
 
     whenDebug $ do
-      checkProgramValidity normalizedE
-      checkHigherOrderFunctionSupport normalizedE
-      Ohua.ALang.Passes.SSA.checkSSA normalizedE
+        checkProgramValidity normalizedE
+        checkHigherOrderFunctionSupport normalizedE
+        Ohua.ALang.Passes.SSA.checkSSA normalizedE
 
-    customAfterNorm <- normalize =<< passAfterNormalize normalizedE
+    customAfterNorm <- passAfterNormalize normalizedE
+    stage customAlangPasses customAfterNorm
 
-    optimizedE <- Ohua.ALang.Optimizations.runOptimizations customAfterNorm
+    optimizedE <-
+        Ohua.ALang.Optimizations.runOptimizations =<< normalize customAfterNorm
+    stage optimizedAlang optimizedE
 
     whenDebug $ Ohua.ALang.Passes.SSA.checkSSA optimizedE
-
-    dfE <- lowerALang optimizedE
+    dfE <- lowerALang =<< normalize optimizedE
+    stage initialDflang dfE
 
     Ohua.DFLang.Verify.verify dfE
-
-    whenDebug $
-      Ohua.DFLang.Passes.checkSSAExpr dfE
-
+    whenDebug $ Ohua.DFLang.Passes.checkSSAExpr dfE
     dfAfterCustom <- passAfterDFLowering dfE
+    stage customDflang dfAfterCustom
 
     optimizedDfE <- Ohua.DFLang.Optimizations.runOptimizations dfAfterCustom
+    stage optimizedDflang optimizedE
 
-    whenDebug $
-      Ohua.DFLang.Passes.checkSSAExpr optimizedDfE
-
+    whenDebug $ Ohua.DFLang.Passes.checkSSAExpr optimizedDfE
     pure $ toGraph optimizedDfE
 
 

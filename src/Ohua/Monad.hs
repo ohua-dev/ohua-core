@@ -32,6 +32,7 @@ import Data.ByteString (hPutStr)
 
 import Ohua.Internal.Monad
 import Ohua.Types
+import Ohua.Util
 
 runSilentLoggingT :: LoggingT m a -> m a
 runSilentLoggingT = flip runLoggingT $ \_ _ _ _ -> pure ()

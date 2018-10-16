@@ -199,4 +199,4 @@ throwErrorS msg = throwError $ msg <> "\n" <> fromString cs
     cs = callStackToStr callStack
 
 throwErrorDebugS :: (HasCallStack, MonadError s m, IsString s, SemigroupConstraint s) => s -> m a
-throwErrorDebugS = whenDebug throwErrorS throwError
+throwErrorDebugS = throwErrorS `debugOr` throwError
