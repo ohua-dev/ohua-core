@@ -37,7 +37,7 @@ noCustomPasses :: CustomPasses env
 noCustomPasses = CustomPasses pure pure
 
 instance Default (CustomPasses env) where
-  def = noCustomPasses
+    def = noCustomPasses
 
 
 forceLog :: (MonadLogger m, NFData a) => Text -> a -> m ()
@@ -52,35 +52,32 @@ pipeline CustomPasses{..} e = do
     stage ssaAlang ssaE
     normalizedE <- normalize ssaE
     stage normalizedAlang normalizedE
-#ifdef DEBUG
-    checkProgramValidity normalizedE
-    checkHigherOrderFunctionSupport normalizedE
-    Ohua.ALang.Passes.SSA.checkSSA normalizedE
-#endif
+
+    whenDebug $ do
+      checkProgramValidity normalizedE
+      checkHigherOrderFunctionSupport normalizedE
+      Ohua.ALang.Passes.SSA.checkSSA normalizedE
 
     customAfterNorm <- normalize =<< passAfterNormalize normalizedE
 
     optimizedE <- Ohua.ALang.Optimizations.runOptimizations customAfterNorm
 
-#ifdef DEBUG
-    Ohua.ALang.Passes.SSA.checkSSA optimizedE
-#endif
+    whenDebug $ Ohua.ALang.Passes.SSA.checkSSA optimizedE
 
     dfE <- lowerALang optimizedE
 
     Ohua.DFLang.Verify.verify dfE
 
-#ifdef DEBUG
-    Ohua.DFLang.Passes.checkSSAExpr dfE
-#endif
+    whenDebug $
+      Ohua.DFLang.Passes.checkSSAExpr dfE
 
     dfAfterCustom <- passAfterDFLowering dfE
 
     optimizedDfE <- Ohua.DFLang.Optimizations.runOptimizations dfAfterCustom
 
-#ifdef DEBUG
-    Ohua.DFLang.Passes.checkSSAExpr optimizedDfE
-#endif
+    whenDebug $
+      Ohua.DFLang.Passes.checkSSAExpr optimizedDfE
+
     pure $ toGraph optimizedDfE
 
 
@@ -88,7 +85,8 @@ pipeline CustomPasses{..} e = do
 compile :: (MonadError Error m, MonadLoggerIO m) => Options -> CustomPasses env -> Expression -> m OutGraph
 compile opts passes exprs = do
     logFn <- askLoggerIO
-    either throwError pure =<< liftIO (runLoggingT (runFromExpr opts (pipeline passes) exprs) logFn)
+    either throwError pure =<<
+        liftIO (runLoggingT (runFromExpr opts (pipeline passes) exprs) logFn)
 
 
 -- | Verify that only higher order fucntions have lambdas as arguments
@@ -99,12 +97,15 @@ checkHigherOrderFunctionSupport (Let _ e rest) = do
   where
     checkNestedExpr (Apply f arg) = do
         supportsHOF <- checkNestedExpr f
-        when (isLambda arg && not supportsHOF) $ failWith $ "Lambdas may only be input to higher order functions, not " <> show f
+        when (isLambda arg && not supportsHOF) $
+            failWith $
+            "Lambdas may only be input to higher order functions, not " <>
+            show f
         pure True
     checkNestedExpr (Var (Sf n _)) = pure $ HM.member n hofNames
     checkNestedExpr (Var _) = pure False
     checkNestedExpr a = failWith $ "Expected var or apply expr, got " <> show a
     isLambda (Lambda _ _) = True
-    isLambda _            = False
+    isLambda _ = False
 checkHigherOrderFunctionSupport (Var _) = pure ()
 checkHigherOrderFunctionSupport a = failWith $ "Expected let or var, got " <> show a

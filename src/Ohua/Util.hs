@@ -31,12 +31,17 @@ module Ohua.Util
     , forceAndReport
     , forceTraceReport
     , intentionally_not_implemented
+    , isDebug
+    , debugOr
+    , whenDebug
+    , unlessDebug
     , Mutator(..)
     , tellMut
     , HasCallStack
     , callStack
     , callStackToStr
     , throwErrorS
+    , throwErrorDebugS
     , (<&>)
     , SemigroupConstraint
     ) where
@@ -51,6 +56,30 @@ import qualified Data.Text as T
 #if !NEW_CALLSTACK_API
 import GHC.Stack
 #endif
+
+
+isDebug :: Bool
+isDebug =
+#if DEBUG
+  True
+#else
+  False
+#endif
+{-# INLINE isDebug #-}
+
+debugOr :: a -> a -> a
+debugOr a0 a1
+  | isDebug = a0
+  | otherwise = a1
+{-# INLINE debugOr #-}
+
+whenDebug :: Applicative f => f () -> f ()
+whenDebug = when isDebug
+{-# INLINE whenDebug #-}
+
+unlessDebug :: Applicative f => f () -> f ()
+unlessDebug = unless isDebug
+{-# INLINE unlessDebug #-}
 
 -- | Similar to prisms from lens, but implemented with traversals.
 type Prism s t a b = Traversal s t a b
@@ -168,3 +197,6 @@ throwErrorS :: (HasCallStack, MonadError s m, IsString s, SemigroupConstraint s)
 throwErrorS msg = throwError $ msg <> "\n" <> fromString cs
   where
     cs = callStackToStr callStack
+
+throwErrorDebugS :: (HasCallStack, MonadError s m, IsString s, SemigroupConstraint s) => s -> m a
+throwErrorDebugS = whenDebug throwErrorS throwError
