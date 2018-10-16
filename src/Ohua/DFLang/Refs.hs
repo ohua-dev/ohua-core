@@ -3,6 +3,7 @@ module Ohua.DFLang.Refs where
 
 import qualified Ohua.ALang.Refs  as Refs
 import           Ohua.DFLang.Lang
+import qualified Ohua.ALang.Passes.TailRec as TailRec
 import           Prelude          hiding (id)
 
 
@@ -58,7 +59,7 @@ seq = EmbedSf "ohua.lang/seq"
 
 
 recur :: DFFnRef
-recur = DFFunction Refs.recur
+recur = DFFunction TailRec.recur
 
 
 array :: DFFnRef

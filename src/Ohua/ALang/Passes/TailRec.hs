@@ -9,6 +9,7 @@ import Data.Functor.Foldable
 import qualified Data.HashSet as HS
 
 import Ohua.ALang.Lang
+import Ohua.ALang.Refs as ALangRefs
 import Ohua.Unit
 import Ohua.Configuration
 
@@ -48,7 +49,7 @@ import Ohua.Configuration
 -- Phase 2: (Performed on the output of Phase 1.)
 -- Turn recursions into HOFs:
 --
--- letrec f' = \x1 ... xn -> ...
+-- let f' = \x1 ... xn -> ...
 --                          let y1 = ....
 --                          ...
 --                          let yn = ...
@@ -110,6 +111,21 @@ loadTailRecPasses True passes@(CustomPasses{ passBeforeNormalize = bn,
                                              passAfterNormalize = an }) = passes { passBeforeNormalize = (\e -> bn =<< (hoferize $ findTailRecs True e)),
                                                                                    passAfterNormalize  = (\e -> an =<< rewrite e) }
 
+-- Currently not exposed by the frontend but only as the only part of recursion
+-- at the backend.
+recur :: QualifiedBinding
+recur = "ohua.lang/recur"
+
+-- This is a compiler-internal higher-order function.
+recur_hof :: QualifiedBinding
+recur_hof = "ohua.lang/recur_hof"
+
+recur_sf :: Expression
+recur_sf = Var $ Sf recur Nothing
+
+recur_hof_sf :: Expression
+recur_hof_sf = Var $ Sf recur_hof Nothing
+
 -- Phase 1:
 findTailRecs :: Bool -> Expression -> Expression
 findTailRecs enabled = snd . flip runReader enabled . flip findRecCall HS.empty
@@ -135,7 +151,7 @@ findRecCall (Apply (Var (Local binding)) a) algosInScope
      = do
        enabledTR <- ask
        if enabledTR
-       then return (HS.insert binding HS.empty, Apply "ohua.lang/recur" a)
+       then return (HS.insert binding HS.empty, Apply recur_sf a)
        else error $ "Detected recursion although tail recursion support is not enabled!"
        -- else error $ "Detected recursion (" ++ (show binding) ++ ") although tail recursion support is not enabled!"
 findRecCall (Apply a b) algosInScope = do
@@ -154,12 +170,13 @@ hoferize :: (Monad m, MonadGenBnd m) => Expression -> m Expression
 hoferize (Let (Recursive f) expr inExpr) = do
   f' <- generateBindingWith f
   return $ Let (Direct f') expr
-              $ Let (Direct f) (Apply (Var (Sf "ohua.lang/recur_hof" Nothing)) (Var (Local f')))
+              $ Let (Direct f) (Apply recur_hof_sf (Var (Local f')))
                     inExpr
 hoferize (Let v expr inExpr) = Let v <$> hoferize expr <*> hoferize inExpr
 hoferize (Apply a b) = Apply <$> hoferize a <*> hoferize b
 hoferize (Lambda a e) = Lambda a <$> hoferize e
 hoferize v@(Var _) = return v
+hoferize e = error $ show e
 
 -- Phase 3:
 rewrite :: (MonadGenBnd m, MonadError Error m) => Expression -> m Expression
@@ -169,16 +186,16 @@ rewrite (Apply a b) = Apply <$> rewrite a <*> rewrite b
 rewrite (Lambda a e) = Lambda a <$> rewrite e
 rewrite v@(Var _) = return v
 
-isRecurHofCall (Apply (Var (Sf "ohua.lang/recur_hof" _)) _) = True
+isRecurHofCall (Apply (Var (Sf recur_hof _)) _) = True
 isRecurHofCall (Apply e@(Apply _ _) _) = isRecurHofCall e
 isRecurHofCall _ = False
 
 rewriteCallExpr :: (MonadGenBnd m, MonadError Error m) => Expression -> m Expression
 rewriteCallExpr e = do
-  let ( (Var (Sf "ohua.lang/recur_hof" _)) : (lamExpr : initialArgs) ) = fromApplyToList e
-  let arrayfiedArgs = fromListToApply (Sf "ohua.lang/array" Nothing) initialArgs
+  let ( (Var (Sf recur_hof _)) : (lamExpr : initialArgs) ) = fromApplyToList e
+  let arrayfiedArgs = fromListToApply (Sf ALangRefs.array Nothing) initialArgs
   lamExpr' <- rewriteLambdaExpr lamExpr
-  return $ Apply (Apply (Var (Sf "ohua.lang/recur" Nothing)) lamExpr') arrayfiedArgs
+  return $ Apply (Apply recur_sf lamExpr') arrayfiedArgs
 
 rewriteLambdaExpr :: (MonadGenBnd m, MonadError Error m) => Expression -> m Expression
 rewriteLambdaExpr (Lambda vars expr) = do
@@ -204,14 +221,14 @@ rewriteLambdaExpr (Lambda vars expr) = do
     rewriteBranch (Let v e o) = (\e' -> Let v e' o) <$> (rewriteRecursionBranch e $ fromApplyToList e)
 
     rewriteTerminationBranch e =
-      (Apply (Apply (Var (Sf "ohua.lang/mkTuple" Nothing))
-                    (Apply (Var (Sf "ohua.lang/false" Nothing)) unitExpr ))
+      (Apply (Apply (Var (Sf ALangRefs.mkTuple Nothing))
+                    (Apply (Var (Sf ALangRefs.false Nothing)) unitExpr ))
               e)
 
-    rewriteRecursionBranch e ( (Var (Sf "ohua.lang/recur" _)) : vars ) = return
-      (Apply (Apply (Var (Sf "ohua.lang/mkTuple" Nothing))
-                    (Apply (Var (Sf "ohua.lang/true" Nothing)) unitExpr ))
-              $ replaceFn (Sf "ohua.lang/array" Nothing) e)
+    rewriteRecursionBranch e ( (Var (Sf recur _)) : vars ) = return
+      (Apply (Apply (Var (Sf ALangRefs.mkTuple Nothing))
+                    (Apply (Var (Sf ALangRefs.true Nothing)) unitExpr ))
+              $ replaceFn (Sf ALangRefs.array Nothing) e)
                   -- fromListToApply (Sf "ohua.lang/array") $ reverse vars)
     rewriteRecursionBranch _ _ = error "invariant broken"
 rewriteLambdaExpr _ = error "invariant broken"

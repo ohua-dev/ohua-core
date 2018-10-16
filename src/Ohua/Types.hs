@@ -208,8 +208,8 @@ instance NFData QualifiedBinding where
 
 instance IsString QualifiedBinding where
     fromString s = case fromString s of
-        Qual q -> q
-        _      -> error "unqualified binding"
+        Qual q   -> q
+        Unqual b -> error $ T.pack $ "Encountered unqualified binding: " ++ (show b)
 
 -- | Utility type for parsing. Denotes a binding which may or may not
 -- be qualified.

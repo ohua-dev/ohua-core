@@ -15,9 +15,6 @@ ifThenElse = "ohua.lang/if"
 scope :: QualifiedBinding
 scope = "ohua.lang/scope"
 
-recur :: QualifiedBinding
-recur = "ohua.lang/recur"
-
 array :: QualifiedBinding
 array = "ohua.lang/array"
 

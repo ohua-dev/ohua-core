@@ -9,6 +9,7 @@ import Ohua.Prelude
 -- import qualified Data.Sequence as S
 
 import Ohua.ALang.Refs as ARefs
+import Ohua.ALang.Passes.TailRec as TR
 import Ohua.DFLang.Lang
 import qualified Ohua.DFLang.Refs as Refs
 import Ohua.DFLang.HOF
@@ -19,7 +20,7 @@ data Recur = Recur
     } deriving (Show)
 
 instance HigherOrderFunction Recur where
-  hofName = tagFnName ARefs.recur
+  hofName = tagFnName TR.recur
 
   parseCallAndInitState [LamArg lam, Variable v] = return $ Recur lam v
   parseCallAndInitState a = throwError $ "Unexpected number/type of arguments to recur" <> show a

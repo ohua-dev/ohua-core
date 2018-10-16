@@ -1,9 +1,11 @@
+
+
 module TailRecSpec (passesSpec) where
 
 import Ohua.Prelude
 
 import Ohua.ALang.Lang
-import Ohua.ALang.Passes.TailRec (findTailRecs, hoferize)
+import Ohua.ALang.Passes.TailRec (findTailRecs, hoferize, recur, recur_hof)
 import qualified Ohua.ALang.Refs as ALangRefs
 
 import Test.Hspec
@@ -103,7 +105,7 @@ expectedRecWithExprOnTerminalBranch =
                                              (Apply (sf ALangRefs.ifThenElse) "x")
                                              (Lambda "then" (Let "t" (Apply (sf ALangRefs.id) "p")
                                                                  "t")))
-                                             (Lambda "else" (Let "r" ((sf ALangRefs.recur) `Apply` "p")
+                                             (Lambda "else" (Let "r" ((sf recur) `Apply` "p")
                                                                  "r")))
                                    "c"))))
                (Let "y" ("a" `Apply` 95) "y"))
@@ -122,7 +124,7 @@ expectedRecWithVarOnlyOnTerminalBranch =
                                        (Apply
                                             (Apply (sf ALangRefs.ifThenElse) "x")
                                             (Lambda "then" "p"))
-                                            (Lambda "else" (Let "r" ((sf ALangRefs.recur) `Apply` "p")
+                                            (Lambda "else" (Let "r" ((sf recur) `Apply` "p")
                                                                 "r")))
                                   "c"))))
               (Let "y" ("a" `Apply` 95) "y"))
@@ -141,7 +143,7 @@ expectedRecWithExprOnRecurBranch =
                                        (Apply
                                             (Apply (sf ALangRefs.ifThenElse) "x")
                                             (Lambda "then" "p"))
-                                            (Lambda "else" (Let "r" ((sf ALangRefs.recur) `Apply` "p")
+                                            (Lambda "else" (Let "r" ((sf recur) `Apply` "p")
                                                                 "r")))
                                   "c"))))
               (Let "y" ("a" `Apply` 95) "y"))
@@ -160,13 +162,13 @@ expectedRecWithCallOnlyOnRecurBranch =
                                        (Apply
                                             (Apply (sf ALangRefs.ifThenElse) "x")
                                             (Lambda "then" "p"))
-                                            (Lambda "else" ((sf ALangRefs.recur) `Apply` "p")))
+                                            (Lambda "else" ((sf recur) `Apply` "p")))
                                   "c"))))
               (Let "y" ("a" `Apply` 95) "y"))
 
 expectedHoferized :: Expression
 expectedHoferized =
-  (Let (Recursive ("a'" :: Binding))
+  (Let (Direct ("a_0" :: Binding))
                (Lambda
                     "i"
                     (Let "p"
@@ -178,12 +180,96 @@ expectedHoferized =
                                         (Apply
                                              (Apply (sf ALangRefs.ifThenElse) "x")
                                              (Lambda "then" "p"))
-                                             (Lambda "else" ((sf ALangRefs.recur) `Apply` "p")))
+                                             (Lambda "else" ((sf recur) `Apply` "p")))
                                    "c"))))
-               (Let "a" ((Var (Sf "recur_hof")) `Apply` "a'")
+               (Let "a" ((sf recur_hof) `Apply` "a_0")
                     (Let "y" ("a" `Apply` 95) "y")))
 
 detect_recursion recExpr expectedExpr = findTailRecs True recExpr `shouldBe` expectedExpr
+
+runPass :: (Expression -> OhuaM env Expression) -> Expression -> IO (Either Error Expression)
+runPass pass expr = runSilentLoggingT $ runFromExpr def pass expr
+
+hof :: Expression -> Expression -> Expectation
+hof expr expected = runPass hoferize expr >>= (`shouldBe` (Right expected))
+
+-- -- (let [a (fn [i] (let [p (math/- i 10)]
+-- --                       (ohua.lang/if (math/< p 0)
+-- --                                     p
+-- --                                     (a p))))]
+-- --       (a 95))
+-- recurSpec :: Spec
+-- recurSpec = do
+--     describe "recur lowering" $ do
+--         it "lowers a simple recursion" $
+--             (Let (Recursive ("a" :: Binding))
+--                  (Lambda
+--                       "i"
+--                       (Let "p"
+--                            (("math/-" `Apply` "i") `Apply` 10)
+--                            (Let "x"
+--                                 (("math/<" `Apply` "p") `Apply` 0)
+--                                 (Let "c"
+--                                      (Apply
+--                                           (Apply
+--                                                (Apply
+--                                                     (Var $
+--                                                      Sf
+--                                                          ALangRefs.ifThenElse
+--                                                          Nothing)
+--                                                     "x")
+--                                                (Lambda
+--                                                     "then"
+--                                                     (Let "t"
+--                                                          (Apply
+--                                                               (Var $
+--                                                                Sf
+--                                                                    ALangRefs.id
+--                                                                    Nothing)
+--                                                               "p")
+--                                                          "t")))
+--                                           (Lambda
+--                                                "else"
+--                                                (Let "r"
+--                                                     ((Var $
+--                                                       Sf ALangRefs.recur Nothing) `Apply`
+--                                                      "p")
+--                                                     "r")))
+--                                      "c"))))
+--                  (Let "y" ("a" `Apply` 95) "y")) `shouldLowerTo`
+--             DFExpr
+--                 [ LetExpr 0 "i_0" Refs.id [DFEnvVar 95] Nothing -- this adapts the actual to the formal that goes into algo-in and then becomes "i"
+--                 -- inside the lambda everything is left untouched.
+--                 , LetExpr
+--                       1
+--                       "p"
+--                       (EmbedSf "math/-")
+--                       [DFVar "i", DFEnvVar 10]
+--                       Nothing
+--                 , LetExpr
+--                       2
+--                       "x"
+--                       (EmbedSf "math/<")
+--                       [DFVar "p", DFEnvVar 0]
+--                       Nothing
+--                 , LetExpr 3 ["then", "else"] Refs.bool [DFVar "x"] Nothing
+--                 , LetExpr 4 ["p_0"] Refs.scope [DFVar "p"] $ Just "then"
+--                 , LetExpr 5 "t" Refs.id [DFVar "p_0"] Nothing
+--                 , LetExpr 6 ["p_1"] Refs.scope [DFVar "p"] $ Just "else"
+--                 -- the two functions to gather the parameters for the call to recur
+--                 , LetExpr 7 "recur-in_0" Refs.array [DFVar "p_1"] Nothing
+--                 , LetExpr 8 "algo-in_0" Refs.array [DFVar "i_0"] Nothing
+--                 -- note: recur produces finally the formal input vars of the lambda
+--                 , LetExpr
+--                       9
+--                       ["i"]
+--                       Refs.recur
+--                       [DFVar "x", DFVar "algo-in_0", DFVar "recur-in_0"]
+--                       Nothing
+--                 , LetExpr 10 "y" Refs.id [DFVar "t"] Nothing -- this adapts the output formal to the output actual
+--                 ]
+--                 "y"
+
 
 passesSpec :: Spec
 passesSpec = do
@@ -197,6 +283,9 @@ passesSpec = do
       it "recursion correctly structured" $
         detect_recursion recWithCallOnlyOnRecurBranch expectedRecWithCallOnlyOnRecurBranch
 
-  describe "Phase 2: hoferizing rec"
+  describe "Phase 2: hoferizing rec" $ do
       it "hoferizes correct recursion" $
-      hoferize expectedRecWithCallOnlyOnRecurBranch `shouldBe` expectedHoferized
+        hof expectedRecWithCallOnlyOnRecurBranch expectedHoferized
+      -- TODO negative test cases
+      -- it "failure when trying to hoferize malformed expression" $
+      --   hof expectedRecWithExprOnRecurBranch ...
