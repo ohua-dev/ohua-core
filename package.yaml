@@ -97,6 +97,7 @@ library:
   - Ohua.DFGraph.Show
   - Ohua.Constants.HostExpr
   - Ohua.Serialize.JSON
+  - Ohua.Stage
   - Ohua.Util
   - Ohua.Unit
   - Ohua.Test.DFGraph

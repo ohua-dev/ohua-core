@@ -2,7 +2,7 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: e080d0076ccbf57185f89117ef2710be678301b52dcd2d2f5b8965a582d85dc5
+-- hash: 7efe7994ca71629b4c810522d224f4ef7bc65d0c709908a6564aff74c9cfa082
 
 name:           ohua-core
 version:        0.2.0
@@ -106,6 +106,7 @@ library
       Ohua.DFGraph.Show
       Ohua.Constants.HostExpr
       Ohua.Serialize.JSON
+      Ohua.Stage
       Ohua.Util
       Ohua.Unit
       Ohua.Test.DFGraph
@@ -119,7 +120,6 @@ library
       Ohua.DFLang.HOF.SmapG
       Ohua.DFLang.Verify
       Ohua.Internal.Monad
-      Ohua.Stage
       Paths_ohua_core
   default-language: Haskell2010
 
