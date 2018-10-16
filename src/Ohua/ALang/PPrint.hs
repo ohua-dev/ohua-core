@@ -122,7 +122,7 @@ prettyNS prettyDecl ns =
   where
     prettyImport ty (nsref, bnds) =
         "import" <+> ty <+> fillBreak 10 (pretty nsref) <+>
-        tupled (map pretty bnds)
+        align (tupled (map pretty bnds))
     prettyDecl0 (bnd, expr) =
         "let" <+> pretty bnd <+> "=" <+> prettyDecl expr <> ";;"
 
