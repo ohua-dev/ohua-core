@@ -38,7 +38,7 @@ runSilentLoggingT :: LoggingT m a -> m a
 runSilentLoggingT = flip runLoggingT $ \_ _ _ _ -> pure ()
 
 -- | Alias for backwards compatibility with old `MonadOhua` interface
-failWith :: MonadError Error m => Error -> m a
+failWith :: (HasCallStack, MonadError Error m) => Error -> m a
 failWith = throwErrorDebugS
 
 
