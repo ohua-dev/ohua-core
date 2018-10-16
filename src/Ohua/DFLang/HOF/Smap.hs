@@ -34,7 +34,7 @@ instance HigherOrderFunction SmapFn where
     parseCallAndInitState [LamArg lam, Variable v] =
         return $ SmapFn v lam (error "size uninitialized")
     parseCallAndInitState a =
-        throwError $ "Unexpected number/type of arguments to smap" <> show a
+        throwErrorDebugS $ "Unexpected number/type of arguments to smap" <> show a
     createContextEntry = do
         f <- get
         sizeId <- generateId
@@ -60,7 +60,7 @@ instance HigherOrderFunction SmapFn where
                   Nothing
             ]
     createContextExit (Destructure d) =
-        throwError $ "Smap result cannot be destructured: " <> show d
+        throwErrorDebugS $ "Smap result cannot be destructured: " <> show d
     createContextExit assignment = do
         collectId <- generateId
         f <- get

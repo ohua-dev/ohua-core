@@ -38,7 +38,7 @@ runSilentLoggingT = flip runLoggingT $ \_ _ _ _ -> pure ()
 
 -- | Alias for backwards compatibility with old `MonadOhua` interface
 failWith :: MonadError Error m => Error -> m a
-failWith = throwError
+failWith = throwErrorDebugS
 
 
 fromEnv :: (MonadReadEnvironment m, Functor m) => Lens' Environment a -> m a

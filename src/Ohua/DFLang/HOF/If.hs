@@ -49,7 +49,7 @@ checkAssignment ::
        (Show a, MonadError Error m) => Text -> AbstractAssignment a -> m a
 checkAssignment _ (Direct b) = pure b
 checkAssignment branch otherBranch =
-    throwError $
+    throwErrorDebugS $
     "if HOF transform expects one direct assignment for `" <> branch <>
     "` branch, got " <>
     show otherBranch
@@ -59,7 +59,7 @@ instance HigherOrderFunction IfFn where
     parseCallAndInitState [Variable v, LamArg thenBr@(Lam {beginAssignment = Direct ret}), LamArg elseBr] =
         pure $ IfFn v thenBr elseBr ret
     parseCallAndInitState args =
-        failWith $
+        throwErrorDebugS $
         "Unexpected number or type of argument for if " <> show args
     createContextEntry = do
         f <- get
@@ -94,7 +94,7 @@ instance HigherOrderFunction IfFn where
             case beginAssignment lam of
                 Direct v -> pure v
                 _ ->
-                    throwError $
+                    throwErrorDebugS $
                     "if HOF transform expects direct assignment in all branches"
         (scopeExpr, varMap) <- scopeVars sourceVar freeVars
         pure ([scopeExpr], varMap)

@@ -133,7 +133,7 @@ instance UnsafeMake FnId where
 instance Make FnId where
     make i
         | i < 0 =
-            throwError $
+            throwErrorDebugS $
             "Function id must be larger than 0, was " <> show i
         | otherwise = pure $ unsafeMake i
 
@@ -150,7 +150,7 @@ deriving instance Semigroup Binding
 type instance SourceType Binding = Text
 
 instance Make Binding where
-    make "" = throwError "Binding cannot be empty"
+    make "" = throwErrorDebugS "Binding cannot be empty"
     make s = pure $ unsafeMake s
 
 instance UnsafeMake Binding where
@@ -230,17 +230,17 @@ instance IsString SomeBinding where
 -- bindings.
 symbolFromString :: MonadError Error m => Text -> m SomeBinding
 symbolFromString s
-    | T.null s = throwError "Symbols cannot be empty"
+    | T.null s = throwErrorDebugS "Symbols cannot be empty"
     | otherwise =
         case T.break (== '/') s of
             (symNs, slashName)
-                | T.null symNs -> throwError $ "An unqualified name cannot start with a '/': " <> show s
+                | T.null symNs -> throwErrorDebugS $ "An unqualified name cannot start with a '/': " <> show s
                 | T.null slashName ->
                     Unqual <$> make symNs
                 | Just ('/', symName) <- T.uncons slashName ->
                     if | (== '/') `T.find` symName /= Nothing ->
-                           throwError $ "Too many '/' delimiters found in the binding " <> show s
-                       | T.null symName -> throwError $ "Name cannot be empty in the binding " <> show s
+                           throwErrorDebugS $ "Too many '/' delimiters found in the binding " <> show s
+                       | T.null symName -> throwErrorDebugS $ "Name cannot be empty in the binding " <> show s
                        | otherwise ->
                            do ns <-
                                   make =<<
@@ -249,7 +249,7 @@ symbolFromString s
                                       (T.split (== '.') symNs)
                               bnd <- make symName
                               pure $ Qual $ QualifiedBinding ns bnd
-            _ -> throwError $ "Leading slash expected after `break` in the binding " <> show s
+            _ -> throwErrorDebugS $ "Leading slash expected after `break` in the binding " <> show s
 
 class ExtractBindings a where
     extractBindings :: a -> [Binding]

@@ -48,8 +48,8 @@ parsePragma :: MonadError Error m => Text -> m Pragma
 parsePragma t =
     case words t of
         ["feature", f] -> pure $ Feature f
-        (x:_) -> throwError $ "Unknown Pragma \'" <> x <> "\'"
-        [] -> throwError $ "Pragma cannot be empty"
+        (x:_) -> throwErrorDebugS $ "Unknown Pragma \'" <> x <> "\'"
+        [] -> throwErrorDebugS $ "Pragma cannot be empty"
 
 instance (TH.Lift k, TH.Lift v) => TH.Lift (HM.HashMap k v) where
   lift m = do

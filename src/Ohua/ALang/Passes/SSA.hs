@@ -95,7 +95,7 @@ isSSA =
   where
     failOrInsert bnd = do
         isDefined <- gets (HS.member bnd)
-        when isDefined $ throwError bnd
+        when isDefined $ throwErrorDebugS bnd
         modify (HS.insert bnd)
     go e = do
         case e of
@@ -105,6 +105,6 @@ isSSA =
         sequence_ e
 
 checkSSA :: MonadOhua envExpr m => Expression -> m ()
-checkSSA = maybe (return ()) (throwError . mkMsg) . isSSA
+checkSSA = maybe (return ()) (throwErrorDebugS . mkMsg) . isSSA
   where
     mkMsg bnd = "Redefinition of binding " <> show bnd

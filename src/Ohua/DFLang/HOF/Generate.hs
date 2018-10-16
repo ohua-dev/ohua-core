@@ -57,7 +57,7 @@ instance HigherOrderFunction GenFn where
                   Nothing
             ]
     createContextExit a =
-        throwError $
+        throwErrorDebugS $
         "generator assignment must be to one direct binding: " <> show a
     scopeFreeVariables _ freeVars = do
         GenFn {pulse} <- get

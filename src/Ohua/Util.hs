@@ -114,7 +114,7 @@ assertM = flip assert (pure ())
 -- @m@ rather than an 'error'.
 assertE :: MonadError String m => Bool -> m ()
 assertE True  = return ()
-assertE False = throwError "AssertionError"
+assertE False = throwErrorDebugS "AssertionError"
 {-# INLINE assertE #-}
 
 

@@ -47,7 +47,7 @@ instance HigherOrderFunction SmapGFn where
     parseCallAndInitState [LamArg lam, Variable v] =
         pure $ SmapGFn v lam $ error "Do not evaluate this"
     parseCallAndInitState a =
-        throwError $ "Unexpected number/type of arguments to smap" <> show a
+        throwErrorDebugS $ "Unexpected number/type of arguments to smap" <> show a
     createContextEntry = do
         SmapGFn {collSource, smapLambda} <- get
         smapId <- generateId
@@ -70,7 +70,7 @@ instance HigherOrderFunction SmapGFn where
                   (Just triggerArcBnd)
             ]
     createContextExit (Destructure d) =
-        throwError $ "Smap result cannot be destructured: " <> show d
+        throwErrorDebugS $ "Smap result cannot be destructured: " <> show d
     createContextExit assignment = do
         collectId <- generateId
         SmapGFn {triggerArc, smapLambda} <- get
