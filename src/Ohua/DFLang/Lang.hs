@@ -21,8 +21,6 @@ module Ohua.DFLang.Lang where
 
 import Ohua.Prelude
 
-import qualified Data.Text as T
-
 -- | A sequence of let statements with a terminating binding to be used as return value
 data DFExpr = DFExpr
     { letExprs :: Seq LetExpr
@@ -82,25 +80,3 @@ instance NFData DFFnRef where
 instance NFData DFVar where
     rnf (DFEnvVar e) = rnf e
     rnf (DFVar v) = rnf v
-
-showDFExpr :: DFExpr -> Text
-showDFExpr (DFExpr lets retVar) =
-    T.unlines $ (toList $ fmap showLet lets) <> [showBnd retVar]
-  where
-    showBnd :: Binding -> Text
-    showBnd = unwrap
-    showAssign (Direct v) = showBnd v
-    showAssign (Destructure vs) =
-        "[" <> T.intercalate ", " (map showBnd vs) <> "]"
-    showAssign (Recursive r) = "(rec) " <> showBnd r
-    showRef (DFFunction a) = show a
-    showRef (EmbedSf a) = show a
-    showVar (DFEnvVar h) = show h
-    showVar (DFVar v) = showBnd v
-    showFid = show . unwrap
-    showLet (LetExpr fid ass ref args ctxArc) =
-        "let " <> showAssign ass <> " = " <> showRef ref <> "<" <> showFid fid <>
-        "> (" <>
-        T.intercalate ", " (map showVar args) <>
-        ")" <>
-        maybe "" (\a -> " [" <> showBnd a <> "]") ctxArc

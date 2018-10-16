@@ -2,7 +2,7 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 7efe7994ca71629b4c810522d224f4ef7bc65d0c709908a6564aff74c9cfa082
+-- hash: ca61f7b88a83f17ae91bbac19d26e4313b568edfe05b7b08960a012ccf9004ec
 
 name:           ohua-core
 version:        0.2.0
@@ -100,6 +100,7 @@ library
       Ohua.DFLang.Util
       Ohua.DFLang.HOF
       Ohua.DFLang.Passes
+      Ohua.DFLang.PPrint
       Ohua.DFLang.TailRec
       Ohua.DFLang.Optimizations
       Ohua.DFGraph
