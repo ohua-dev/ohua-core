@@ -29,17 +29,6 @@ import Ohua.Configuration
 import Ohua.Stage
 
 
-data CustomPasses env = CustomPasses
-  { passAfterDFLowering :: DFExpr -> OhuaM env DFExpr
-  , passAfterNormalize  :: Expression -> OhuaM env Expression
-  }
-
-noCustomPasses :: CustomPasses env
-noCustomPasses = CustomPasses pure pure
-
-instance Default (CustomPasses env) where
-  def = noCustomPasses
-
 
 forceLog :: (MonadLogger m, NFData a) => Text -> a -> m ()
 forceLog msg a = a `deepseq` logDebugN msg
@@ -51,8 +40,8 @@ pipeline CustomPasses{..} e = do
     stage resolvedAlang e
     ssaE <- performSSA e
     stage ssaAlang ssaE
-    normalizedE <- normalize ssaE
-    stage normalizedAlang normalizedE =<< passBeforeNormalize ssaE
+    normalizedE <- normalize =<< passBeforeNormalize ssaE
+    stage normalizedAlang normalizedE
 #ifdef DEBUG
     checkProgramValidity normalizedE
     checkHigherOrderFunctionSupport normalizedE
@@ -89,7 +78,7 @@ pipeline CustomPasses{..} e = do
 compile :: (MonadError Error m, MonadLoggerIO m) => Options -> CustomPasses env -> Expression -> m OutGraph
 compile opts passes exprs = do
     logFn <- askLoggerIO
-    let passes' = flip loadTailRecPasses passes $ view enableRecursiveFunctions opts
+    let passes' = flip loadTailRecPasses passes $ view transformRecursiveFunctions opts
     either throwError pure =<< liftIO (runLoggingT (runFromExpr opts (pipeline passes') exprs) logFn)
 
 
