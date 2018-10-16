@@ -5,8 +5,10 @@ module TailRecSpec (passesSpec) where
 import Ohua.Prelude
 
 import Ohua.ALang.Lang
-import Ohua.ALang.Passes.TailRec (findTailRecs, hoferize, recur, recur_hof)
+import Ohua.ALang.Passes (normalize)
+import Ohua.ALang.Passes.TailRec (findTailRecs, hoferize, recur, recur_hof, verifyTailRecursion)
 import qualified Ohua.ALang.Refs as ALangRefs
+import Ohua.ALang.PPrint (quickRender)
 
 import Test.Hspec
 
@@ -166,6 +168,66 @@ expectedRecWithCallOnlyOnRecurBranch =
                                   "c"))))
               (Let "y" ("a" `Apply` 95) "y"))
 
+notTailRecursive1 :: Expression
+notTailRecursive1 =
+ (Let (Recursive ("a" :: Binding))
+      (Lambda
+           "i"
+           (Let "p"
+                (("math/-" `Apply` "i") `Apply` 10)
+                (Let "x"
+                     (("math/<" `Apply` "p") `Apply` 0)
+                     (Let "c"
+                          (Apply
+                               (Apply
+                                    (Apply (sf ALangRefs.ifThenElse) "x")
+                                    (Lambda "then" "p"))
+                                    (Lambda "else"
+                                      (Let "g" ((sf recur) `Apply` "p")
+                                           ("math/times10" `Apply` "g"))
+                                    ))
+                          "c"))))
+      (Let "y" ("a" `Apply` 95) "y"))
+
+notTailRecursive2 :: Expression
+notTailRecursive2 =
+ (Let (Recursive ("a" :: Binding))
+      (Lambda
+           "i"
+           (Let "p"
+                (("math/-" `Apply` "i") `Apply` 10)
+                (Let "x"
+                     (("math/<" `Apply` "p") `Apply` 0)
+                     (Let "c"
+                          (Apply
+                               (Apply
+                                    (Apply (sf ALangRefs.ifThenElse) "x")
+                                    (Lambda "then" "p"))
+                                    (Lambda "else" ((sf recur) `Apply` "p")))
+                          ("math/times10" `Apply` "c")))))
+      (Let "y" ("a" `Apply` 95) "y"))
+
+notTailRecursive3 :: Expression
+notTailRecursive3 =
+  (Let (Recursive ("a" :: Binding))
+             (Lambda
+                  "i"
+                  (Let "g"
+                        (Let "p"
+                             (("math/-" `Apply` "i") `Apply` 10)
+                             (Let "x"
+                                  (("math/<" `Apply` "p") `Apply` 0)
+                                  (Let "c"
+                                       (Apply
+                                            (Apply
+                                                 (Apply (sf ALangRefs.ifThenElse) "x")
+                                                 (Lambda "then" "p"))
+                                                 (Lambda "else" ((sf recur) `Apply` "p")))
+                                       "c")))
+                          ("math/times10" `Apply` "g")))
+             (Let "y" ("a" `Apply` 95) "y"))
+
+
 expectedHoferized :: Expression
 expectedHoferized =
   (Let (Direct ("a_0" :: Binding))
@@ -191,7 +253,11 @@ runPass :: (Expression -> OhuaM env Expression) -> Expression -> IO (Either Erro
 runPass pass expr = runSilentLoggingT $ runFromExpr def pass expr
 
 hof :: Expression -> Expression -> Expectation
-hof expr expected = runPass hoferize expr >>= (`shouldBe` (Right expected))
+hof expr expected = runPass hoferize expr >>= ((`shouldBe` (quickRender expected)) . quickRender . (fromRight (Var "test/failure")))
+
+-- noTailRec :: Expression -> String -> Expectation
+noTailRec expr expected = (runPass (hoferize >=> normalize >=> verifyTailRecursion) expr) `shouldThrow` (errorCall expected)
+
 
 -- -- (let [a (fn [i] (let [p (math/- i 10)]
 -- --                       (ohua.lang/if (math/< p 0)
@@ -286,6 +352,11 @@ passesSpec = do
   describe "Phase 2: hoferizing rec" $ do
       it "hoferizes correct recursion" $
         hof expectedRecWithCallOnlyOnRecurBranch expectedHoferized
-      -- TODO negative test cases
-      -- it "failure when trying to hoferize malformed expression" $
-      --   hof expectedRecWithExprOnRecurBranch ...
+
+  describe "Verification:" $ do
+    it "no tail recursion 1" $
+      noTailRec notTailRecursive1 "Recursion is not tail recursive!"
+    it "no tail recursion 2" $
+      noTailRec notTailRecursive2 "Recursion is not tail recursive! Last stmt: \"math/times10 c\""
+    it "no tail recursion 3" $
+      noTailRec notTailRecursive3 "Recursion is not tail recursive! Last stmt: \"math/times10 g\""
