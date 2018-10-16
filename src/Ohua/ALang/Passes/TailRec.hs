@@ -7,11 +7,14 @@ import Ohua.Prelude
 import Control.Monad.Writer
 import Data.Functor.Foldable
 import qualified Data.HashSet as HS
+import qualified Data.Text as T
+import qualified Data.List.NonEmpty as NE
 
 import Ohua.ALang.Lang
 import Ohua.ALang.Refs as ALangRefs
 import Ohua.Unit
 import Ohua.Configuration
+import Ohua.ALang.PPrint (quickRender)
 
 -- Design:
 -- ============
@@ -140,7 +143,6 @@ findRecCall (Let (Direct a) expr inExpr) algosInScope = do
     return $ if HS.member a found
              then (iFound, Let (Recursive a) e iExpr)
              else (HS.union found iFound, Let (Direct a) e iExpr)
-  where
 
 findRecCall (Let a expr inExpr) algosInScope = do
     (iFound, iExpr) <- findRecCall inExpr algosInScope
@@ -178,17 +180,61 @@ hoferize (Lambda a e) = Lambda a <$> hoferize e
 hoferize v@(Var _) = return v
 hoferize e = error $ show e
 
+-- performed after normalization
+verifyTailRecursion :: (Monad m, MonadGenBnd m) => Expression -> m Expression
+verifyTailRecursion e | isCall recur_hof e = (performChecks $ fromApplyToList e) >> return e
+  where
+    performChecks (_:((Lambda a e):_)) = traverseToLastCall checkIf e
+    performChecks (_:(e:_)) = error $ T.pack $ "Recursion is not inside a lambda but: " ++ (show e)
+
+    traverseToLastCall check (Let v e ie) | isLastStmt ie = check e
+    traverseToLastCall check (Let v e ie) = failOnRecur e >> traverseToLastCall check ie
+    traverseToLastCall _ e = error $ T.pack $ "Invariant broken! Found expression: " ++ (show $ quickRender e)
+
+    -- failOnRecur (Let _ e ie) | isCall recur e || isCall recur ie = error "Recursion is not tail recursive!"
+    failOnRecur (Let _ e ie) = failOnRecur e >> failOnRecur ie
+    failOnRecur (Lambda v e) = failOnRecur e -- TODO maybe throw a better error message when this happens
+    failOnRecur (Apply (Var (Sf recur _)) _) = error "Recursion is not tail recursive!"
+    failOnRecur (Apply a b) = return ()
+    failOnRecur e = error $ T.pack $ "Invariant broken! Found pattern: " ++ (show e)
+
+    checkIf e | isCall "ohua.lang/if" e = do
+      -- assumes well-structured if
+      let (_:(_:(tBranch:(fBranch:_)))) = fromApplyToList e
+      let (Lambda v et) = tBranch
+      let (Lambda v ef) = fBranch
+      let lastFnOnBranch = traverseToLastCall (return . (\(Var (Sf f _)) -> f::QualifiedBinding) . head . NE.fromList . fromApplyToList)
+      tFn <- lastFnOnBranch et
+      fFn <- lastFnOnBranch ef
+      if tFn == recur
+      then if fFn == recur
+           then error "Endless loop detected: Tail recursion does not have a non-recursive branch!"
+           else return ()
+      else if fFn == recur
+           then return ()
+           else error $ T.pack $ "We currently do not support recursive calls that are located on"
+                              ++ "nested conditional branches (#conditional branches > 1) or in"
+                              ++ "Lambdas to other higher-order functions! Found: "
+                              ++ (show fFn)
+                              ++ " : "
+                              ++ (show tFn)
+    checkIf e = error $ T.pack $ "Recursion is not tail recursive! Last stmt: " ++ (show $ quickRender e)
+
+    isLastStmt (Var (Local _)) = True
+    isLastStmt _ = False
+verifyTailRecursion e@(Let v expr inExpr) = verifyTailRecursion expr >> verifyTailRecursion inExpr >> return e
+
 -- Phase 3:
 rewrite :: (MonadGenBnd m, MonadError Error m) => Expression -> m Expression
-rewrite e | isRecurHofCall e = rewriteCallExpr e
+rewrite e | isCall recur_hof e = rewriteCallExpr e
 rewrite (Let v expr inExpr) = Let v <$> rewrite expr <*> rewrite inExpr
 rewrite (Apply a b) = Apply <$> rewrite a <*> rewrite b
 rewrite (Lambda a e) = Lambda a <$> rewrite e
 rewrite v@(Var _) = return v
 
-isRecurHofCall (Apply (Var (Sf recur_hof _)) _) = True
-isRecurHofCall (Apply e@(Apply _ _) _) = isRecurHofCall e
-isRecurHofCall _ = False
+isCall f (Apply (Var (Sf f' _)) _) | f == f' = True
+isCall f (Apply e@(Apply _ _) _) = isCall f e
+isCall _ _ = False
 
 rewriteCallExpr :: (MonadGenBnd m, MonadError Error m) => Expression -> m Expression
 rewriteCallExpr e = do
