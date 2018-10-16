@@ -58,6 +58,7 @@ import GHC.Stack
 #endif
 
 
+-- | Boolean indicating whether this is a debug build
 isDebug :: Bool
 isDebug =
 #if DEBUG
@@ -67,16 +68,19 @@ isDebug =
 #endif
 {-# INLINE isDebug #-}
 
+-- | @a `debugOr` b@ executed @a@ in a debug build, otherwise @b@
 debugOr :: a -> a -> a
 debugOr a0 a1
   | isDebug = a0
   | otherwise = a1
 {-# INLINE debugOr #-}
 
+-- | Run an action only if this is a debug build
 whenDebug :: Applicative f => f () -> f ()
 whenDebug = when isDebug
 {-# INLINE whenDebug #-}
 
+-- | Run an action only if this is _not_ a debug build
 unlessDebug :: Applicative f => f () -> f ()
 unlessDebug = unless isDebug
 {-# INLINE unlessDebug #-}
@@ -198,5 +202,8 @@ throwErrorS msg = throwError $ msg <> "\n" <> fromString cs
   where
     cs = callStackToStr callStack
 
+-- | Throws a canonical compiler error which, in case of a debug build, has a
+-- call stack attached.
 throwErrorDebugS :: (HasCallStack, MonadError s m, IsString s, SemigroupConstraint s) => s -> m a
 throwErrorDebugS = throwErrorS `debugOr` throwError
+{-# INLINE throwErrorDebugS #-}
