@@ -28,6 +28,7 @@ import Ohua.DFLang.HOF.Seq
 import Ohua.DFLang.HOF.Smap
 import Ohua.DFLang.HOF.SmapG
 import Ohua.DFLang.HOF.Generate
+import Ohua.DFLang.HOF.TailRec
 import Ohua.DFLang.Lang (DFExpr(..), DFFnRef(..), DFVar(..), LetExpr(..))
 import qualified Ohua.DFLang.Refs as Refs
 import Ohua.DFLang.Util
@@ -217,6 +218,7 @@ hofs =
     , WHOF (Proxy :: Proxy SeqFn)
     , WHOF (Proxy :: Proxy SmapGFn)
     , WHOF (Proxy :: Proxy GenFn)
+    , WHOF (Proxy :: Proxy TailRecursion)
     ]
 
 hofNames :: HM.HashMap QualifiedBinding WHOF

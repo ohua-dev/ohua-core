@@ -14,28 +14,28 @@ import Ohua.DFLang.Lang
 import qualified Ohua.DFLang.Refs as Refs
 import Ohua.DFLang.HOF
 
-data Recur = Recur
+data TailRecursion = TailRecursion
     { recursion :: Lambda,
       initialArgs :: DFVar -- packaged in a []
     } deriving (Show)
 
-instance HigherOrderFunction Recur where
+instance HigherOrderFunction TailRecursion where
   hofName = tagFnName TR.recur
 
-  parseCallAndInitState [LamArg lam, Variable v] = return $ Recur lam v
+  parseCallAndInitState [LamArg lam, Variable v] = return $ TailRecursion lam v
   parseCallAndInitState a = throwError $ "Unexpected number/type of arguments to recur" <> show a
 
   -- we need the outgoing arc of the lambda for the recur op
   createContextEntry = return []
 
   createContextExit recurResultVar = do
-    (Recur (Lam (Direct lamIn) lamOut) initArgs) <- get
+    (TailRecursion (Lam (Direct lamIn) lamOut) initArgs) <- get
     recurId <- generateId
     return [
             LetExpr recurId
-                    (Destructure $ (extractBindings recurResultVar) ++ [lamOut])
+                    (Destructure $ (extractBindings recurResultVar) ++ [lamIn])
                     Refs.recur
-                    [initArgs, DFVar lamIn]
+                    [initArgs, DFVar lamOut]
                     Nothing
            ]
 

@@ -223,6 +223,8 @@ verifyTailRecursion e | isCall recur_hof e = (performChecks $ fromApplyToList e)
     isLastStmt (Var (Local _)) = True
     isLastStmt _ = False
 verifyTailRecursion e@(Let v expr inExpr) = verifyTailRecursion expr >> verifyTailRecursion inExpr >> return e
+verifyTailRecursion e@(Var _) = return e
+verifyTailRecursion e = error $ T.pack $ "Invariant broken! Found stmt: " ++ (show e)
 
 -- Phase 3:
 rewrite :: (MonadGenBnd m, MonadError Error m) => Expression -> m Expression
