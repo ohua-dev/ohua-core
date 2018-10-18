@@ -12,7 +12,7 @@
 -- the call-by-need lambda calculus.
 --
 -- The best place to start would be the 'AExprF' data type. 'AExprF' is a simple
--- functor, which defines the basic alang syntax and it is the only actual type
+-- functor, which defines the basic ALang syntax and it is the only actual type
 -- present at runtime. The other expression types are either synonyms or
 -- specializations which map back to the 'AExprF' type in some way.
 --
@@ -20,7 +20,7 @@
 --
 -- Alang is built around the @recursion-schemes@ library, which allows generic
 -- traversals and easy manipulation of tree style recursive data types. As a
--- result all versions of alang have an underlying /base functor/ type and a top
+-- result all versions of ALang have an underlying /base functor/ type and a top
 -- level type. The "base functor" is used when pattern matching in the generic
 -- functions, such as 'RS.cata', and the top level type is used when constructing
 -- new values. The base functor has the same name as its corresponding top level
@@ -115,11 +115,11 @@ import Ohua.LensClasses
 --          because the concrete type of the host expression depends on the backend.
 -- some types for `bindingType`
 
--- | Type of references which can inhabit a `Var` once the source is copletely parsed.
+-- | When the source is completely parsed, a `Var` may contain any of the following:
 data Symbol a
     = Local !Binding -- ^ the basic symbols occuring in the algorithm language
     | Sf !a
-         !(Maybe FnId) -- ^ reference to a stateful function
+         !(Maybe FnId) -- ^ reference to a stateful function (with an optional identifier)
     | Env !HostExpr -- ^ reference to an environment object. this
                     -- maybe a var or any other term of the host
                     -- language.

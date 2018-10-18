@@ -1,3 +1,149 @@
+{-|
+Module      : $Header$
+Description : Implementation for basic tail recrusion support.
+Copyright   : (c) Sebastian Ertel, Justus Adam 2017. All Rights Reserved.
+License     : EPL-1.0
+Maintainer  : dev@justus.science, sebastian.ertel@gmail.com
+Stability   : experimental
+Portability : portable
+This source code is licensed under the terms described in the associated LICENSE.TXT file
+
+== Design:
+
+The tail recursion implementation for the ohua-core compiler encompasses the following phases:
+
+=== Phase 1: (Performed directly on the initial ALang form.)
+Find recursions and mark them, i.e., perform the following transformation:
+
+@
+  let f = \x1 ... xn -> ...
+                       let y1 = ....
+                       ...
+                       let yn = ...
+                       ...
+                       if c then
+                           result
+                       else
+                           f y1 ... yn
+@
+
+into this:
+
+@
+  letrec f = \x1 ... xn -> ...
+                           let y1 = ....
+                           ...
+                           let yn = ...
+                           ...
+                           if c then
+                               result
+                           else
+                               recur y1 ... yn
+@
+
+This turns the recursive function into a non-recursive one. But it would still
+not be possible to let the other transformations run. Especially, the lambda-inlining
+transformation would actually lose the `letrec` marker.
+
+
+=== Phase 2: (Performed on the output of Phase 1.)
+Turn recursions into HOFs:
+
+@
+  let f' = \x1 ... xn -> ...
+                           let y1 = ....
+                           ...
+                           let yn = ...
+                           ...
+                           if c then
+                               result
+                           else
+                               recur y1 ... yn
+  let f = recur_hof f'
+@
+
+Lambda-inlinling will then just inline f' while still performing all other transformations
+on it. A nice benefit: lowering for tail recursion is just an implementation of
+a HigherOrderFunction lowering. As such though, we can not access the lambda, i.e., f.
+So we need to do the lambda modifications on ALang before (which is nicer anyways).
+
+=== Phase 3: (Performed on the expression in ALang-normalized form (ANF)!)
+Rewrite the code (for a call) such that:
+
+@
+  let g = recur (\args -> let (x1 ... xn) = args
+                              ...
+                              let y1 = ....
+                              ...
+                              let yn = ...
+                              ...
+                              let e = if c then
+                                        let z = right result
+                                        in z
+                                      else
+                                        let ys = array y1 ... yn
+                                        let z = left ys
+                                        in z
+                              in e
+                )
+                array a1 ... an
+@
+
+Note: recur_hof became recur
+Either might be also implemented as:
+
+@
+  right a = (false, a)
+  left a = (true, a)
+  isRight = not . fst
+  isLeft = fst
+@
+
+Phase 4: Handling free variables in the Lambda expression
+
+The ALang phase handles free variables via lambda lifting:
+
+@
+  let g = recur (\b ->
+                    let (args, freeArgs) = b
+                    let (x1 ... xn) = args
+                    let (a1 ... am) = freeArgs
+                              ...
+                              let y1 = ....
+                              ...
+                              let yn = ...
+                              ...
+                              let e = if c then
+                                        let z = right result
+                                        in z
+                                      else
+                                        let ys = array y1 ... yn
+                                        let z = left ys
+                                        in z
+                              in e
+                )
+                array a1 ... an
+                array arg1 ... argm
+@
+
+We again pack them in an array to make the recur operator easier to implement for a backend.
+This way, it does not need to support varariable argument lists.
+
+=== Phase 5: (DF Lowering for recur_hof.)
+Adds the following operator as a context op:
+
+@
+  recur [a1 ... an] Either [y1 ... yn] result -> Either [y1 ... yn] result
+@
+
+The operator has two incoming arcs and two outgoing arcs:
+
+  [1. incoming arc] @[a1 ... an]@
+  [2. incoming arc] @Either [y1 ... yn] result@  <-- feedback edge: @e@
+  [1. outgoing arc] @Either [a1 ... an] [y1 ... yn]@
+  [2. outgoing arc] @result@
+
+-}
 {-# LANGUAGE CPP #-}
 
 module Ohua.ALang.Passes.TailRec where
@@ -11,100 +157,12 @@ import qualified Data.Text as T
 import qualified Data.List.NonEmpty as NE
 
 import Ohua.ALang.Lang
+import Ohua.ALang.Passes (lambdaLifting)
 import Ohua.ALang.Refs as ALangRefs
 import Ohua.Unit
 import Ohua.Configuration
 import Ohua.ALang.PPrint (quickRender)
 
--- Design:
--- ============
---
--- Phase 1: (Performed directly on the initial ALang form.)
--- Find recursions and mark them, i.e., perform the following transformation:
---
--- let f = \x1 ... xn -> ...
---                      let y1 = ....
---                      ...
---                      let yn = ...
---                      ...
---                      if c then
---                          result
---                      else
---                          f y1 ... yn
---
--- into this:
---
--- letrec f = \x1 ... xn -> ...
---                          let y1 = ....
---                          ...
---                          let yn = ...
---                          ...
---                          if c then
---                              result
---                          else
---                              recur y1 ... yn
---
--- This turns the recursive function into a non-recursive one. But it would still
--- not be possible to let the other transformations run. Especially, the lambda-inlining
--- transformation would actually lose the `letrec` marker.
---
---
--- Phase 2: (Performed on the output of Phase 1.)
--- Turn recursions into HOFs:
---
--- let f' = \x1 ... xn -> ...
---                          let y1 = ....
---                          ...
---                          let yn = ...
---                          ...
---                          if c then
---                              result
---                          else
---                              recur y1 ... yn
--- let f = recur_hof f'
---
--- Lambda-inlinling will then just inline f' while still performing all other transformations
--- on it. A nice benefit: lowering for tail recursion is just an implementation of
--- a HigherOrderFunction lowering. As such though, we can not access the lambda, i.e., f.
--- So we need to do the lambda modifications on ALang before (which is nicer anyways).
---
--- Phase 3: (Performed on the expression in ALang-normalized form (ANF)!)
--- Rewrite the code (for a call) such that:
---
--- let g = recur (\x -> let (x1 ... xn) = x
---                             ...
---                             let y1 = ....
---                             ...
---                             let yn = ...
---                             ...
---                             let e = if c then
---                                       let z = right result
---                                       in z
---                                     else
---                                       let ys = array y1 ... yn
---                                       let z = left ys
---                                       in z
---                             in e
---               )
---               array a1 ... an
---
--- Note: recur_hof became recur
--- Either might be also implemented as:
--- right a = (false, a)
--- left a = (true, a)
--- isRight = not . fst
--- isLeft = fst
---
--- Phase 4: (DF Lowering for recur_hof.)
--- add a the following operator as a context op:
---
--- recur [a1 ... an] Either [y1 ... yn] result -> Either [y1 ... yn] result
---
--- The operator has two incoming arcs and two outgoing arcs:
--- 1. incoming arc: [a1 ... an]
--- 2. incoming arc: Either [y1 ... yn] result  <-- feedback edge: e
--- 1. outgoing arc: Either [a1 ... an] [y1 ... yn]
--- 2. outgoing arc: result
 
 --  ==== Implementation starts here
 
@@ -289,6 +347,33 @@ fromListToApply f (v:vs) = Apply (fromListToApply f vs) v
 
 fromApplyToList (Apply f@(Var _) v) = [f, v]
 fromApplyToList (Apply a b) = fromApplyToList a ++ [b]
+
+-- | Phase 4: Free variable handling via lambda lifting
+freeVarHandling :: (Monad m, MonadGenBnd m) => Expression -> m Expression
+freeVarHandling e | isCall recur e = liftLambda e
+freeVarHandling (Let v expr inExpr) = Let v <$> freeVarHandling expr <*> freeVarHandling inExpr
+freeVarHandling (Apply a b) = Apply <$> freeVarHandling a <*> freeVarHandling b
+freeVarHandling (Lambda a e) = Lambda a <$> freeVarHandling e
+freeVarHandling v@(Var _) = return v
+
+liftLambda :: (Monad m, MonadGenBnd m) => Expression -> m Expression
+liftLambda e = do
+  let ((Var (Sf recur _)) : (lamExpr : callArgs) ) = fromApplyToList e
+  let (callArg : []) = callArgs -- due to the previous rewrite
+  (Lambda formals liftedExpr, actuals) <- lambdaLifting lamExpr
+  let (initialFormal : freeFormals) = extractBindings formals
+  b <- generateBindingWith "b"
+  freeArgs <- generateBindingWith "freeArgs"
+  let lam = Lambda (Direct b)
+            (Let (Destructure [initialFormal, freeArgs]) (Apply (Var (Sf "ohua.lang/id" Nothing)) $ Var $ Local b)
+              (Let (Destructure freeFormals) (Apply (Var (Sf "ohua.lang/id" Nothing)) $ Var $ Local freeArgs)
+                liftedExpr))
+  return $ Apply
+            (Apply
+              (Apply recur_sf lam)
+              callArg)
+            $ fromListToApply (Sf ALangRefs.array Nothing) $ map (Var . Local) actuals
+
 
 --  ==== Implementation ends here
 

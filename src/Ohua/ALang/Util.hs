@@ -13,6 +13,8 @@ module Ohua.ALang.Util where
 import Ohua.Prelude
 
 import           Data.Functor.Foldable
+import qualified Data.HashSet as HS
+
 import           Ohua.ALang.Lang
 
 
@@ -40,3 +42,18 @@ substitute !var val = cata f
 --             | otherwise -> Lambda assignment (recurse body)
 --   where
 --     recurse = substitute var val
+
+findFreeVariables :: Expression -> HS.HashSet Binding
+findFreeVariables (Let (Direct v) e ie) =
+  let ves  = findFreeVariables e
+      vies = findFreeVariables ie
+      in HS.union ves $ HS.delete v vies
+findFreeVariables (Let (Destructure vs) e ie) =
+  let ves  = findFreeVariables e
+      vies = findFreeVariables ie
+      in HS.union ves $ HS.difference vies $ HS.fromList vs
+findFreeVariables (Let (Recursive _) _ _) = error "Invariant broken! (Recursive binding detected.)"
+findFreeVariables (Apply a b) = HS.union (findFreeVariables a) $ findFreeVariables b
+findFreeVariables (Var (Local v)) = HS.singleton v
+findFreeVariables (Var _) = HS.empty
+findFreeVariables (Lambda v e) = HS.difference (findFreeVariables e) $ HS.fromList $ extractBindings v

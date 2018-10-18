@@ -2,7 +2,7 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 1a5f3555fdabf05a06b74381ae561c54b992eba9005971f75e460e583a35ef29
+-- hash: 6ef0f235b41e252ba351b887ae8f81da0f9362704f6d21069ba5e6907f39472d
 
 name:           ohua-core
 version:        0.2.0
@@ -70,6 +70,7 @@ library
       Ohua.Unit
       Ohua.Test.DFGraph
   other-modules:
+      Ohua.Configuration
       Ohua.DAGLang.Lang
       Ohua.DAGLang.Passes
       Ohua.DFLang.HOF.Generate
@@ -180,6 +181,7 @@ test-suite ohua-tests
       DFLowering
       Ohua.Types.Arbitrary
       PassesSpec
+      TailRecSpec
       TestAesonConvert
       TestALangUtils
       Paths_ohua_core

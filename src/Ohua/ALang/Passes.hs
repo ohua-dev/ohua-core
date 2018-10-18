@@ -28,7 +28,9 @@ import Control.Monad.Writer (runWriter, listen, tell)
 import Data.Functor.Foldable
 import qualified Data.HashMap.Strict as HM
 import qualified Data.HashSet as HS
+import qualified Data.Text as T
 
+import Ohua.ALang.Util (findFreeVariables)
 import Ohua.ALang.Lang
 import qualified Ohua.ALang.Refs as Refs
 
@@ -255,13 +257,6 @@ applyToSf =
             failWith $ "Illegal Apply to local var " <> show bnd
         e -> sequence_ $ fmap snd e
 
--- FIXME this function is never called. was it supposed to be part of
--- the below validity check?
-lamdasAreInputToHigherOrderFunctions ::
-       MonadOhua envExpr m => Expression -> m ()
-lamdasAreInputToHigherOrderFunctions _ = return ()
-
--- lamdasAreInputToHigherOrderFunctions (Apply v (Lambda _ body)) = undefined
 -- | Checks that all local bindings are defined before use.
 -- Scoped. Aka bindings are only visible in their respective scopes.
 -- Hence the expression does not need to be in SSA form.
@@ -312,6 +307,33 @@ normalize e =
         if res == expr
             then return res
             else reduceLambdas res
+
+-- | Note that this only performs the initial lifting of the lambda expression.
+-- It does not find calls to the lambda and rewrites them accordingly.
+-- This is due to the fact that we often want to package the freeVars via a call to
+-- ohua.lang/array to make the backend implementation easier and I'm not sure whether
+-- this is always true.
+
+-- TODO: I believe, we need to rename the free variables in the expression otherwise
+--       the other optimizations might get confused. Would another SSA-Pass on the expression do the job?
+-- > do a simple rename pass for Vars (not for bindings!) -> return the array of vars that has the original vars in the order that they are now formal vars.
+--   they can be used as actuals to calls!
+lambdaLifting :: (Monad m, MonadGenBnd m) => Expression -> m (Expression, [Binding])
+lambdaLifting (Lambda v e) = do
+  let inputVars = extractBindings v
+  let freeVars  = HS.difference (findFreeVariables e) $ HS.fromList inputVars
+  let actuals = sort $ HS.toList freeVars -- makes the list of args deterministic
+  formals <- mapM generateBindingWith actuals
+  let rewrittenExp = foldl renameVar e $ zip actuals formals
+  return (flip Lambda rewrittenExp $ Destructure $ inputVars ++ formals, actuals)
+lambdaLifting e = error $ T.pack $ "Invariant broken! Lambda lifting is only applicable to lambda expressions! Found: " ++ (show e)
+
+renameVar :: Expression -> (Binding, Binding) -> Expression
+renameVar (Var (Local v)) (old,new) | old == v = Var $ Local new
+renameVar v@(Var _)       _                    = v
+renameVar (Let v e ie)    m                    = Let v (renameVar e m) $ renameVar ie m
+renameVar (Lambda v e)    m                    = Lambda v $ renameVar e m
+renameVar (Apply a b)     m                    = Apply (renameVar a m) $ renameVar b m
 
 -- letLift (Let assign1 (Let assign2 expr2 expr3) expr4) = letLift $ Let assign2 expr2 $ Let assign1 expr3 expr4
 -- letLift (Let assign v@(Var _) expr) = Let assign v $ letLift expr
