@@ -13,7 +13,7 @@
 -- The ALang IR is transformed straight into the dataflow IR.
 -- One important aspect of DFLang: it does not define any abstractions, i.e., there are no function definitions.
 --
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP, DeriveLift #-}
 
 #include "compat.h"
 
@@ -21,11 +21,13 @@ module Ohua.DFLang.Lang where
 
 import Ohua.Prelude
 
+import Language.Haskell.TH.Syntax (Lift)
+
 -- | A sequence of let statements with a terminating binding to be used as return value
 data DFExpr = DFExpr
     { letExprs :: Seq LetExpr
     , returnVar :: !Binding
-    } deriving (Eq, Show)
+    } deriving (Eq, Show, Lift)
 
 data LetExpr = LetExpr
     { callSiteId :: !FnId
@@ -33,12 +35,12 @@ data LetExpr = LetExpr
     , functionRef :: !DFFnRef
     , callArguments :: ![DFVar]
     , contextArg :: !(Maybe Binding)
-    } deriving (Eq, Show)
+    } deriving (Eq, Show, Lift)
 
 data DFFnRef
     = DFFunction !QualifiedBinding -- a build-in function of DFLang
     | EmbedSf !QualifiedBinding -- an generic dataflow function that wraps a stateful function call
-    deriving (Eq, Show)
+    deriving (Eq, Show, Lift)
 
 instance Hashable DFFnRef where
     hashWithSalt s =
@@ -49,7 +51,7 @@ instance Hashable DFFnRef where
 data DFVar
     = DFEnvVar !HostExpr
     | DFVar !Binding
-    deriving (Eq, Show)
+    deriving (Eq, Show, Lift)
 
 instance Hashable DFVar where
     hashWithSalt s (DFVar v) = hashWithSalt s (0 :: Int, v)

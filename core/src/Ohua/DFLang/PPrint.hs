@@ -37,7 +37,7 @@ instance Pretty DFVar where
     pretty = prettyDFVar
 
 prettyDFFnRef :: DFFnRef -> Doc a
-prettyDFFnRef (DFFunction f) = pretty f
+prettyDFFnRef (DFFunction f) = "dataflow" <+> pretty f
 prettyDFFnRef (EmbedSf f) = pretty f
 
 instance Pretty DFFnRef where
