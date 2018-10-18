@@ -1,0 +1,65 @@
+name: ohua-test-tools
+version: '0.1.0'
+synopsis: Tools for easy creation of tests for the ohua platform
+category: Testing
+author:
+- Sebastian Ertel
+- Justus Adam
+maintainer: dev@justus.science
+license: OtherLicense
+license-file: LICENSE.txt
+homepage: https://ohua-dev.github.io/ohua
+github: ohua-dev/ohua-test-tools
+extra-source-files:
+- README.md
+dependencies:
+- base >=4.8 && <5
+- text
+- mtl
+- aeson # >= 1.0.0.0
+- microlens
+- microlens-mtl
+- containers
+- bytestring
+- deepseq
+- data-default-class
+- universum >= 1.0
+- ohua-core
+- alang-ml-parser
+- QuickCheck
+- array
+- template-haskell
+- fgl
+default-extensions:
+- OverloadedStrings
+- OverloadedLists
+- MultiParamTypeClasses
+- FunctionalDependencies
+- TypeFamilies
+- GADTs
+- FlexibleContexts
+- FlexibleInstances
+- TypeSynonymInstances
+- LambdaCase
+- TupleSections
+- BangPatterns
+- ExplicitForAll
+- ScopedTypeVariables
+- DefaultSignatures
+- DeriveFunctor
+- DeriveFoldable
+- DeriveTraversable
+- DeriveGeneric
+- PatternSynonyms
+- NamedFieldPuns
+- RecordWildCards
+- ConstraintKinds
+- StandaloneDeriving
+- NoImplicitPrelude
+- RankNTypes
+- ViewPatterns
+library:
+  source-dirs: src
+  build-tools:
+    - alex
+    - happy
