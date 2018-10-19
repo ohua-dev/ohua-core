@@ -319,13 +319,16 @@ normalize e =
 -- > do a simple rename pass for Vars (not for bindings!) -> return the array of vars that has the original vars in the order that they are now formal vars.
 --   they can be used as actuals to calls!
 lambdaLifting :: (Monad m, MonadGenBnd m) => Expression -> m (Expression, [Binding])
-lambdaLifting (Lambda v e) = do
+lambdaLifting o@(Lambda v e) =
   let inputVars = extractBindings v
-  let freeVars  = HS.difference (findFreeVariables e) $ HS.fromList inputVars
-  let actuals = sort $ HS.toList freeVars -- makes the list of args deterministic
-  formals <- mapM generateBindingWith actuals
-  let rewrittenExp = foldl renameVar e $ zip actuals formals
-  return (flip Lambda rewrittenExp $ Destructure $ inputVars ++ formals, actuals)
+      freeVars  = HS.difference (findFreeVariables e) $ HS.fromList inputVars
+      actuals   = sort $ HS.toList freeVars -- makes the list of args deterministic
+  in case actuals of
+      [] -> return (o,[])
+      _  -> do
+          formals <- mapM generateBindingWith actuals
+          let rewrittenExp = foldl renameVar e $ zip actuals formals
+          return (flip Lambda rewrittenExp $ Destructure $ inputVars ++ formals, actuals)
 lambdaLifting e = error $ T.pack $ "Invariant broken! Lambda lifting is only applicable to lambda expressions! Found: " ++ (show e)
 
 renameVar :: Expression -> (Binding, Binding) -> Expression

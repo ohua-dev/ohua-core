@@ -170,7 +170,7 @@ loadTailRecPasses :: Bool -> CustomPasses env -> CustomPasses env
 loadTailRecPasses False passes@(CustomPasses{ passBeforeNormalize = bn }) = passes { passBeforeNormalize = (bn . findTailRecs False) }
 loadTailRecPasses True passes@(CustomPasses{ passBeforeNormalize = bn,
                                              passAfterNormalize = an }) = passes { passBeforeNormalize = (\e -> bn =<< (hoferize $ findTailRecs True e)),
-                                                                                   passAfterNormalize  = (\e -> an =<< rewrite e) }
+                                                                                   passAfterNormalize  = (\e -> an =<< (freeVarHandling <=< rewrite) e) }
 
 -- Currently not exposed by the frontend but only as the only part of recursion
 -- at the backend.
@@ -361,18 +361,23 @@ liftLambda e = do
   let ((Var (Sf recur _)) : (lamExpr : callArgs) ) = fromApplyToList e
   let (callArg : []) = callArgs -- due to the previous rewrite
   (Lambda formals liftedExpr, actuals) <- lambdaLifting lamExpr
-  let (initialFormal : freeFormals) = extractBindings formals
-  b <- generateBindingWith "b"
-  freeArgs <- generateBindingWith "freeArgs"
-  let lam = Lambda (Direct b)
-            (Let (Destructure [initialFormal, freeArgs]) (Apply (Var (Sf "ohua.lang/id" Nothing)) $ Var $ Local b)
-              (Let (Destructure freeFormals) (Apply (Var (Sf "ohua.lang/id" Nothing)) $ Var $ Local freeArgs)
-                liftedExpr))
-  return $ Apply
-            (Apply
-              (Apply recur_sf lam)
-              callArg)
-            $ fromListToApply (Sf ALangRefs.array Nothing) $ map (Var . Local) actuals
+  case actuals of
+    [] -> return e
+    _ -> do
+          let (initialFormal : freeFormals) = extractBindings formals
+          b <- generateBindingWith "b"
+          freeArgs <- generateBindingWith "freeArgs"
+          let lam = Lambda (Direct b)
+                    (Let (Destructure [initialFormal, freeArgs])
+                         (Apply (Var (Sf "ohua.lang/id" Nothing)) $ Var $ Local b)
+                         (Let (Destructure freeFormals)
+                              (Apply (Var (Sf "ohua.lang/id" Nothing)) $ Var $ Local freeArgs)
+                              liftedExpr))
+          return $ Apply
+                    (Apply
+                      (Apply recur_sf lam)
+                      callArg)
+                    $ fromListToApply (Sf ALangRefs.array Nothing) $ map (Var . Local) actuals
 
 
 --  ==== Implementation ends here
