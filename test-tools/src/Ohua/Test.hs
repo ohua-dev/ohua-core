@@ -3,7 +3,7 @@ module Ohua.Test where
 import Ohua.Prelude hiding (lift)
 
 import Language.Haskell.TH.Quote
-import Language.Haskell.TH.Syntax (lift)
+import Language.Haskell.TH.Syntax (lift, Exp, Q)
 import qualified Data.ByteString.Lazy.Char8 as LB
 
 import Ohua.ALang.Lang
@@ -15,13 +15,15 @@ import qualified Ohua.Compat.ML.Parser as ParseALang
 embedALang :: QuasiQuoter
 embedALang =
     QuasiQuoter
-        { quoteExp = lift . ParseALang.parseExp . LB.pack
+        { quoteExp = (lift :: Expression -> Q Exp) . fmap remapRefs . ParseALang.parseExp . LB.pack
         , quotePat = notDefined
         , quoteType = notDefined
         , quoteDec = notDefined
         }
   where
     notDefined = const $ fail "ALang can only be embedded as an expression"
+    remapRefs (Qual q) = Sf q Nothing
+    remapRefs (Unqual b) = Local b
 
 embedDFLang :: QuasiQuoter
 embedDFLang =
