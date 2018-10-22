@@ -7,11 +7,9 @@ author:
 - Justus Adam
 maintainer: dev@justus.science
 license: OtherLicense
-license-file: LICENSE.txt
+license-file: ../LICENSE.txt
 homepage: https://ohua-dev.github.io/ohua
 github: ohua-dev/ohua-test-tools
-extra-source-files:
-- README.md
 dependencies:
 - base >=4.8 && <5
 - text
@@ -20,6 +18,7 @@ dependencies:
 - microlens
 - microlens-mtl
 - containers
+- unordered-containers
 - bytestring
 - deepseq
 - data-default-class
@@ -63,3 +62,10 @@ library:
   build-tools:
     - alex
     - happy
+tests:
+  test-tools-tests:
+    source-dirs: test
+    main: Spec.hs
+    dependencies:
+    - ohua-test-tools
+    - hspec

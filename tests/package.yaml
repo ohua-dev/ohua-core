@@ -54,10 +54,10 @@ executables:
     main: Main.hs
     dependencies:
     - ohua-core
+    other-modules: []
   test-graph-gen:
     main: GenJSONGraph.hs
-    other-modules:
-      - Ohua.Types.Arbitrary
+    other-modules: []
     source-dirs:
     - src
     - ./.
@@ -68,6 +68,11 @@ tests:
   ohua-tests:
     main: Spec.hs
     source-dirs: src
+    other-modules:
+    - DFLowering
+    - PassesSpec
+    - TestALangUtils
+    - TestAesonConvert
     dependencies:
     - ohua-core
     - hspec
