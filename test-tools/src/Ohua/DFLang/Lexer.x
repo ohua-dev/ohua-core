@@ -36,7 +36,7 @@ $sep = [$white]
 @id = $idstartchar $idchar*
 @ns = @id (\. @id)*
 
-@number = $num_not_zero $numerical*
+@number = $num_not_zero* $numerical
 
 :-
 <0> {
@@ -52,7 +52,7 @@ $sep = [$white]
     "dataflow"      { direct KWDataflow }
     "="             { direct OPEq }
     ","             { direct OPComma }
-    "$" @number     { tokenOverInputStr $ EnvRef . makeThrow . read . BS.unpack }
+    "$" @number     { tokenOverInputStr $ EnvRef . makeThrow . read . BS.unpack . BS.tail }
     @number         { tokenOverInputStr $ Int_ . read . BS.unpack }
     @id             { tokenOverInputStr $ UnqualId . convertId }
     @ns\/@id        { tokenOverInputStr $ QualId . mkQualId }

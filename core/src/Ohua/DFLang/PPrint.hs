@@ -24,13 +24,14 @@ prettyLetExpr LetExpr {..} =
         , pretty functionRef <> angles (pretty callSiteId)
         , tupled $ map pretty callArguments
         , maybe mempty (brackets . pretty) contextArg
+        , "in"
         ]
 
 instance Pretty LetExpr where
     pretty = prettyLetExpr
 
 prettyDFVar :: DFVar -> Doc a
-prettyDFVar (DFEnvVar he) = pretty he
+prettyDFVar (DFEnvVar he) = "$" <> pretty he
 prettyDFVar (DFVar b) = pretty b
 
 instance Pretty DFVar where
