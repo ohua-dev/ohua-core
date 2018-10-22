@@ -218,6 +218,16 @@ newtype AExpr bndType refType = AExpr
     { unAExpr :: AExprF bndType refType (AExpr bndType refType)
     } deriving (Show, Eq, Lift)
 
+instance Functor (AExpr bndType) where
+    fmap f = refold (embed . g) project
+      where
+        g =
+            \case
+                VarF b -> VarF $ f b
+                LetF a b c -> LetF a b c
+                ApplyF a b -> ApplyF a b
+                LambdaF a b -> LambdaF a b
+
 instance RS.RECURSION_SCHEMES_RECURSIVE_CLASS (AExpr bndType refType) where
     project = unAExpr
 
