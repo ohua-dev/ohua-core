@@ -36,7 +36,7 @@ $sep = [$white]
 @id = $idstartchar $idchar*
 @ns = @id (\. @id)*
 
-@number = $num_not_zero* $numerical
+@number = $num_not_zero $numerical* | 0
 
 :-
 <0> {

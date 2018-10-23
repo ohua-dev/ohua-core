@@ -19,10 +19,10 @@ prettyLetExpr :: LetExpr -> Doc a
 prettyLetExpr LetExpr {..} =
     hsep
         [ "let"
-        , pretty returnAssignment
+        , align $ pretty returnAssignment
         , "="
         , pretty functionRef <> angles (pretty callSiteId)
-        , tupled $ map pretty callArguments
+        , align $ tupled $ map pretty callArguments
         , maybe mempty (brackets . pretty) contextArg
         , "in"
         ]
