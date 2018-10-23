@@ -73,6 +73,7 @@ tests:
     - PassesSpec
     - TestALangUtils
     - TestAesonConvert
+    - TailRecSpec
     dependencies:
     - ohua-core
     - hspec

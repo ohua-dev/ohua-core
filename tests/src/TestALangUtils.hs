@@ -1,10 +1,14 @@
+{-# LANGUAGE QuasiQuotes #-}
+
 module TestALangUtils where
 
 import Ohua.Prelude
 
 import           Test.Hspec
 
+import           Ohua.Test (embedALang)
 import           Ohua.ALang.Lang
+import           Ohua.ALang.Util (lambdaLifting)
 
 
 substitute' :: Binding -> Expression -> Expression -> Expression
@@ -13,6 +17,30 @@ substitute' var val = lrPostwalkExpr f
     f (Var (Local v)) | var == v = val
     f e               = e
 
+simpleLift = [embedALang| \a -> some/sfn a c |]
+expectedSimpleLift = ( [embedALang| \(a,c_0) -> some/sfn a c_0 |], [ "c" ] )
+
+simpleLiftWithLet = [embedALang| \a -> let b = some/sfn a c in b |]
+expectedSimpleLiftWithLet = ( [embedALang| \(a,c_0) -> let b = some/sfn a c_0 in b |], [ "c" ] )
+
+moreComplexExpr = [embedALang| \(a,b) ->
+                                    let c = some/computation a d
+                                    in if c
+                                       then something.on.true/branch b e
+                                       else something.on.false/branch f
+                  |]
+
+expectedMoreComplexExpr = ( [embedALang| \(a,b,d_0,e_0,f_0) ->
+                                   let c = some/computation a d_0
+                                   in if c
+                                      then something.on.true/branch b e_0
+                                      else something.on.false/branch f_0
+                            |]
+                          , ["d", "e", "f"])
+
+liftLambda expr expected = (runSilentLoggingT $ runFromExpr def lambdaLifting expr)
+                           >>=
+                             ((`shouldBe` expected) . (fromRight ([embedALang| some.failure/happened |],[])))
 
 utilsSpec :: Spec
 utilsSpec = do
@@ -38,6 +66,15 @@ utilsSpec = do
 
         it "does not recurse indefinitely" $
             substitute' "h" "h" "h" `shouldBe` "h"
+
+    describe "lambda lifting" $ do
+      it "lambda lift single free var in function application" $
+        liftLambda simpleLift expectedSimpleLift
+      it "lambda lift single free var in function application (with let binding)" $
+        liftLambda simpleLiftWithLet expectedSimpleLiftWithLet
+      it "a more complex expression with conditionals" $
+        liftLambda moreComplexExpr expectedMoreComplexExpr
+
 
 
 spec :: Spec

@@ -157,7 +157,7 @@ import qualified Data.Text as T
 import qualified Data.List.NonEmpty as NE
 
 import Ohua.ALang.Lang
-import Ohua.ALang.Passes (lambdaLifting)
+import Ohua.ALang.Util (lambdaLifting)
 import Ohua.ALang.Refs as ALangRefs
 import Ohua.Unit
 import Ohua.Configuration
