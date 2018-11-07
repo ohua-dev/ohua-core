@@ -47,14 +47,18 @@ prettyAExpr prettyBnd prettyRef prettyAbstractAssign0 = fst . histo worker
                     sep
                         [ "let" <+>
                           align
-                              (sep [ hsep (map prettyAssign $ assign : assigns) <+>
+                              (hang 2 $
+                               sep
+                                   [ hsep (map prettyAssign $ assign : assigns) <+>
                                      "="
-                                   , hang 2 $ discardParens e
-                                   ])
-                        , "in" <+> align (discardParens cont)
+                                   , discardParens e
+                                   ]) <+>
+                          "in"
+                        , align (discardParens cont)
                         ]
             ApplyF (extract -> fun) (extract -> arg) ->
-                needParens 1 $ sep [parenthesize 1 fun, parenthesize 0 arg]
+                needParens 1 $
+                hang 4 $ sep [parenthesize 1 fun, parenthesize 0 arg]
             LambdaF assign body ->
                 let (assigns, e) = collectLambdas body
                  in needParens 2 $
