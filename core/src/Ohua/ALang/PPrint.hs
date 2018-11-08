@@ -23,6 +23,12 @@ import Ohua.ALang.NS
 import Ohua.Constants.HostExpr as HEConst
 import Ohua.Unit
 
+
+afterLetIndent :: Int
+afterLetIndent = 0
+argumentIndent :: Int
+argumentIndent = 2
+
 prettyAExpr ::
        (bndType -> Doc a)
     -> (refType -> Doc a)
@@ -47,7 +53,7 @@ prettyAExpr prettyBnd prettyRef prettyAbstractAssign0 = fst . histo worker
                     sep
                         [ "let" <+>
                           align
-                              (hang 2 $
+                              (hang afterLetIndent $
                                sep
                                    [ hsep (map prettyAssign $ assign : assigns) <+>
                                      "="
@@ -58,15 +64,17 @@ prettyAExpr prettyBnd prettyRef prettyAbstractAssign0 = fst . histo worker
                         ]
             ApplyF (extract -> fun) (extract -> arg) ->
                 needParens 1 $
-                hang 4 $ sep [parenthesize 1 fun, parenthesize 0 arg]
+                hang argumentIndent $
+                sep [parenthesize 1 fun, parenthesize 0 arg]
             LambdaF assign body ->
                 let (assigns, e) = collectLambdas body
                  in needParens 2 $
-                    sep
-                        [ "λ" <+>
-                          hsep (map prettyAssign $ assign : assigns) <+> "->"
-                        , hang 2 $ discardParens e
-                        ]
+                    "λ" <+>
+                    align
+                        (sep [ sep (map prettyAssign (assign : assigns) <>
+                                    ["->"])
+                             , discardParens e
+                             ])
     collectLambdas =
         para $ \case
             (tailF -> LambdaF assign (_, (assigns, e))) -> (assign : assigns, e)
@@ -122,13 +130,16 @@ prettyNS prettyDecl ns =
     "" :
     map (prettyImport "algo") (ns ^. algoImports) <>
     map (prettyImport "sf") (ns ^. sfImports) <>
-    intersperse line (map prettyDecl0 (HM.toList $ ns ^. decls))
+    ["", ""] <>
+    intersperse "" (map prettyDecl0 (HM.toList $ ns ^. decls))
   where
     prettyImport ty (nsref, bnds) =
-        "import" <+> ty <+> fillBreak 10 (pretty nsref) <+>
-        align (tupled (map pretty bnds))
+        "import" <+>
+        ty <+> fillBreak 10 (pretty nsref) <+> align (tupled (map pretty bnds))
     prettyDecl0 (bnd, expr) =
-        "let" <+> pretty bnd <+> "=" <+> prettyDecl expr <> ";;"
+        "let" <+>
+        align (hang afterLetIndent $ sep [pretty bnd <+> "=", prettyDecl expr]) <>
+        ";;"
 
 instance Pretty decl => Pretty (Namespace decl) where
     pretty = prettyNS pretty
