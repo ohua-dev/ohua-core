@@ -1,7 +1,7 @@
 {
 -- |
 -- Module      : $Header$
--- Description : Lexer for an ML version of the DFLang
+-- Description : Lexer for DFLang
 -- Copyright   : (c) Justus Adam 2018. All Rights Reserved.
 -- License     : EPL-1.0
 -- Maintainer  : dev@justus.science

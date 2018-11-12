@@ -99,6 +99,7 @@ module Ohua.ALang.Lang
 
 import Universum
 
+import Data.Bifunctor (Bifunctor(bimap, first, second))
 import Data.Foldable as F
 import Data.Functor.Foldable as RS
 import Data.Generics.Uniplate.Direct
@@ -265,6 +266,13 @@ pattern Lambda a b = AExpr (LambdaF a b)
 #endif
 instance IsString b => IsString (AExpr a b) where
     fromString = Var . fromString
+
+instance Bifunctor AExpr where
+    bimap f g = cata $ embed . \case
+        VarF b -> VarF $ g b
+        LetF assign a b -> LetF (fmap f assign) a b
+        ApplyF a b -> ApplyF a b
+        LambdaF assign a -> LambdaF (fmap f assign) a
 
 instance ExtractBindings ref => ExtractBindings (AExpr bnd ref) where
     extractBindings e = [b | Var bnds <- universe e, b <- extractBindings bnds]
@@ -531,22 +539,10 @@ lrPostwalkExpr f = runIdentity . lrPostwalkExprM (return . f)
 -- lrMapBndsRefs :: (bndT -> bndT') -> (refT -> refT') -> AExpr bndT refT -> AExpr bndT' refT'
 -- lrMapBndsRefs = bimap
 mapBnds :: (bndT -> bndT') -> AExpr bndT refT -> AExpr bndT' refT
-mapBnds f =
-    cata $
-    embed . \case
-        LetF assign a b -> LetF (fmap f assign) a b
-        LambdaF assign b -> LambdaF (fmap f assign) b
-        VarF v -> VarF v
-        ApplyF a b -> ApplyF a b
+mapBnds = first
 
 mapRefs :: (refT -> refT') -> AExpr bndT refT -> AExpr bndT refT'
-mapRefs f =
-    cata $
-    embed . \case
-        VarF ref -> VarF $ f ref
-        LetF assign a b -> LetF assign a b
-        LambdaF assign b -> LambdaF assign b
-        ApplyF a b -> ApplyF a b
+mapRefs = second
 
 removeTyAnns :: TyAnnExpr a -> Expr a
 removeTyAnns = cata $ embed . (^. value)
