@@ -138,6 +138,9 @@ instance ExtractBindings (Symbol a) where
     extractBindings (Local l) = return l
     extractBindings _ = mempty
 
+instance Uniplate (Symbol a) where
+    uniplate = plate
+
 instance NFData a => NFData (Symbol a) where
     rnf (Local b) = rnf b
     rnf (Env e) = rnf e
@@ -286,13 +289,27 @@ instance (NFData a, NFData b) => NFData (AExpr a b) where
             LambdaF assign b -> assign `deepseq` rnf b
 
 instance Uniplate (AExpr bndType refType) where
-    uniplate (Var v) = plate Var |- v
-    uniplate (Let assign val body) = plate Let |- assign |* val |* body
+    uniplate v@(Var _) = plate v
+    uniplate (Let assign val body) = plate (Let assign) |* val |* body
     uniplate (Apply f v) = plate Apply |* f |* v
-    uniplate (Lambda assign body) = plate Lambda |- assign |* body
+    uniplate (Lambda assign body) = plate (Lambda assign) |* body
 
 instance Biplate (AExpr bndType refType) (AExpr bndType refType) where
     biplate = plateSelf
+
+instance Uniplate (AbstractAssignment bndType) => Biplate (AExpr bndType refType) (AbstractAssignment bndType) where
+    biplate = \case
+        v@(Var _) -> plate v
+        Let assign a b -> plate Let |* assign |+ a |+ b
+        Apply a b -> plate Apply |+ a |+ b
+        Lambda assign b -> plate Lambda |* assign |+ b
+
+instance Uniplate refType => Biplate (AExpr bndType refType) refType where
+    biplate = \case
+        Var v -> plate Var |* v
+        Let assign a b -> plate (Let assign) |+ a |+ b
+        Apply a b -> plate Apply |+ a |+ b
+        Lambda assign b -> plate (Lambda assign) |+ b
 
 -- instance Uniplate refType => Biplate (AExpr bndType refType) refTyp where
 --   biplate (Var v)               = plate Var |* v

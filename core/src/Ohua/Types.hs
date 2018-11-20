@@ -269,6 +269,9 @@ data AbstractAssignment binding
 
 instance Container (AbstractAssignment binding)
 
+instance Uniplate (AbstractAssignment binding) where
+    uniplate = plate
+
 type Assignment = AbstractAssignment Binding
 
 instance IsString Assignment where
