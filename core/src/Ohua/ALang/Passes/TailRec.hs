@@ -158,7 +158,7 @@ import qualified Data.List.NonEmpty as NE
 
 import Ohua.ALang.Lang
 import Ohua.ALang.Util (lambdaLifting, fromListToApply, fromApplyToList)
-import Ohua.ALang.Refs as ALangRefs
+import qualified Ohua.ALang.Refs as ALangRefs
 import Ohua.Unit
 import Ohua.Configuration
 import Ohua.ALang.PPrint (quickRender)

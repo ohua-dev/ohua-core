@@ -44,3 +44,12 @@ generate = "ohua.lang/generate"
 
 nth :: QualifiedBinding
 nth = "ohua.lang/nth"
+
+ctrl :: QualifiedBinding
+ctrl = "ohua.lang/ctrl"
+
+not :: QualifiedBinding
+not = "ohua.lang/not"
+
+select :: QualifiedBinding
+select = "ohua.lang/select"

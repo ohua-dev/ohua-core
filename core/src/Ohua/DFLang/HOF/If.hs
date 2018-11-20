@@ -89,6 +89,7 @@ instance HigherOrderFunction IfFn where
                   ]
                   Nothing
             ]
+    -- FIXME should be done via lambda lifting
     scopeFreeVariables lam freeVars = do
         sourceVar <-
             case beginAssignment lam of

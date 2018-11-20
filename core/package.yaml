@@ -84,6 +84,7 @@ library:
   - Ohua.ALang.Passes
   - Ohua.ALang.Passes.SSA
   - Ohua.ALang.Passes.TailRec
+  - Ohua.ALang.Passes.If
   - Ohua.ALang.Optimizations
   - Ohua.ALang.Util
   - Ohua.DFLang.Lang
