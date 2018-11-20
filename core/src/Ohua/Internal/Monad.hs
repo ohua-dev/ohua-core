@@ -236,8 +236,9 @@ class HasEnvExpr m =>
 instance MonadRecordEnvExpr (OhuaM env) where
     addEnvExpression expr =
         OhuaM $ do
+            he <- makeThrow . V.length <$> use envExpressions
             envExpressions %= (`V.snoc` expr)
-            makeThrow . V.length <$> use envExpressions
+            pure he
 
 instance (MonadRecordEnvExpr m, Monad m) =>
          MonadRecordEnvExpr (ReaderT e m)
