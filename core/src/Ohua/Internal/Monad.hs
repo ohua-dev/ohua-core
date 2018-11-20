@@ -28,6 +28,7 @@ import qualified Data.HashSet as HS
 import qualified Data.Text as T
 import qualified Data.Vector as V
 import Lens.Micro.Mtl
+import Data.Generics.Uniplate.Direct
 
 import Ohua.Types as Ty
 import Ohua.ALang.Lang
@@ -309,7 +310,7 @@ runFromExpr ::
     -> Expression
     -> LoggingT IO (Either Error result)
 runFromExpr opts f tree =
-    runFromBindings opts (f tree) $ HS.fromList $ extractBindings tree
+    runFromBindings opts (f tree) $ HS.fromList $ [ b | Local b <- universeBi tree :: [Symbol QualifiedBinding] ] <> [ b | Destructure bs <- universeBi tree , b <- bs] <> [ b | Direct b <- universeBi tree]
 
 runFromBindings ::
        Options
