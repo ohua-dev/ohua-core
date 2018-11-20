@@ -11,6 +11,7 @@
 {-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE QuasiQuotes #-}
 {-# OPTIONS_GHC -fno-warn-orphans -fno-warn-missing-methods #-}
 
 #if __GLASGOW_HASKELL__ >= 800
@@ -29,7 +30,9 @@ import Test.QuickCheck.Property as P
 import Ohua.ALang.Lang
 import Ohua.ALang.Passes
 import Ohua.ALang.Passes.SSA
+import qualified Ohua.ALang.Refs as ALangRefs
 import Ohua.Types.Arbitrary ()
+import Ohua.Test
 
 
 
@@ -211,3 +214,15 @@ passesSpec = do
                      ("some-ns/fn-with-3-args" `Apply` "a" `Apply` "b" `Apply`
                       "c")
                      "x")
+    describe "removing destructuring" $ do
+        let mkNth0 objBnd = \i -> Var (Sf ALangRefs.nth Nothing) `Apply` i `Apply` Var (Local objBnd)
+            runRemDestr = runSilentLoggingT . runFromExpr def (Ohua.ALang.Passes.removeDestructuring (show))
+        it "removes destructuring from lets" $
+            let objBnd = "d"
+                mkNth = mkNth0 objBnd
+            in
+            runRemDestr [embedALang| let (a, b, c) = x in y |] `shouldReturn` Right (Let (Direct objBnd) "x" (Let "a" (mkNth 0) $ Let "b" (mkNth 1) $ Let "c" (mkNth 2) "y"))
+        it "removes destructuring from lambdas" $
+            let objBnd = "d"
+                mkNth = mkNth0 objBnd
+            in runRemDestr [embedALang| \(a, b, c) -> y |] `shouldReturn` Right (Lambda (Direct objBnd) (Let "a" (mkNth 0) $ Let "b" (mkNth 1) $ Let "c" (mkNth 2) "y"))
