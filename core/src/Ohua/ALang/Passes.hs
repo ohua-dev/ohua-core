@@ -322,7 +322,7 @@ type EnvOnlyExpr = Expr (Either Binding HostExpr)
 
 {-| Find complete subtrees in ALang which are only dependent on
 environemt values.  Uses a user supplied function which is supposed to
-turn this inte some constant environment expression.
+turn this into some constant environment expression.
 
 The idea is that you can use this to create a custom pass by supplying a
 domain specific compression function.

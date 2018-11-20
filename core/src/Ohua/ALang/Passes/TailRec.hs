@@ -157,7 +157,7 @@ import qualified Data.Text as T
 import qualified Data.List.NonEmpty as NE
 
 import Ohua.ALang.Lang
-import Ohua.ALang.Util (lambdaLifting)
+import Ohua.ALang.Util (lambdaLifting, fromListToApply, fromApplyToList)
 import Ohua.ALang.Refs as ALangRefs
 import Ohua.Unit
 import Ohua.Configuration
@@ -341,12 +341,6 @@ rewriteLambdaExpr _ = error "invariant broken"
 
 replaceFn fn (Apply (Var (Sf _ _)) v) = Apply (Var fn) v
 replaceFn fn (Apply f v) = Apply (replaceFn fn f) v
-
-fromListToApply f (v:[]) = Apply (Var f) v
-fromListToApply f (v:vs) = Apply (fromListToApply f vs) v
-
-fromApplyToList (Apply f@(Var _) v) = [f, v]
-fromApplyToList (Apply a b) = fromApplyToList a ++ [b]
 
 -- | Phase 4: Free variable handling via lambda lifting
 freeVarHandling :: (Monad m, MonadGenBnd m) => Expression -> m Expression

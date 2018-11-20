@@ -49,7 +49,7 @@ substitute !var val = cata f
 -- This is due to the fact that we often want to package the freeVars via a call to
 -- ohua.lang/array to make the backend implementation easier and I'm not sure whether
 -- this is always true.
--- This is also the readon why I keep this in Util into of making it an own pass.
+-- This is also the readon why I keep this in Util instead of making it an own pass.
 
 lambdaLifting :: (Monad m, MonadGenBnd m) => Expression -> m (Expression, [Binding])
 lambdaLifting o@(Lambda v e) =
@@ -85,3 +85,11 @@ findFreeVariables (Apply a b) = HS.union (findFreeVariables a) $ findFreeVariabl
 findFreeVariables (Var (Local v)) = HS.singleton v
 findFreeVariables (Var _) = HS.empty
 findFreeVariables (Lambda v e) = HS.difference (findFreeVariables e) $ HS.fromList $ extractBindings v
+
+fromListToApply :: refType -> [Expr refType] -> Expr refType
+fromListToApply f (v:[]) = Apply (Var f) v
+fromListToApply f (v:vs) = Apply (fromListToApply f vs) v
+
+fromApplyToList :: Expr refType -> [Expr refType]
+fromApplyToList (Apply f@(Var _) v) = [f, v]
+fromApplyToList (Apply a b) = fromApplyToList a ++ [b]

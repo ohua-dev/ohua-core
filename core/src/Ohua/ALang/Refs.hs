@@ -41,3 +41,6 @@ smapG = "ohua.lang/smapG"
 
 generate :: QualifiedBinding
 generate = "ohua.lang/generate"
+
+nth :: QualifiedBinding
+nth = "ohua.lang/nth"
