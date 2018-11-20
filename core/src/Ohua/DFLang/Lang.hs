@@ -40,7 +40,7 @@ data LetExpr = LetExpr
     } deriving (Eq, Show, Lift)
 
 data DFFnRef
-    = DFFunction !QualifiedBinding -- a build-in function of DFLang
+    = DFFunction !QualifiedBinding -- a built-in function of DFLang
     | EmbedSf !QualifiedBinding -- an generic dataflow function that wraps a stateful function call
     deriving (Eq, Show, Lift)
 

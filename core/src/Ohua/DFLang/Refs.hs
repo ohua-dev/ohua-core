@@ -35,7 +35,6 @@ false = EmbedSf Refs.false
 bool :: DFFnRef
 bool = EmbedSf Refs.bool
 
--- FIXME should be ohua.lang/if
 ifThenElse :: DFFnRef
 ifThenElse = bool
 {-# DEPRECATED ifThenElse "use 'bool' instead" #-}
@@ -47,11 +46,13 @@ switch = select
 
 
 select :: DFFnRef
-select = DFFunction "ohua.lang/select"
+select = DFFunction Refs.select
 
+ctrl :: DFFnRef
+ctrl = EmbedSf Refs.ctrl
 
 scope :: DFFnRef
-scope = DFFunction Refs.scope
+scope = EmbedSf Refs.scope
 
 
 seq :: DFFnRef
@@ -85,7 +86,7 @@ repeat = DFFunction "ohua.lang/repeat"
 isJust :: DFFnRef
 isJust = EmbedSf "ohua.lang/isJust"
 
--- FIXME I don't think we needs this as of now.
+-- FIXME I don't think we need this as of now.
 ndMerge :: DFFnRef
 ndMerge = DFFunction "ohua.lang/ndMerge"
 

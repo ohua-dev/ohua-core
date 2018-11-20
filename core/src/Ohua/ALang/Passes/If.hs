@@ -63,7 +63,33 @@ As such, we write:
 let result :: a = select cond resultTrue resultFalse in ...
 @
 
-The lowering pass will then create the following expression:
+Note that we translate the applications `(\() -> ... branch ...) ctrlVal` into the following:
+
+@
+let x = scope ctrl a b in
+ ...
+  let y = idependentFn ctrl in
+   ...
+@
+
+In fact, this applies the control value to the lambda expression.
+As a result, we can write the following:
+
+@
+let cond :: Bool = ...
+  let ncond :: Bool = not cond in
+    let tBranchCtrl :: Control Bool = ctrl cond in
+      let fBranchCtrl :: Control Bool = ctrl ncond in
+        let resultTrue :: Control a = ... true branch expression ... in
+          let resultFalse :: Control a = ... false branch expression ... in
+            let result :: a = select tBranchCtrl fBranchCtrl resultTrue resultFalse in
+              result
+@
+
+Now this expression can be lowered to DFLang without any further ado.
+The lowering itself should be sensitive to value of type `Control` and perform the
+respective steps.
+As a last step, we can optimize the DFLang expression to end up with:
 
 @
 let cond :: Bool = ...
@@ -121,12 +147,12 @@ ifRewrite (Apply (Apply (Apply ifSf cond) trueBranch) falseBranch) = do
   trueBranch'  <- (liftBranchIntoCtrlCtxt tBranchCtrl) <$> lambdaLiftBranch trueBranch
   falseBranch' <- (liftBranchIntoCtrlCtxt fBranchCtrl) <$> lambdaLiftBranch falseBranch
   return $ Let (Direct nCond) (Apply notSf cond)
-               $ Let (Direct tBranchCtrl) (Apply ctrlSf cond)
-                     $ Let (Direct fBranchCtrl) (Apply ctrlSf $ Var $ Local nCond)
-                           $ Let (Direct resultTrue) (Apply trueBranch' $ Var $ Local tBranchCtrl)
-                                 $ Let (Direct resultFalse) (Apply falseBranch' $ Var $ Local fBranchCtrl)
-                                       $ Let (Direct result) (Apply (Apply (Apply selectSf cond) $ Var $ Local resultTrue) $ Var $ Local resultFalse)
-                                             $ Var $ Local result
+          $ Let (Direct tBranchCtrl) (Apply ctrlSf cond)
+           $ Let (Direct fBranchCtrl) (Apply ctrlSf $ Var $ Local nCond)
+            $ Let (Direct resultTrue) (Apply trueBranch' $ Var $ Local tBranchCtrl)
+             $ Let (Direct resultFalse) (Apply falseBranch' $ Var $ Local fBranchCtrl)
+              $ Let (Direct result) (Apply (Apply (Apply selectSf cond) $ Var $ Local resultTrue) $ Var $ Local resultFalse)
+               $ Var $ Local result
 
 lambdaLiftBranch :: (Monad m, MonadGenBnd m) => Expression -> m Expression
 lambdaLiftBranch branch@(Lambda args _) = do
@@ -155,8 +181,6 @@ liftBranchIntoCtrlCtxt ctrl (Lambda args body) = addCtrl body
     addCtrl (Let v e ie) = Let v (addCtrl e) (addCtrl ie)
     addCtrl v@(Var _) = v
     addCtrl l@(Lambda _ _) = l -- we are after normalization so all existing lambdas are from other HOFs
-    addCtrl (Apply f@scopeSf arg) =
-    -- addCtrl (Apply f@(Var (Sf Refs.scope Nothing)) arg) = -- TODO why does this not work?!
-      Apply (Apply f $ Var $ Local ctrl) arg
+    addCtrl (Apply f@scopeSf arg) = Apply (Apply f $ Var $ Local ctrl) arg
     addCtrl (Apply f@(Var (Sf _ _)) someUnitExpr) = Apply f $ Var $ Local ctrl
     addCtrl (Apply f arg) = flip Apply arg $ addCtrl arg
