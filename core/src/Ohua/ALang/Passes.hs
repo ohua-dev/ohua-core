@@ -13,7 +13,6 @@
 -- form of a sequence of let bindings which are invocations of
 -- stateful functions on local or environment variables finalised by a
 -- local binding as a return value.
-
 -- This source code is licensed under the terms described in the associated LICENSE.TXT file
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ExplicitForAll #-}
@@ -24,8 +23,9 @@ module Ohua.ALang.Passes where
 import Ohua.Prelude
 
 import Control.Monad.RWS.Lazy (evalRWST)
-import Control.Monad.Writer (runWriter, listen, tell)
+import Control.Monad.Writer (listen, runWriter, tell)
 import Data.Functor.Foldable
+import Data.Generics.Uniplate.Operations (rewriteM)
 import qualified Data.HashMap.Strict as HM
 import qualified Data.HashSet as HS
 
@@ -220,8 +220,7 @@ removeCurrying e = fst <$> evalRWST (para inlinePartials e) mempty ()
         val <- asks (HM.lookup bnd)
         Apply <$>
             (maybe
-                 (failWith $
-                  "No suitable value found for binding " <> show bnd)
+                 (failWith $ "No suitable value found for binding " <> show bnd)
                  pure
                  val) <*>
             arg
@@ -361,3 +360,37 @@ compressEnvExpressions compress = either pure compress' <=< go
         compressed <- compress expr
         ref <- addEnvExpression compressed
         pure $ Var $ Env ref
+
+removeDestructuring ::
+       MonadOhua (EnvExpr m) m
+    => (Int -> EnvExpr m)
+    -> Expression
+    -> m Expression
+removeDestructuring litToEnv =
+    evaluatingStateT mempty .
+    rewriteM
+        (\case
+             Lambda (Destructure ds) body ->
+                 unstructure ds (\bnd f -> Lambda bnd $ f body)
+             Let (Destructure ds) expr body ->
+                 unstructure ds (\bnd f -> Let bnd expr $ f body)
+             _ -> pure Nothing)
+  where
+    unstructure bnds cont = do
+        bnd <- generateBinding
+        f <-
+            foldl (.) id <$>
+            mapM
+                (\(idx, bnd0) ->
+                     Let (Direct bnd0) <$> mkNthExpr idx (Var $ Local bnd))
+                (zip [0 ..] bnds)
+        pure $ Just $ cont (Direct bnd) f
+    mkNthExpr idx source = do
+        envLit <- litAsExpr idx
+        pure $ Var (Sf Refs.nth Nothing) `Apply` envLit `Apply` source
+    litAsExpr lit = gets (HM.lookup lit) >>= maybe (createNewLitExpr lit) pure
+    createNewLitExpr lit = do
+        he <- addEnvExpression (litToEnv lit)
+        let e = Var $ Env he
+        modify (HM.insert lit e)
+        pure e
