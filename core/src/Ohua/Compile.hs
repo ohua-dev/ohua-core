@@ -75,7 +75,12 @@ pipeline CustomPasses {..} e = do
 
 
 -- | Run the pipeline in an arbitrary monad that supports error reporting.
-compile :: (MonadError Error m, MonadLoggerIO m) => Options -> CustomPasses env -> Expression -> m OutGraph
+compile ::
+       (MonadError Error m, MonadLoggerIO m)
+    => Options
+    -> CustomPasses env
+    -> Expression
+    -> m OutGraph
 compile opts passes exprs = do
     logFn <- askLoggerIO
     let passes' = flip loadTailRecPasses passes $ view transformRecursiveFunctions opts
@@ -83,7 +88,7 @@ compile opts passes exprs = do
 
 
 -- | Verify that only higher order fucntions have lambdas as arguments
-checkHigherOrderFunctionSupport :: MonadOhua envExpr m => Expression -> m ()
+checkHigherOrderFunctionSupport :: MonadOhua m => Expression -> m ()
 checkHigherOrderFunctionSupport (Let _ e rest) = do
     void $ checkNestedExpr e
     checkHigherOrderFunctionSupport rest

@@ -290,7 +290,7 @@ instance (MonadReadEnvironment m, Monad m, Monoid w) =>
 instance (MonadReadEnvironment m, Monad m, Monoid w) =>
          MonadReadEnvironment (Control.Monad.RWS.Strict.RWST e w s m)
 
-type MonadOhua env m
+type MonadOhua m
      = ( MonadGenId m
        , MonadGenBnd m
        , MonadReadEnvExpr m
@@ -298,7 +298,6 @@ type MonadOhua env m
        , MonadError Error m
        , MonadIO m
        , MonadReadEnvironment m
-       , EnvExpr m ~ env
        , MonadLogger m)
 
 -- | Run a compiler

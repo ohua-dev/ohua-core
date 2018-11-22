@@ -54,13 +54,13 @@ ssaRenameMany oldBnds cont = do
     newBnds <- traverse generateBindingWith oldBnds
     local (HM.union $ HM.fromList $ zip oldBnds newBnds) $ cont newBnds
 
-performSSA :: MonadOhua envExpr m => Expression -> m Expression
+performSSA :: MonadOhua m => Expression -> m Expression
 performSSA = flip runReaderT mempty . ssa
 
 flattenTuple :: (a, ([a], b)) -> ([a], b)
 flattenTuple (a, (as, r)) = (a : as, r)
 
-ssa :: (MonadOhua envExpr m, MonadReader LocalScope m)
+ssa :: (MonadOhua m, MonadReader LocalScope m)
     => Expression
     -> m Expression
 ssa =
@@ -78,7 +78,7 @@ ssa =
 -- destructuring with a builtin function instead and collapse it down
 -- at the very end ...
 handleAssignment ::
-       (MonadOhua envExpr m, MonadReader LocalScope m)
+       (MonadOhua m, MonadReader LocalScope m)
     => Assignment
     -> (Assignment -> m t)
     -> m t
@@ -104,7 +104,7 @@ isSSA =
             _ -> pure ()
         sequence_ e
 
-checkSSA :: MonadOhua envExpr m => Expression -> m ()
+checkSSA :: MonadOhua m => Expression -> m ()
 checkSSA = maybe (return ()) (throwErrorDebugS . mkMsg) . isSSA
   where
     mkMsg bnd = "Redefinition of binding " <> show bnd

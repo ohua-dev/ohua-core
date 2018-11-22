@@ -34,7 +34,7 @@ import qualified Ohua.ALang.Refs as Refs
 
 -- | Inline all references to lambdas.
 -- Aka `let f = (\a -> E) in f N` -> `(\a -> E) N`
-inlineLambdaRefs :: MonadOhua envExpr m => Expression -> m Expression
+inlineLambdaRefs :: MonadOhua m => Expression -> m Expression
 inlineLambdaRefs = flip runReaderT mempty . para go
   where
     go (LetF assignment (Lambda _ _, l) (_, body)) =
@@ -135,18 +135,18 @@ inlineReassignments = flip runReader HM.empty . cata go
 -- Aka `let x = E in some/sf a` -> `let x = E in let y = some/sf a in y`
 --
 -- EDIT: Now also does the same for any residual lambdas
-ensureFinalLet :: MonadOhua envExpr m => Expression -> m Expression
+ensureFinalLet :: MonadOhua m => Expression -> m Expression
 ensureFinalLet = ensureFinalLetInLambdas >=> ensureFinalLet'
 
 -- | Transforms the final expression into a let expression with the result variable as body.
-ensureFinalLet' :: MonadOhua envExpr m => Expression -> m Expression
+ensureFinalLet' :: MonadOhua m => Expression -> m Expression
 ensureFinalLet' (Let a e b) = Let a e <$> ensureFinalLet' b
 ensureFinalLet' v@(Var _) = return v
 ensureFinalLet' a = do
     newBnd <- generateBinding
     return $ Let (Direct newBnd) a (Var (Local newBnd))
 
-ensureFinalLetInLambdas :: MonadOhua envExpr m => Expression -> m Expression
+ensureFinalLetInLambdas :: MonadOhua m => Expression -> m Expression
 ensureFinalLetInLambdas =
     cata $ \case
         LambdaF bnd body -> Lambda bnd <$> (ensureFinalLet' =<< body)
@@ -228,7 +228,7 @@ removeCurrying e = fst <$> evalRWST (para inlinePartials e) mempty ()
 
 -- | Ensures the expression is a sequence of let statements terminated
 -- with a local variable.
-hasFinalLet :: MonadOhua envExpr m => Expression -> m ()
+hasFinalLet :: MonadOhua m => Expression -> m ()
 hasFinalLet (Let _ _ body) = hasFinalLet body
 hasFinalLet (Var (Local _)) = return ()
 hasFinalLet (Var _) = failWith "Non-local final var"
@@ -247,7 +247,7 @@ noDuplicateIds = flip evalStateT mempty . cata go
 -- | Checks that no apply to a local variable is performed.  This is a
 -- simple check and it will pass on complex expressions even if they
 -- would reduce to an apply to a local variable.
-applyToSf :: MonadOhua envExpr m => Expression -> m ()
+applyToSf :: MonadOhua m => Expression -> m ()
 applyToSf =
     para $ \case
         ApplyF (Var (Local bnd), _) _ ->
@@ -257,7 +257,7 @@ applyToSf =
 -- | Checks that all local bindings are defined before use.
 -- Scoped. Aka bindings are only visible in their respective scopes.
 -- Hence the expression does not need to be in SSA form.
-noUndefinedBindings :: MonadOhua envExpr m => Expression -> m ()
+noUndefinedBindings :: MonadOhua m => Expression -> m ()
 noUndefinedBindings = flip runReaderT mempty . cata go
   where
     go (LetF (Recursive r) val body) = local (HS.insert r) $ val >> body
@@ -269,7 +269,7 @@ noUndefinedBindings = flip runReaderT mempty . cata go
     go e = sequence_ e
     registerAssign = local . HS.union . HS.fromList . extractBindings
 
-checkProgramValidity :: MonadOhua envExpr m => Expression -> m ()
+checkProgramValidity :: MonadOhua m => Expression -> m ()
 checkProgramValidity e = do
     hasFinalLet e
     noDuplicateIds e
@@ -277,7 +277,7 @@ checkProgramValidity e = do
     noUndefinedBindings e
 
 -- | Lifts something like @if (f x) a b@ to @let x0 = f x in if x0 a b@
-liftApplyToApply :: MonadOhua envExpr m => Expression -> m Expression
+liftApplyToApply :: MonadOhua m => Expression -> m Expression
 liftApplyToApply =
     lrPrewalkExprM $ \case
         Apply fn arg@(Apply _ _) -> do
@@ -287,7 +287,7 @@ liftApplyToApply =
 
 -- The canonical composition of the above transformations to create a
 -- program with the invariants we expect.
-normalize :: MonadOhua envExpr m => Expression -> m Expression
+normalize :: MonadOhua m => Expression -> m Expression
 normalize e =
     reduceLambdas (letLift e) >>= removeCurrying >>= liftApplyToApply >>=
     ensureFinalLet . inlineReassignments . letLift >>=
@@ -327,8 +327,8 @@ The idea is that you can use this to create a custom pass by supplying a
 domain specific compression function.
 -}
 compressEnvExpressions ::
-       forall env m. MonadOhua env m
-    => (EnvOnlyExpr -> m env)
+       forall m. MonadOhua m
+    => (EnvOnlyExpr -> m (EnvExpr m))
     -> Expression
     -> m Expression
 compressEnvExpressions compress = either pure compress' <=< go
@@ -362,7 +362,7 @@ compressEnvExpressions compress = either pure compress' <=< go
         pure $ Var $ Env ref
 
 removeDestructuring ::
-       MonadOhua (EnvExpr m) m
+       MonadOhua m
     => (Int -> EnvExpr m)
     -> Expression
     -> m Expression

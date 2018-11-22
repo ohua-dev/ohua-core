@@ -38,7 +38,7 @@ type Pass m
 
 
 -- | Check that a sequence of let expressions does not redefine bindings.
-checkSSA :: (Container c, Element c ~ LetExpr, MonadOhua envExpr m) => c -> m ()
+checkSSA :: (Container c, Element c ~ LetExpr, MonadOhua m) => c -> m ()
 checkSSA = flip evalStateT mempty . mapM_ go
   where
     go le = do
@@ -54,14 +54,14 @@ checkSSA = flip evalStateT mempty . mapM_ go
     addAll = flip $ foldr' HS.insert
 
 -- | Check that a DFExpression is in SSA form.
-checkSSAExpr :: MonadOhua envExpr m => DFExpr -> m ()
+checkSSAExpr :: MonadOhua m => DFExpr -> m ()
 checkSSAExpr (DFExpr l _) = checkSSA l
 
 -- | Transform an ALang expression into a DFExpression.
 -- This assumes a certain structure in the expression.
 -- This can be achieved with the 'normalize' and 'performSSA' functions and tested with
 -- 'checkProgramValidity'.
-lowerALang :: MonadOhua envExpr m => Expression -> m DFExpr
+lowerALang :: MonadOhua m => Expression -> m DFExpr
 lowerALang expr = do
     logDebugN $ "Lowering alang expr: " <> quickRender expr
     (var, exprs) <- runWriterT $ lowerToDF expr
@@ -69,7 +69,7 @@ lowerALang expr = do
 
 --    (var, exprs) <- runWriterT (go expr)
 lowerToDF ::
-       (MonadOhua env m, MonadWriter (Seq LetExpr) m)
+       (MonadOhua m, MonadWriter (Seq LetExpr) m)
     => Expression
     -> m Binding
 lowerToDF (Var (Local bnd)) = pure bnd
@@ -82,7 +82,7 @@ lowerToDF (Let assign expr rest) = do
 lowerToDF g = failWith $ "Expected `let` or binding: " <> show g
 
 handleDefinitionalExpr ::
-       (MonadOhua env m, MonadWriter (Seq LetExpr) m)
+       (MonadOhua m, MonadWriter (Seq LetExpr) m)
     => Assignment
     -> Expression
     -> m Binding
@@ -100,7 +100,7 @@ handleDefinitionalExpr _ e _ =
     show e
 
 -- | Lower any not specially treated function type.
-lowerDefault :: MonadOhua env m => Pass m
+lowerDefault :: MonadOhua m => Pass m
 lowerDefault "ohua.lang/recur" fnId assign args =
     mapM expectVar args <&> \args' ->
         [LetExpr fnId assign Refs.recur args' Nothing]
@@ -112,7 +112,7 @@ lowerDefault fn fnId assign args =
 -- function and the nested arguments as a list.  Also generates a new
 -- function id for the inner function should it not have one yet.
 handleApplyExpr ::
-       (MonadOhua env m)
+       (MonadOhua m)
     => Expression
     -> m (QualifiedBinding, FnId, [Expression])
 handleApplyExpr l@(Apply _ _) = go l []
@@ -172,8 +172,8 @@ expectVar (Var v) = failWith $ "Var must be local or env, was " <> show v
 expectVar a = failWith $ "Argument must be var, was " <> show a
 
 lowerHOF ::
-       forall f m envExpr.
-       (MonadOhua envExpr m, HigherOrderFunction f, MonadWriter (Seq LetExpr) m)
+       forall f m .
+       (MonadOhua m, HigherOrderFunction f, MonadWriter (Seq LetExpr) m)
     => TaggedFnName f
     -> Assignment
     -> [Expression]
