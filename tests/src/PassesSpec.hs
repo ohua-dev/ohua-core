@@ -6,19 +6,18 @@
 -- Maintainer  : sebastian.ertel@gmail.com, dev@justus.science
 -- Stability   : experimental
 -- Portability : portable
-
 -- This source code is licensed under the terms described in the associated LICENSE.TXT file
-{-# LANGUAGE FlexibleContexts  #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# OPTIONS_GHC -fno-warn-orphans -fno-warn-missing-methods #-}
-
 #if __GLASGOW_HASKELL__ >= 800
 {-# OPTIONS_GHC -fno-warn-unused-top-binds #-}
 #endif
-
-module PassesSpec (passesSpec) where
+module PassesSpec
+    ( passesSpec
+    ) where
 
 import Ohua.Prelude
 
@@ -31,23 +30,22 @@ import Ohua.ALang.Lang
 import Ohua.ALang.Passes
 import Ohua.ALang.Passes.SSA
 import qualified Ohua.ALang.Refs as ALangRefs
-import Ohua.Types.Arbitrary ()
 import Ohua.Test
-
-
+import Ohua.Types.Arbitrary ()
 
 smapName :: QualifiedBinding
 smapName = "ohua.lang/smap"
 
 -- newtype ApplyOnlyExpr = ApplyOnlyExpr { unApplyOnlyExpr :: Expression } deriving (Eq, Show)
-
 -- instance Arbitrary ApplyOnlyExpr where
 --     arbitrary = ApplyOnlyExpr <$> sized tree
 --       where
 --         tree (_, values) 0 = Var $ Local
+instance Num ResolvedSymbol where
+    fromInteger = Env . fromInteger
 
-instance Num ResolvedSymbol where fromInteger = Env . fromInteger
-instance Num Expression where fromInteger = Var . fromInteger
+instance Num Expression where
+    fromInteger = Var . fromInteger
 
 runPasses :: Expression -> IO (Either Error Expression)
 runPasses expr =
@@ -57,24 +55,20 @@ runPasses expr =
 
 type ALangCheck = Either Text
 
-
 everyLetBindsCall :: Expression -> ALangCheck ()
 everyLetBindsCall (Let _ (Apply _ _) body) = everyLetBindsCall body
-everyLetBindsCall (Let _ _ _)              = throwErrorS "Let without call"
-everyLetBindsCall _                        = return ()
-
+everyLetBindsCall (Let _ _ _) = throwErrorS "Let without call"
+everyLetBindsCall _ = return ()
 
 noNestedLets :: Expression -> ALangCheck ()
 noNestedLets (Let _ expr1 body) = noLets expr1 >> noNestedLets body
-noNestedLets _                  = return ()
-
+noNestedLets _ = return ()
 
 noLets :: Expression -> ALangCheck ()
-noLets e@(Let _ _ _)       = throwErrorS $ "Found a let " <> show e
+noLets e@(Let _ _ _) = throwErrorS $ "Found a let " <> show e
 noLets (Apply expr1 expr2) = noLets expr1 >> noLets expr2
-noLets (Lambda _ expr)     = noNestedLets expr
-noLets _                   = return ()
-
+noLets (Lambda _ expr) = noNestedLets expr
+noLets _ = return ()
 
 checkInvariants :: Expression -> ALangCheck ()
 checkInvariants expr = do
@@ -106,13 +100,11 @@ prop_passes input =
                         Right _ -> succeeded
                 _ -> succeeded {abort = True}
 
-
 shouldSatisfyRet :: Show a => IO a -> (a -> Bool) -> Expectation
 shouldSatisfyRet action predicate = action >>= (`shouldSatisfy` predicate)
 
 -- rejects :: Expression -> Expectation
 -- rejects e = runPasses e `shouldSatisfyRet` isLeft
-
 doesn't_reject :: Expression -> Expectation
 doesn't_reject e = runPasses e `shouldSatisfyRet` isRight
 
@@ -215,14 +207,28 @@ passesSpec = do
                       "c")
                      "x")
     describe "removing destructuring" $ do
-        let mkNth0 objBnd = \i -> Var (Sf ALangRefs.nth Nothing) `Apply` i `Apply` Var (Local objBnd)
-            runRemDestr = runSilentLoggingT . runFromExpr def (Ohua.ALang.Passes.removeDestructuring (show))
+        let mkNth0 objBnd =
+                \i ->
+                    Var (Sf ALangRefs.nth Nothing) `Apply` i `Apply`
+                    Var (Local objBnd)
+            runRemDestr =
+                runSilentLoggingT .
+                runFromExpr def (Ohua.ALang.Passes.removeDestructuring (show))
         it "removes destructuring from lets" $
             let objBnd = "d"
                 mkNth = mkNth0 objBnd
-            in
-            runRemDestr [embedALang| let (a, b, c) = x in y |] `shouldReturn` Right (Let (Direct objBnd) "x" (Let "a" (mkNth 0) $ Let "b" (mkNth 1) $ Let "c" (mkNth 2) "y"))
+             in runRemDestr [embedALang| let (a, b, c) = x in y |] `shouldReturn`
+                Right
+                    (Let (Direct objBnd)
+                         "x"
+                         (Let "a" (mkNth 0) $
+                          Let "b" (mkNth 1) $ Let "c" (mkNth 2) "y"))
         it "removes destructuring from lambdas" $
             let objBnd = "d"
                 mkNth = mkNth0 objBnd
-            in runRemDestr [embedALang| \(a, b, c) -> y |] `shouldReturn` Right (Lambda (Direct objBnd) (Let "a" (mkNth 0) $ Let "b" (mkNth 1) $ Let "c" (mkNth 2) "y"))
+             in runRemDestr [embedALang| \(a, b, c) -> y |] `shouldReturn`
+                Right
+                    (Lambda
+                         (Direct objBnd)
+                         (Let "a" (mkNth 0) $
+                          Let "b" (mkNth 1) $ Let "c" (mkNth 2) "y"))
