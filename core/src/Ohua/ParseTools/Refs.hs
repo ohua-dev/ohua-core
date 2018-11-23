@@ -9,19 +9,19 @@ ohuaLangNS :: NSRef
 ohuaLangNS = makeThrow ["ohua", "lang"]
 
 
-mkQualVar :: NSRef -> Binding -> Expr SomeBinding
-mkQualVar ns name0 = Var $ Qual $ QualifiedBinding ns name0
+mkQualVar :: NSRef -> Binding -> Expr
+mkQualVar ns name0 = Sf (QualifiedBinding ns name0) Nothing
 
 
-mkOhuaLangRef :: Binding -> Expr SomeBinding
+mkOhuaLangRef :: Binding -> Expr
 mkOhuaLangRef = mkQualVar ohuaLangNS
 
 
-ifBuiltin :: Expr SomeBinding
+ifBuiltin :: Expr
 ifBuiltin = mkOhuaLangRef "if"
 
 
-smapBuiltin :: Expr SomeBinding
+smapBuiltin :: Expr
 smapBuiltin = mkOhuaLangRef "smap"
 
 

@@ -13,21 +13,15 @@ cleanUnits (DFExpr lets ret) = pure $ DFExpr (fmap f lets) ret
     f e@(LetExpr{callArguments=[a]}) | a == dfVarUnit = e {callArguments = []}
     f e                              = e
 
-unitSym :: ResolvedSymbol
-unitSym = Env HEConst.unit
+unitSym :: Lit
+unitSym = UnitLit
 
 
-unitExpr :: AExpr s ResolvedSymbol
-unitExpr = Var unitSym
+unitExpr :: AExpr s
+unitExpr = Lit unitSym
 
-unitBinding :: Binding
-unitBinding = unsafeMake "()"
-
-someUnitSymbol :: SomeBinding
-someUnitSymbol = Unqual unitBinding
-
-someUnitExpr :: AExpr s SomeBinding
-someUnitExpr = Var someUnitSymbol
+someUnitExpr :: AExpr s
+someUnitExpr = unitExpr
 
 dfVarUnit :: DFVar
-dfVarUnit = DFEnvVar HEConst.unit
+dfVarUnit = DFEnvVar UnitLit

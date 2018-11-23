@@ -6,9 +6,9 @@
 -- Maintainer  : sebastian.ertel@gmail.com, dev@justus.science
 -- Stability   : experimental
 --
--- This module basically does not expose anything that is not available otherwise.
--- It is a single place to collect the orphan instances for the types in ohua that are part of the
--- external API.
+-- This module basically does not expose anything that is not available
+-- otherwise. It is a single place to collect the orphan instances for the types
+-- in ohua that are part of the external API.
 --
 -- The two exposed functions, 'encode' and 'eitherDecode', are just convenient reexports from
 -- @Data.Aeson@.
@@ -26,6 +26,7 @@ import Ohua.Prelude hiding (Options)
 import Data.Aeson
 import Data.Aeson.Types
 import Data.List
+import Ohua.ALang.Lang (Lit (..), FunRef(..))
 
 import Ohua.DFGraph
 
@@ -101,6 +102,16 @@ instance ToJSON HostExpr where
     toJSON = unwrapToJSON
 instance FromJSON HostExpr where
     parseJSON = makeParseJSON
+instance ToJSON FunRef where
+    toEncoding = genericToEncoding baseOptions
+    toJSON = genericToJSON baseOptions
+instance FromJSON FunRef where
+    parseJSON = genericParseJSON baseOptions
+instance ToJSON Lit where
+    toEncoding = genericToEncoding baseOptions
+    toJSON = genericToJSON baseOptions
+instance FromJSON Lit where
+    parseJSON = genericParseJSON baseOptions
 instance ToJSON QualifiedBinding where
     toEncoding = genericToEncoding qualBindOptions
     toJSON = genericToJSON qualBindOptions

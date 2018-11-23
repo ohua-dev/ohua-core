@@ -16,6 +16,7 @@ import           Ohua.ALang.Lang
 import           Data.Functor.Foldable
 import qualified Data.HashSet as HS
 import qualified Data.Text as T
+import Data.Generics.Uniplate.Operations (transform)
 
 
 
@@ -24,10 +25,12 @@ substitute :: Binding -> Expression -> Expression -> Expression
 -- `var` binding.  This should never happen but might if this
 -- invariant is violated for some reason and the violation is not
 -- caught.
+substitute !var val = transform $ \case Var v | v == var -> val; other -> other
 substitute !var val = cata f
   where
-    f (VarF (Local v)) | var == v = val
-    f e                = embed e
+    f (VarF v)
+        | var == v = val
+    f e = embed e
 -- substitute var val e =
 --     case e of
 --         Var (Local v)
@@ -65,11 +68,7 @@ lambdaLifting o@(Lambda v e) =
 lambdaLifting e = error $ T.pack $ "Invariant broken! Lambda lifting is only applicable to lambda expressions! Found: " ++ (show e)
 
 renameVar :: Expression -> (Binding, Binding) -> Expression
-renameVar (Var (Local v)) (old,new) | old == v = Var $ Local new
-renameVar v@(Var _)       _                    = v
-renameVar (Let v e ie)    m                    = Let v (renameVar e m) $ renameVar ie m
-renameVar (Lambda v e)    m                    = Lambda v $ renameVar e m
-renameVar (Apply a b)     m                    = Apply (renameVar a m) $ renameVar b m
+renameVar e (old, new) = flip transform e $ \case Var v | v == old -> Var new; other -> other
 
 findFreeVariables :: Expression -> HS.HashSet Binding
 findFreeVariables (Let (Direct v) e ie) =
@@ -82,6 +81,6 @@ findFreeVariables (Let (Destructure vs) e ie) =
       in HS.union ves $ HS.difference vies $ HS.fromList vs
 findFreeVariables (Let (Recursive _) _ _) = error "Invariant broken! (Recursive binding detected.)"
 findFreeVariables (Apply a b) = HS.union (findFreeVariables a) $ findFreeVariables b
-findFreeVariables (Var (Local v)) = HS.singleton v
-findFreeVariables (Var _) = HS.empty
+findFreeVariables (Var v) = HS.singleton v
+findFreeVariables (Lit _) = HS.empty
 findFreeVariables (Lambda v e) = HS.difference (findFreeVariables e) $ HS.fromList $ extractBindings v

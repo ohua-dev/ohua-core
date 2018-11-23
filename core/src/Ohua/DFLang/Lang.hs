@@ -22,6 +22,7 @@
 module Ohua.DFLang.Lang where
 
 import Ohua.Prelude
+import Ohua.ALang.Lang (Lit (..))
 
 import Language.Haskell.TH.Syntax (Lift)
 
@@ -51,7 +52,7 @@ instance Hashable DFFnRef where
             EmbedSf f -> (1, f)
 
 data DFVar
-    = DFEnvVar !HostExpr
+    = DFEnvVar !Lit
     | DFVar !Binding
     deriving (Eq, Show, Lift)
 
@@ -61,14 +62,6 @@ instance Hashable DFVar where
 
 instance IsString DFVar where
     fromString = DFVar . fromString
-
-instance Num DFVar where
-    fromInteger = DFEnvVar . fromInteger
-    (+) = intentionally_not_implemented
-    (-) = intentionally_not_implemented
-    (*) = intentionally_not_implemented
-    abs = intentionally_not_implemented
-    signum = intentionally_not_implemented
 
 instance NFData DFExpr where
     rnf (DFExpr a b) = a `deepseq` rnf b
@@ -84,3 +77,6 @@ instance NFData DFFnRef where
 instance NFData DFVar where
     rnf (DFEnvVar e) = rnf e
     rnf (DFVar v) = rnf v
+
+dfEnvExpr :: HostExpr -> DFVar
+dfEnvExpr = DFEnvVar . EnvRefLit

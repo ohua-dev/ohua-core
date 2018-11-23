@@ -14,6 +14,7 @@ import Ohua.Prelude
 import qualified Data.HashMap.Strict as HM
 
 import           Ohua.DFLang.Lang
+import Ohua.ALang.Lang (Lit (..))
 
 data Operator = Operator
     { operatorId   :: !FnId
@@ -43,7 +44,7 @@ data AbstractOutGraph envExpr = OutGraph
     , returnArc :: Target
     } deriving (Eq, Generic, Show)
 
-type OutGraph = AbstractOutGraph HostExpr
+type OutGraph = AbstractOutGraph Lit
 
 
 instance Functor Source where
@@ -103,5 +104,5 @@ toGraph (DFExpr lets r) = OutGraph ops grArcs (getSource r)
         ]
 
 
-spliceEnv :: (Int -> a) -> OutGraph -> AbstractOutGraph a
-spliceEnv lookupExpr = fmap f where f i = lookupExpr $ unwrap i
+-- spliceEnv :: (Int -> a) -> OutGraph -> AbstractOutGraph a
+-- spliceEnv lookupExpr = fmap f where f i = lookupExpr $ unwrap i

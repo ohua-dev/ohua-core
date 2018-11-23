@@ -27,7 +27,7 @@ import Ohua.DFLang.HOF.If
 import Ohua.DFLang.HOF.Seq
 import Ohua.DFLang.HOF.Smap
 import Ohua.DFLang.HOF.SmapG
-import Ohua.DFLang.HOF.Generate
+--import Ohua.DFLang.HOF.Generate
 import Ohua.DFLang.HOF.TailRec
 import Ohua.DFLang.Lang (DFExpr(..), DFFnRef(..), DFVar(..), LetExpr(..))
 import qualified Ohua.DFLang.Refs as Refs
@@ -72,8 +72,7 @@ lowerToDF ::
        (MonadOhua m, MonadWriter (Seq LetExpr) m)
     => Expression
     -> m Binding
-lowerToDF (Var (Local bnd)) = pure bnd
-lowerToDF (Var v) = failWith $ "Non local return binding: " <> show v
+lowerToDF (Var bnd) = pure bnd
 lowerToDF (Let assign expr rest) = do
     logDebugN "Lowering Let -->"
     handleDefinitionalExpr assign expr continuation
@@ -115,26 +114,28 @@ handleApplyExpr ::
        (MonadOhua m)
     => Expression
     -> m (QualifiedBinding, FnId, [Expression])
-handleApplyExpr l@(Apply _ _) = go l []
+handleApplyExpr l@(Apply _ _) = go [] l
   where
-    go ve@(Var v) args =
-        case v of
-            Sf fn fnId -> (fn, , args) <$> maybe generateId return fnId
-            Local _ ->
-                    fromEnv (options . callLocalFunction) >>= \case
-                        Nothing ->
-                            failWith
-                                "Calling local functions is not supported in this adapter"
-                        Just fn -> (fn, , ve : args) <$> generateId
-            Env _ ->
-                fromEnv (options . callEnvExpr) >>= \case
+    go args = \case
+        ve@Var{} ->
+            fromEnv (options . callLocalFunction) >>= \case
+            Nothing ->
+                failWith
+                "Calling local functions is not supported in this adapter"
+            Just fn -> (fn, , ve : args) <$> generateId
+        Sf fn fnId -> (fn, , args) <$> maybe generateId return fnId
+        ve@(Lit v) ->
+            case v of
+                EnvRefLit _ ->
+                    fromEnv (options . callEnvExpr) >>= \case
                     Nothing ->
                         failWith
                             "Calling environment functions is not supported in this adapter"
                     Just fn -> (fn, , ve : args) <$> generateId
-    go (Apply fn arg) args = go fn (arg : args)
-    go x _ = failWith $ "Expected Apply or Var but got: " <> show x
-handleApplyExpr (Var (Sf fn fnId)) = (fn, , []) <$> maybe generateId return fnId
+                other -> throwError $ "This literal cannot be used as a function :" <> show (pretty other)
+        Apply fn arg -> go (arg : args) fn
+        x -> failWith $ "Expected Apply or Var but got: " <> show (x :: Expression)
+handleApplyExpr (Sf fn fnId) = (fn, , []) <$> maybe generateId return fnId
                                                                                  -- what is this?
 handleApplyExpr g = failWith $ "Expected apply but got: " <> show g
 
@@ -166,10 +167,10 @@ tieContext0 initExpr lets
 -- | Inspect an expression expecting something which can be captured
 -- in a DFVar otherwise throws appropriate errors.
 expectVar :: MonadError Error m => Expression -> m DFVar
-expectVar (Var (Local bnd)) = pure $ DFVar bnd
-expectVar (Var (Env i)) = pure $ DFEnvVar i
-expectVar (Var v) = failWith $ "Var must be local or env, was " <> show v
-expectVar a = failWith $ "Argument must be var, was " <> show a
+expectVar (Var bnd) = pure $ DFVar bnd
+expectVar r@Sf{} = throwError $ "Stateful function references are not yet supported as arguments: " <> show (pretty r)
+expectVar (Lit l) = pure $ DFEnvVar l
+expectVar a = failWith $ "Argument must be local binding or literal, was " <> show a
 
 lowerHOF ::
        forall f m .
@@ -201,8 +202,8 @@ lowerHOF _ assign args = do
                     (renameWith (HM.fromList renaming) body)
         createContextExit assign >>= tell
   where
-    handleArg (Var (Local v)) = return $ Left $ DFVar v
-    handleArg (Var (Env e)) = return $ Left $ DFEnvVar e
+    handleArg (Var v) = return $ Left $ DFVar v
+    handleArg (Lit e) = return $ Left $ DFEnvVar e
     handleArg (Lambda assign' body) = do
         DFExpr lets bnd <- lowerALang body
         return $ Right (Lam assign' bnd, lets)
@@ -217,7 +218,7 @@ hofs =
     , WHOF (Proxy :: Proxy SmapFn)
     , WHOF (Proxy :: Proxy SeqFn)
     , WHOF (Proxy :: Proxy SmapGFn)
-    , WHOF (Proxy :: Proxy GenFn)
+--   , WHOF (Proxy :: Proxy GenFn)
     , WHOF (Proxy :: Proxy TailRecursion)
     ]
 

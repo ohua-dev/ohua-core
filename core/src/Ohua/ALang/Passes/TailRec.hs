@@ -182,10 +182,10 @@ recur_hof :: QualifiedBinding
 recur_hof = "ohua.lang/recur_hof"
 
 recur_sf :: Expression
-recur_sf = Var $ Sf recur Nothing
+recur_sf = Sf recur Nothing
 
 recur_hof_sf :: Expression
-recur_hof_sf = Var $ Sf recur_hof Nothing
+recur_hof_sf = Sf recur_hof Nothing
 
 -- Phase 1:
 findTailRecs :: Bool -> Expression -> Expression
@@ -205,7 +205,7 @@ findRecCall (Let (Direct a) expr inExpr) algosInScope = do
 findRecCall (Let a expr inExpr) algosInScope = do
     (iFound, iExpr) <- findRecCall inExpr algosInScope
     return (iFound, Let a expr iExpr)
-findRecCall (Apply (Var (Local binding)) a) algosInScope
+findRecCall (Apply (Var binding) a) algosInScope
     | HS.member binding algosInScope
      -- no recursion here because if the expression is correct then these can be only nested APPLY statements
      = do
@@ -218,19 +218,19 @@ findRecCall (Apply a b) algosInScope = do
     (aFound, aExpr) <- findRecCall a algosInScope
     (bFound, bExpr) <- findRecCall b algosInScope
     return (HS.union aFound bFound, Apply aExpr bExpr)
-findRecCall (Var b) _ = return (HS.empty, Var b)
 findRecCall (Lambda a e) algosInScope = do
     (eFound, eExpr) <- findRecCall e algosInScope
     return $ if HS.size eFound == 0
              then (eFound, Lambda a eExpr)
              else (eFound, Lambda a eExpr)
+findRecCall other _ = return (HS.empty, other)
 
 -- Phase 2:
 hoferize :: (Monad m, MonadGenBnd m) => Expression -> m Expression
 hoferize (Let (Recursive f) expr inExpr) = do
   f' <- generateBindingWith f
   return $ Let (Direct f') expr
-              $ Let (Direct f) (Apply recur_hof_sf (Var (Local f')))
+              $ Let (Direct f) (Apply recur_hof_sf (Var f'))
                     inExpr
 hoferize (Let v expr inExpr) = Let v <$> hoferize expr <*> hoferize inExpr
 hoferize (Apply a b) = Apply <$> hoferize a <*> hoferize b
@@ -252,7 +252,7 @@ verifyTailRecursion e | isCall recur_hof e = (performChecks $ fromApplyToList e)
     -- failOnRecur (Let _ e ie) | isCall recur e || isCall recur ie = error "Recursion is not tail recursive!"
     failOnRecur (Let _ e ie) = failOnRecur e >> failOnRecur ie
     failOnRecur (Lambda v e) = failOnRecur e -- TODO maybe throw a better error message when this happens
-    failOnRecur (Apply (Var (Sf recur _)) _) = error "Recursion is not tail recursive!"
+    failOnRecur (Apply (Sf recur _) _) = error "Recursion is not tail recursive!"
     failOnRecur (Apply a b) = return ()
     failOnRecur e = error $ T.pack $ "Invariant broken! Found pattern: " ++ (show e)
 
@@ -261,7 +261,7 @@ verifyTailRecursion e | isCall recur_hof e = (performChecks $ fromApplyToList e)
       let (_:(_:(tBranch:(fBranch:_)))) = fromApplyToList e
       let (Lambda v et) = tBranch
       let (Lambda v ef) = fBranch
-      let lastFnOnBranch = traverseToLastCall (return . (\(Var (Sf f _)) -> f::QualifiedBinding) . head . NE.fromList . fromApplyToList)
+      let lastFnOnBranch = traverseToLastCall (return . (\(Sf f _) -> f::QualifiedBinding) . head . NE.fromList . fromApplyToList)
       tFn <- lastFnOnBranch et
       fFn <- lastFnOnBranch ef
       if tFn == recur
@@ -278,7 +278,7 @@ verifyTailRecursion e | isCall recur_hof e = (performChecks $ fromApplyToList e)
                               ++ (show tFn)
     checkIf e = error $ T.pack $ "Recursion is not tail recursive! Last stmt: " ++ (show $ quickRender e)
 
-    isLastStmt (Var (Local _)) = True
+    isLastStmt (Var _) = True
     isLastStmt _ = False
 verifyTailRecursion e@(Let v expr inExpr) = verifyTailRecursion expr >> verifyTailRecursion inExpr >> return e
 verifyTailRecursion e@(Var _) = return e
@@ -292,13 +292,13 @@ rewrite (Apply a b) = Apply <$> rewrite a <*> rewrite b
 rewrite (Lambda a e) = Lambda a <$> rewrite e
 rewrite v@(Var _) = return v
 
-isCall f (Apply (Var (Sf f' _)) _) | f == f' = True
+isCall f (Apply (Sf f' _) _) | f == f' = True
 isCall f (Apply e@(Apply _ _) _) = isCall f e
 isCall _ _ = False
 
 rewriteCallExpr :: (MonadGenBnd m, MonadError Error m) => Expression -> m Expression
 rewriteCallExpr e = do
-  let ( (Var (Sf recur_hof _)) : (lamExpr : initialArgs) ) = fromApplyToList e
+  let Sf recur_hof _ : lamExpr : initialArgs = fromApplyToList e
   let arrayfiedArgs = fromListToApply (Sf ALangRefs.array Nothing) initialArgs
   lamExpr' <- rewriteLambdaExpr lamExpr
   return $ Apply (Apply recur_sf lamExpr') arrayfiedArgs
@@ -307,14 +307,14 @@ rewriteLambdaExpr :: (MonadGenBnd m, MonadError Error m) => Expression -> m Expr
 rewriteLambdaExpr (Lambda vars expr) = do
   x <- generateBinding
   expr' <- rewriteLastCond expr
-  return $ Lambda (Direct x) $ Let (Destructure (extractBindings vars)) (Var (Local x)) expr'
+  return $ Lambda (Direct x) $ Let (Destructure (extractBindings vars)) (Var x) expr'
   where
     rewriteLastCond :: (MonadGenBnd m, MonadError Error m) => Expression -> m Expression
     rewriteLastCond (Let v e o@(Var _)) = (\e' -> Let v e' o) <$> rewriteCond e
     rewriteLastCond (Let v e ie) = Let v e <$> rewriteLastCond ie
 
     rewriteCond :: (MonadGenBnd m, MonadError Error m) => Expression -> m Expression
-    rewriteCond (Apply (Apply c@(Apply (Var (Sf "ohua.lang/if" Nothing)) cond)
+    rewriteCond (Apply (Apply c@(Apply (Sf "ohua.lang/if" Nothing) cond)
                                        (Lambda a trueB))
                                        (Lambda b falseB)) = do
       trueB'  <- rewriteBranch trueB
@@ -323,27 +323,30 @@ rewriteLambdaExpr (Lambda vars expr) = do
     rewriteCond _ = error "invariant broken: recursive function does not have the proper structure."
 
     rewriteBranch :: (MonadGenBnd m, MonadError Error m) => Expression -> m Expression
-    rewriteBranch (Let v e@(Apply (Var (Sf "ohua.lang/id" Nothing)) _) o) = return $ Let v (rewriteTerminationBranch e) o
+    rewriteBranch (Let v e@(Apply (Sf "ohua.lang/id" Nothing) _) o) = return $ Let v (rewriteTerminationBranch e) o
     rewriteBranch (Let v e o) = (\e' -> Let v e' o) <$> (rewriteRecursionBranch e $ fromApplyToList e)
 
     rewriteTerminationBranch e =
-      (Apply (Apply (Var (Sf ALangRefs.mkTuple Nothing))
-                    (Apply (Var (Sf ALangRefs.false Nothing)) unitExpr ))
+      (Apply (Apply (Sf ALangRefs.mkTuple Nothing)
+                    (Apply (Sf ALangRefs.false Nothing) unitExpr ))
               e)
 
-    rewriteRecursionBranch e ( (Var (Sf recur _)) : vars ) = return
-      (Apply (Apply (Var (Sf ALangRefs.mkTuple Nothing))
-                    (Apply (Var (Sf ALangRefs.true Nothing)) unitExpr ))
+    rewriteRecursionBranch e ( (Sf recur _) : vars ) = return
+      (Apply (Apply (Sf ALangRefs.mkTuple Nothing)
+                    (Apply (Sf ALangRefs.true Nothing) unitExpr ))
               $ replaceFn (Sf ALangRefs.array Nothing) e)
                   -- fromListToApply (Sf "ohua.lang/array") $ reverse vars)
     rewriteRecursionBranch _ _ = error "invariant broken"
 rewriteLambdaExpr _ = error "invariant broken"
 
-replaceFn fn (Apply (Var (Sf _ _)) v) = Apply (Var fn) v
-replaceFn fn (Apply f v) = Apply (replaceFn fn f) v
+replaceFn fn (Apply f v) =
+    flip Apply v $
+    case fn of
+        Sf {} -> fn
+        _ -> replaceFn fn f
 
-fromListToApply f (v:[]) = Apply (Var f) v
-fromListToApply f (v:vs) = Apply (fromListToApply f vs) v
+fromListToApply :: AExpr b -> [AExpr b] -> AExpr b
+fromListToApply f = foldl Apply f . reverse
 
 fromApplyToList (Apply f@(Var _) v) = [f, v]
 fromApplyToList (Apply a b) = fromApplyToList a ++ [b]
@@ -358,7 +361,7 @@ freeVarHandling v@(Var _) = return v
 
 liftLambda :: (Monad m, MonadGenBnd m) => Expression -> m Expression
 liftLambda e = do
-  let ((Var (Sf recur _)) : (lamExpr : callArgs) ) = fromApplyToList e
+  let Sf recur _ : lamExpr : callArgs = fromApplyToList e
   let (callArg : []) = callArgs -- due to the previous rewrite
   (Lambda formals liftedExpr, actuals) <- lambdaLifting lamExpr
   case actuals of
@@ -369,15 +372,15 @@ liftLambda e = do
           freeArgs <- generateBindingWith "freeArgs"
           let lam = Lambda (Direct b)
                     (Let (Destructure [initialFormal, freeArgs])
-                         (Apply (Var (Sf "ohua.lang/id" Nothing)) $ Var $ Local b)
+                         (Apply (Sf "ohua.lang/id" Nothing) $ Var b)
                          (Let (Destructure freeFormals)
-                              (Apply (Var (Sf "ohua.lang/id" Nothing)) $ Var $ Local freeArgs)
+                              (Apply ( Sf "ohua.lang/id" Nothing) $ Var freeArgs)
                               liftedExpr))
           return $ Apply
                     (Apply
                       (Apply recur_sf lam)
                       callArg)
-                    $ fromListToApply (Sf ALangRefs.array Nothing) $ map (Var . Local) actuals
+                    $ fromListToApply (Sf ALangRefs.array Nothing) $ map Var actuals
 
 
 --  ==== Implementation ends here
@@ -399,7 +402,7 @@ markRecursiveBindings = fst . runWriter . cata go
                          Direct bnd -> Let (Recursive bnd) e' <$> b
                          _ -> error "Cannot use destrutured binding recursively"
                 else Let assign e' <$> b
-    go (VarF val@(Local bnd)) = tell (HS.singleton bnd) >> pure (Var val)
+    go (VarF val) = tell (HS.singleton val) >> pure (Var val)
     go e@(LambdaF assign _) = shadowAssign assign $ embed <$> sequence e
     go e = embed <$> sequence e
     shadowAssign (Direct b) = censor (HS.delete b)

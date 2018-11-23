@@ -65,7 +65,7 @@ ssa :: (MonadOhua m, MonadReader LocalScope m)
     -> m Expression
 ssa =
     cata $ \case
-        VarF (Local bnd) -> Var . Local <$> ssaResolve bnd
+        VarF bnd -> Var <$> ssaResolve bnd
         LambdaF args body ->
             handleAssignment args $ \assign -> Lambda assign <$> body
         LetF assignment val body ->

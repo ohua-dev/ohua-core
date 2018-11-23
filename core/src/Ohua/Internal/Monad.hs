@@ -311,7 +311,7 @@ runFromExpr ::
 runFromExpr opts f tree =
     runFromBindings opts (f tree) $
     HS.fromList $
-    [b | Local b <- universeBi tree :: [Symbol QualifiedBinding]] <>
+    [b | Var b <- universe tree] <>
     [b | Destructure bs <- universeBi tree, b <- bs] <>
     [b | Direct b <- universeBi tree]
 
