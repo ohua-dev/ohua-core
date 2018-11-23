@@ -14,20 +14,18 @@ module Ohua.DFLang.Passes where
 
 import Ohua.Prelude
 
-import Control.Monad.Writer (MonadWriter, tell, runWriterT)
+import Control.Monad (msum)
+import Control.Monad.Writer (MonadWriter, runWriterT, tell)
 import qualified Data.HashMap.Strict as HM
 import qualified Data.HashSet as HS
 import Data.Sequence (Seq)
-import Control.Monad (msum)
 
 import Ohua.ALang.Lang
 import Ohua.ALang.PPrint
 import Ohua.DFLang.HOF as HOF
-import Ohua.DFLang.HOF.If
-import Ohua.DFLang.HOF.Seq
-import Ohua.DFLang.HOF.Smap
-import Ohua.DFLang.HOF.SmapG
 import Ohua.DFLang.HOF.Generate
+import Ohua.DFLang.HOF.Seq
+import Ohua.DFLang.HOF.SmapG
 import Ohua.DFLang.HOF.TailRec
 import Ohua.DFLang.Lang (DFExpr(..), DFFnRef(..), DFVar(..), LetExpr(..))
 import qualified Ohua.DFLang.Refs as Refs
@@ -35,7 +33,6 @@ import Ohua.DFLang.Util
 
 type Pass m
      = QualifiedBinding -> FnId -> Assignment -> [Expression] -> m (Seq LetExpr)
-
 
 -- | Check that a sequence of let expressions does not redefine bindings.
 checkSSA :: (Container c, Element c ~ LetExpr, MonadOhua envExpr m) => c -> m ()
@@ -69,9 +66,7 @@ lowerALang expr = do
 
 --    (var, exprs) <- runWriterT (go expr)
 lowerToDF ::
-       (MonadOhua env m, MonadWriter (Seq LetExpr) m)
-    => Expression
-    -> m Binding
+       (MonadOhua env m, MonadWriter (Seq LetExpr) m) => Expression -> m Binding
 lowerToDF (Var (Local bnd)) = pure bnd
 lowerToDF (Var v) = failWith $ "Non local return binding: " <> show v
 lowerToDF (Let assign expr rest) = do
@@ -96,8 +91,7 @@ handleDefinitionalExpr assign l@(Apply _ _) cont = do
     cont
 handleDefinitionalExpr _ e _ =
     failWith $
-    "Definitional expressions in a let can only be 'apply' but got: " <>
-    show e
+    "Definitional expressions in a let can only be 'apply' but got: " <> show e
 
 -- | Lower any not specially treated function type.
 lowerDefault :: MonadOhua env m => Pass m
@@ -121,11 +115,11 @@ handleApplyExpr l@(Apply _ _) = go l []
         case v of
             Sf fn fnId -> (fn, , args) <$> maybe generateId return fnId
             Local _ ->
-                    fromEnv (options . callLocalFunction) >>= \case
-                        Nothing ->
-                            failWith
-                                "Calling local functions is not supported in this adapter"
-                        Just fn -> (fn, , ve : args) <$> generateId
+                fromEnv (options . callLocalFunction) >>= \case
+                    Nothing ->
+                        failWith
+                            "Calling local functions is not supported in this adapter"
+                    Just fn -> (fn, , ve : args) <$> generateId
             Env _ ->
                 fromEnv (options . callEnvExpr) >>= \case
                     Nothing ->
@@ -138,9 +132,14 @@ handleApplyExpr (Var (Sf fn fnId)) = (fn, , []) <$> maybe generateId return fnId
                                                                                  -- what is this?
 handleApplyExpr g = failWith $ "Expected apply but got: " <> show g
 
-
 tieContext0 ::
-       (Monad m, Functor f, SemigroupConstraint (f LetExpr), f LetExpr ~ c, Container c, Element c ~ LetExpr)
+       ( Monad m
+       , Functor f
+       , SemigroupConstraint (f LetExpr)
+       , f LetExpr ~ c
+       , Container c
+       , Element c ~ LetExpr
+       )
     => m (Maybe (c, Binding))
     -> c
     -> m c
@@ -208,14 +207,11 @@ lowerHOF _ assign args = do
         return $ Right (Lam assign' bnd, lets)
     handleArg a =
         failWith $
-        "unexpected type of argument, expected var or lambda, got " <>
-        show a
+        "unexpected type of argument, expected var or lambda, got " <> show a
 
 hofs :: [WHOF]
 hofs =
-    [ WHOF (Proxy :: Proxy IfFn)
-    , WHOF (Proxy :: Proxy SmapFn)
-    , WHOF (Proxy :: Proxy SeqFn)
+    [ WHOF (Proxy :: Proxy SeqFn)
     , WHOF (Proxy :: Proxy SmapGFn)
     , WHOF (Proxy :: Proxy GenFn)
     , WHOF (Proxy :: Proxy TailRecursion)

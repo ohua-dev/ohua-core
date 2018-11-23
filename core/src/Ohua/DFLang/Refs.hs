@@ -1,27 +1,15 @@
 module Ohua.DFLang.Refs where
 
-
-import qualified Ohua.ALang.Refs  as Refs
-import           Ohua.DFLang.Lang
 import qualified Ohua.ALang.Passes.TailRec as TailRec
-import           Prelude          hiding (id)
-
-
-oneToN :: DFFnRef
-oneToN = DFFunction "ohua.lang/oneToN"
-
-
-size :: DFFnRef
-size = EmbedSf Refs.size
-
+import qualified Ohua.ALang.Refs as Refs
+import Ohua.DFLang.Lang
+import Prelude hiding (id)
 
 collect :: DFFnRef
 collect = DFFunction "ohua.lang/collect"
 
-
--- FIXME should be ohua.lang/smap
 smapFun :: DFFnRef
-smapFun = DFFunction "ohua.lang/smapFun"
+smapFun = DFFunction Refs.smapFun
 
 id :: DFFnRef
 id = EmbedSf Refs.id
@@ -32,18 +20,8 @@ true = EmbedSf Refs.true
 false :: DFFnRef
 false = EmbedSf Refs.false
 
-bool :: DFFnRef
-bool = EmbedSf Refs.bool
-
-ifThenElse :: DFFnRef
-ifThenElse = bool
-{-# DEPRECATED ifThenElse "use 'bool' instead" #-}
-
-
-switch :: DFFnRef
-switch = select
-{-# DEPRECATED switch "use 'select' instead" #-}
-
+ifFun :: DFFnRef
+ifFun = DFFunction Refs.ifFun
 
 select :: DFFnRef
 select = DFFunction Refs.select
@@ -51,29 +29,20 @@ select = DFFunction Refs.select
 ctrl :: DFFnRef
 ctrl = EmbedSf Refs.ctrl
 
-scope :: DFFnRef
-scope = EmbedSf Refs.scope
-
-
 seq :: DFFnRef
 seq = EmbedSf "ohua.lang/seq"
-
 
 recur :: DFFnRef
 recur = DFFunction TailRec.recur
 
-
 array :: DFFnRef
 array = EmbedSf Refs.array
-
 
 mkTuple :: DFFnRef
 mkTuple = EmbedSf Refs.mkTuple
 
-
 smapGFun :: DFFnRef
 smapGFun = DFFunction "ohua.lang/smapGFun"
-
 
 collectG :: DFFnRef
 collectG = DFFunction "ohua.lang/collectG"
@@ -89,7 +58,6 @@ isJust = EmbedSf "ohua.lang/isJust"
 -- FIXME I don't think we need this as of now.
 ndMerge :: DFFnRef
 ndMerge = DFFunction "ohua.lang/ndMerge"
-
 
 toGen :: DFFnRef
 toGen = DFFunction "ohua.lang/toGen"

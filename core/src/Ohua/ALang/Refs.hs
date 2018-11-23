@@ -3,32 +3,38 @@ module Ohua.ALang.Refs where
 import Ohua.ParseTools.Refs
 import Ohua.Types
 
-size :: QualifiedBinding
-size = "ohua.lang/size"
-
 id :: QualifiedBinding
 id = "ohua.lang/id"
 
+-- transforms into `ifFun` and `select`
 ifThenElse :: QualifiedBinding
 ifThenElse = "ohua.lang/if"
 
-scope :: QualifiedBinding
-scope = "ohua.lang/scope"
+-- TODO: maybe these functions belong into the concrete passes
+-- semantically a different function from `ifThenElse`
+ifFun :: QualifiedBinding
+ifFun = "ohua.lang/ifFun"
 
-array :: QualifiedBinding
-array = "ohua.lang/array"
+select :: QualifiedBinding
+select = "ohua.lang/select"
 
+-- transforms into `smapFun` and `collect`
 smap :: QualifiedBinding
 smap = "ohua.lang/smap"
+
+-- TODO: maybe these functions belong into the concrete passes
+-- semantically a different function from `smap`
+smapFun :: QualifiedBinding
+smapFun = "ohua.lang/smapFun"
+
+collect :: QualifiedBinding
+collect = "ohua.lang/collect"
 
 true :: QualifiedBinding
 true = "ohua.lang/true"
 
 false :: QualifiedBinding
 false = "ohua.lang/false"
-
-bool :: QualifiedBinding
-bool = "ohua.lang/bool"
 
 seq :: QualifiedBinding
 seq = "ohua.lang/seq"
@@ -48,8 +54,6 @@ nth = "ohua.lang/nth"
 ctrl :: QualifiedBinding
 ctrl = "ohua.lang/ctrl"
 
-not :: QualifiedBinding
-not = "ohua.lang/not"
-
-select :: QualifiedBinding
-select = "ohua.lang/select"
+-- needed by tail recursion (?)
+array :: QualifiedBinding
+array = "ohua.lang/array"

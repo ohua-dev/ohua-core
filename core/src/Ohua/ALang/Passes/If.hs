@@ -106,7 +106,7 @@ import Ohua.Prelude
 
 import Ohua.ALang.Lang
 import Ohua.ALang.Passes.Control (liftIntoCtrlCtxt)
-import qualified Ohua.ALang.Refs as Refs (ctrl, ifThenElse, not, scope, select)
+import qualified Ohua.ALang.Refs as Refs (ifFun, ifThenElse, select)
 import Ohua.ALang.Util (fromListToApply, lambdaLifting, mkDestructured)
 import Ohua.Unit
 
@@ -115,14 +115,11 @@ import Control.Monad (foldM)
 ifSf :: Expression
 ifSf = Var $ Sf Refs.ifThenElse Nothing
 
-ctrlSf :: Expression
-ctrlSf = Var $ Sf Refs.ctrl Nothing
-
 selectSf :: Expression
 selectSf = Var $ Sf Refs.select Nothing
 
-ifFun :: Expression
-ifFun = Var $ Sf "ohua.lang/ifFun" Nothing
+ifFunSf :: Expression
+ifFunSf = Var $ Sf "ohua.lang/ifFun" Nothing
 
 ifRewrite :: (Monad m, MonadGenBnd m) => Expression -> m Expression
 ifRewrite (Let v a b) = Let v <$> ifRewrite a <*> ifRewrite b
@@ -146,7 +143,7 @@ ifRewrite (Apply (Apply (Apply ifSf cond) trueBranch) falseBranch) = do
     trueResult <- generateBindingWith "trueResult"
     falseResult <- generateBindingWith "falseResult"
     result <- generateBindingWith "result"
-    Let (Direct ctrls) (Apply ifFun cond) <$>
+    Let (Direct ctrls) (Apply ifFunSf cond) <$>
         (mkDestructured [ctrlTrue, ctrlFalse] ctrls $
          Let (Direct trueResult) trueBranch' $
          Let (Direct falseResult) falseBranch' $
