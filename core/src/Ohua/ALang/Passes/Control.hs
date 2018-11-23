@@ -153,47 +153,42 @@ let cond :: Bool = ...
                                ... true branch expression ... ) in ...
 @
 
+TODO: replace the `recur` operator in the tail recursion with a `ctrl` operator.
+TODO: provide an optimization pass on DFLang that removes the `nth` nodes knowning that
+the `ctrl` operator can provide this destructuring easily in its implementation.
 -}
 module Ohua.ALang.Passes.Control where
 
 import Ohua.Prelude
 
-import Ohua.DFLang.Lang
-import qualified Ohua.DFLang.Refs as Refs
-import Ohua.DFLang.Util
-import Ohua.Types
+import Ohua.ALang.Lang
+import Ohua.Unit
 
-import qualified Data.HashMap.Lazy as HM
-import Data.List (delete)
-import Data.Maybe
--- transformCtrl :: DFExpr -> DFExpr
--- transformCtrl (DFExpr lets retVar) =
---     let ctrlExprs = filter ((== Refs.ctrl) . functionRef) $ foldl concat [] lets
---         updated =
---             join $
---             flip map ctrlExprs $ \e ->
---                 let bnd =
---                         case returnAssignment e of
---                             Direct b -> b
---                             otherwise ->
---                                 error
---                                     "Invariant broken: ctrl only has a single output!"
---                     usageExprs = findUsages bnd ctrlExprs
---                  in flip map usageExprs $ \ue ->
---                         let inputs = callArguments ue
---                             inputs' = flip delete inputs $ DFVar bnd
---                          in ue {callArguments = inputs', contextArg = Just bnd}
---         updatedIds = HM.fromList $ zip (map callSiteId updated) updated
---         lets' =
---             DS.fromList $
---             foldl
---                 (\l e ->
---                      let cId = callSiteId e
---                       in let ne =
---                                  case HM.lookup cId updatedIds of
---                                      Just updateExpr -> updatedExpr
---                                      Nothing -> e
---                           in l ++ [ne])
---                 []
---                 lets
---      in DFExpr lets' retVar
+-- | We perform the following steps:
+--  1. perform lambda lifting to extract the free variables
+--  2. add the `ctrl` operator with the free variables as input
+--  3. provide independent functions with the unitVal that the `ctrl` operator always provides.
+-- (if there are no independent function then this binding will never turn into an arc anyway.)
+liftIntoCtrlCtxt :: (Monad m, MonadGenBnd m) => Binding -> Expression -> m Expression
+liftIntoCtrlCtxt ctrlIn (Lambda (Destructure originalFormals) body)) = do
+    ((Lambda (Destructure allFormals) e), actuals) <- lambdaLifting body
+    let formals = reverse $ take (length actuals) $ reverse allFormals
+    let formals' = formals ++ [unitBinding]
+    unitVar <- generateBindingWith "unitVar"
+    ctrlOut <- generateBindingWith "ctrl"
+    let actuals' = [ctrlIn] ++ actuals ++ [unitVar]
+    let e' = replaceUnitWithVar unitVar e
+    -- construction of the `ctrl` call
+    ie <- mkDestructured formals ctrlOut e'
+    return $
+        Lambda originalFormals $
+        Let
+            (Direct ctrlVar)
+            (fromListToApply (Sf "ohua.lang/ctrl" Nothing) $ map (Var . Local) actuals')
+            ie
+    where
+      replaceUnitWithVar unitVar (Lambda v e) = Lambda v $ replaceUnitWithVar unitVar e
+      replaceUnitWithVar unitVar (Let v e ie) = Let v (replaceUnitWithVar unitVar e) (replaceUnitWithVar unitVar ir)
+      replaceUnitWithVar unitVar (Apply e1 e2) = Apply (replaceUnitWithVar unitVar e1) (replaceUnitWithVar unitVar e2)
+      replaceUnitWithVar unitVar someunitExpr = Var $ Local unitVar
+      replaceUnitWithVar unitVar v@(Var _) = v

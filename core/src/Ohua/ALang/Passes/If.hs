@@ -100,20 +100,17 @@ let cond :: Bool = ...
           result
 @
 -}
-
 module Ohua.ALang.Passes.If where
 
-import           Ohua.Prelude
+import Ohua.Prelude
 
-import qualified Ohua.ALang.Refs as Refs (ifThenElse, scope, nth, not, ctrl, select)
-import           Ohua.ALang.Util (fromListToApply, lambdaLifting)
-import           Ohua.ALang.Lang
-import           Ohua.Unit
+import Ohua.ALang.Lang
+import Ohua.ALang.Passes.Control (liftIntoCtrlCtxt)
+import qualified Ohua.ALang.Refs as Refs (ctrl, ifThenElse, not, scope, select)
+import Ohua.ALang.Util (fromListToApply, lambdaLifting, mkDestructured)
+import Ohua.Unit
 
-import           Control.Monad (foldM)
-
--- mkIntLiteral :: Int -> m Expression
-addEnvExpr = undefined
+import Control.Monad (foldM)
 
 ifSf :: Expression
 ifSf = Var $ Sf Refs.ifThenElse Nothing
@@ -130,57 +127,40 @@ ctrlSf = Var $ Sf Refs.ctrl Nothing
 selectSf :: Expression
 selectSf = Var $ Sf Refs.select Nothing
 
--- TODO verify that this transformation works with the normalization passes
---      because it has a lambda in function position of a call and not anymore
---      as an argument to a HOF
-
 ifRewrite :: (Monad m, MonadGenBnd m) => Expression -> m Expression
 ifRewrite (Let v a b) = Let v <$> ifRewrite a <*> ifRewrite b
 ifRewrite (Lambda v e) = Lambda v <$> ifRewrite e
 ifRewrite (Apply (Apply (Apply ifSf cond) trueBranch) falseBranch) = do
-  nCond        <- generateBinding
-  tBranchCtrl  <- generateBinding
-  fBranchCtrl  <- generateBinding
-  resultTrue   <- generateBinding
-  resultFalse  <- generateBinding
-  result       <- generateBinding
-  trueBranch'  <- (liftBranchIntoCtrlCtxt tBranchCtrl) <$> lambdaLiftBranch trueBranch
-  falseBranch' <- (liftBranchIntoCtrlCtxt fBranchCtrl) <$> lambdaLiftBranch falseBranch
-  return $ Let (Direct nCond) (Apply notSf cond)
-          $ Let (Direct tBranchCtrl) (Apply ctrlSf cond)
-           $ Let (Direct fBranchCtrl) (Apply ctrlSf $ Var $ Local nCond)
-            $ Let (Direct resultTrue) (Apply trueBranch' $ Var $ Local tBranchCtrl)
-             $ Let (Direct resultFalse) (Apply falseBranch' $ Var $ Local fBranchCtrl)
-              $ Let (Direct result) (Apply (Apply (Apply selectSf cond) $ Var $ Local resultTrue) $ Var $ Local resultFalse)
-               $ Var $ Local result
+    nCond <- generateBinding
+    tBranchCtrl <- generateBinding
+    fBranchCtrl <- generateBinding
+    resultTrue <- generateBinding
+    resultFalse <- generateBinding
+    result <- generateBinding
+    trueBranch' <-
+        (liftIntoCtrlCtxt tBranchCtrl) <$> lambdaLiftBranch trueBranch
+    falseBranch' <-
+        (liftIntoCtrlCtxt fBranchCtrl) <$> lambdaLiftBranch falseBranch
+    return $
+        Let (Direct nCond) (Apply notSf cond) $
+        Let (Direct tBranchCtrl) (Apply ctrlSf cond) $
+        Let (Direct fBranchCtrl) (Apply ctrlSf $ Var $ Local nCond) $
+        Let (Direct resultTrue) (Apply trueBranch' $ Var $ Local tBranchCtrl) $
+        Let (Direct resultFalse) (Apply falseBranch' $ Var $ Local fBranchCtrl) $
+        Let
+            (Direct result)
+            (Apply (Apply (Apply selectSf cond) $ Var $ Local resultTrue) $
+             Var $ Local resultFalse) $
+        Var $ Local result
 
 lambdaLiftBranch :: (Monad m, MonadGenBnd m) => Expression -> m Expression
 lambdaLiftBranch branch@(Lambda args _) = do
-   ((Lambda (Destructure formals) e), actuals) <- lambdaLifting branch
-   x <- generateBinding
-   let lastIdx = (length formals) - 1
-   -- TODO turn this into a function in Util that can also be used to desugar destructuring
-   ie <- foldM (mkDestructured x) e $ reverse $ zip formals [0..lastIdx]
-   return $ Lambda args
-                   $ Let (Direct x)
-                         (fromListToApply (Sf Refs.scope Nothing) $ map (Var . Local) actuals)
-                         ie
-
-mkDestructured :: (Monad m) => Binding -> Expression -> (Binding, Int) -> m Expression
-mkDestructured x expr (f, i) = do
-   -- idx <- addEnvExpression i -- FIXME not sure about this. see issue #17
-   idx <- addEnvExpr i -- FIXME not sure about this. see issue #17
-   return $ Let (Direct f)
-                (Apply (Apply (Var $ Sf Refs.nth Nothing) $ Var $ Env idx)
-                       $ Var $ Local x)
-                expr
-
-liftBranchIntoCtrlCtxt :: Binding -> Expression -> Expression
-liftBranchIntoCtrlCtxt ctrl (Lambda args body) = addCtrl body
-  where
-    addCtrl (Let v e ie) = Let v (addCtrl e) (addCtrl ie)
-    addCtrl v@(Var _) = v
-    addCtrl l@(Lambda _ _) = l -- we are after normalization so all existing lambdas are from other HOFs
-    addCtrl (Apply f@scopeSf arg) = Apply (Apply f $ Var $ Local ctrl) arg
-    addCtrl (Apply f@(Var (Sf _ _)) someUnitExpr) = Apply f $ Var $ Local ctrl
-    addCtrl (Apply f arg) = flip Apply arg $ addCtrl arg
+    ((Lambda (Destructure formals) e), actuals) <- lambdaLifting branch
+    x <- generateBinding
+    ie <- mkDestructured formals x e
+    return $
+        Lambda args $
+        Let
+            (Direct x)
+            (fromListToApply (Sf Refs.scope Nothing) $ map (Var . Local) actuals)
+            ie
