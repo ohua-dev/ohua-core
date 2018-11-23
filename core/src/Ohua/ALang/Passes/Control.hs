@@ -162,6 +162,7 @@ module Ohua.ALang.Passes.Control where
 import Ohua.Prelude
 
 import Ohua.ALang.Lang
+import Ohua.ALang.Util (fromListToApply, lambdaLifting, mkDestructured)
 import Ohua.Unit
 
 -- | We perform the following steps:
@@ -169,8 +170,9 @@ import Ohua.Unit
 --  2. add the `ctrl` operator with the free variables as input
 --  3. provide independent functions with the unitVal that the `ctrl` operator always provides.
 -- (if there are no independent function then this binding will never turn into an arc anyway.)
-liftIntoCtrlCtxt :: (Monad m, MonadGenBnd m) => Binding -> Expression -> m Expression
-liftIntoCtrlCtxt ctrlIn (Lambda (Destructure originalFormals) body)) = do
+liftIntoCtrlCtxt ::
+       (Monad m, MonadGenBnd m) => Binding -> Expression -> m Expression
+liftIntoCtrlCtxt ctrlIn (Lambda (Destructure originalFormals) body) = do
     ((Lambda (Destructure allFormals) e), actuals) <- lambdaLifting body
     let formals = reverse $ take (length actuals) $ reverse allFormals
     let formals' = formals ++ [unitBinding]
@@ -178,17 +180,20 @@ liftIntoCtrlCtxt ctrlIn (Lambda (Destructure originalFormals) body)) = do
     ctrlOut <- generateBindingWith "ctrl"
     let actuals' = [ctrlIn] ++ actuals ++ [unitVar]
     let e' = replaceUnitWithVar unitVar e
-    -- construction of the `ctrl` call
     ie <- mkDestructured formals ctrlOut e'
     return $
-        Lambda originalFormals $
+        Lambda (Destructure originalFormals) $
         Let
-            (Direct ctrlVar)
-            (fromListToApply (Sf "ohua.lang/ctrl" Nothing) $ map (Var . Local) actuals')
+            (Direct ctrlOut)
+            (fromListToApply (Sf "ohua.lang/ctrl" Nothing) $
+             map (Var . Local) actuals')
             ie
-    where
-      replaceUnitWithVar unitVar (Lambda v e) = Lambda v $ replaceUnitWithVar unitVar e
-      replaceUnitWithVar unitVar (Let v e ie) = Let v (replaceUnitWithVar unitVar e) (replaceUnitWithVar unitVar ir)
-      replaceUnitWithVar unitVar (Apply e1 e2) = Apply (replaceUnitWithVar unitVar e1) (replaceUnitWithVar unitVar e2)
-      replaceUnitWithVar unitVar someunitExpr = Var $ Local unitVar
-      replaceUnitWithVar unitVar v@(Var _) = v
+  where
+    replaceUnitWithVar unitVar (Lambda v e) =
+        Lambda v $ replaceUnitWithVar unitVar e
+    replaceUnitWithVar unitVar (Let v e ie) =
+        Let v (replaceUnitWithVar unitVar e) (replaceUnitWithVar unitVar ie)
+    replaceUnitWithVar unitVar (Apply e1 e2) =
+        Apply (replaceUnitWithVar unitVar e1) (replaceUnitWithVar unitVar e2)
+    replaceUnitWithVar unitVar someunitExpr = Var $ Local unitVar
+    replaceUnitWithVar unitVar v@(Var _) = v

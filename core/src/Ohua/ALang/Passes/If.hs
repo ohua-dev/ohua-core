@@ -115,52 +115,43 @@ import Control.Monad (foldM)
 ifSf :: Expression
 ifSf = Var $ Sf Refs.ifThenElse Nothing
 
-scopeSf :: Expression
-scopeSf = Var $ Sf Refs.scope Nothing
-
-notSf :: Expression
-notSf = Var $ Sf Refs.not Nothing
-
 ctrlSf :: Expression
 ctrlSf = Var $ Sf Refs.ctrl Nothing
 
 selectSf :: Expression
 selectSf = Var $ Sf Refs.select Nothing
 
+ifFun :: Expression
+ifFun = Var $ Sf "ohua.lang/ifFun" Nothing
+
 ifRewrite :: (Monad m, MonadGenBnd m) => Expression -> m Expression
 ifRewrite (Let v a b) = Let v <$> ifRewrite a <*> ifRewrite b
 ifRewrite (Lambda v e) = Lambda v <$> ifRewrite e
 ifRewrite (Apply (Apply (Apply ifSf cond) trueBranch) falseBranch) = do
-    nCond <- generateBinding
-    tBranchCtrl <- generateBinding
-    fBranchCtrl <- generateBinding
-    resultTrue <- generateBinding
-    resultFalse <- generateBinding
-    result <- generateBinding
-    trueBranch' <-
-        (liftIntoCtrlCtxt tBranchCtrl) <$> lambdaLiftBranch trueBranch
-    falseBranch' <-
-        (liftIntoCtrlCtxt fBranchCtrl) <$> lambdaLiftBranch falseBranch
-    return $
-        Let (Direct nCond) (Apply notSf cond) $
-        Let (Direct tBranchCtrl) (Apply ctrlSf cond) $
-        Let (Direct fBranchCtrl) (Apply ctrlSf $ Var $ Local nCond) $
-        Let (Direct resultTrue) (Apply trueBranch' $ Var $ Local tBranchCtrl) $
-        Let (Direct resultFalse) (Apply falseBranch' $ Var $ Local fBranchCtrl) $
-        Let
-            (Direct result)
-            (Apply (Apply (Apply selectSf cond) $ Var $ Local resultTrue) $
-             Var $ Local resultFalse) $
-        Var $ Local result
-
-lambdaLiftBranch :: (Monad m, MonadGenBnd m) => Expression -> m Expression
-lambdaLiftBranch branch@(Lambda args _) = do
-    ((Lambda (Destructure formals) e), actuals) <- lambdaLifting branch
-    x <- generateBinding
-    ie <- mkDestructured formals x e
-    return $
-        Lambda args $
-        Let
-            (Direct x)
-            (fromListToApply (Sf Refs.scope Nothing) $ map (Var . Local) actuals)
-            ie
+    ctrlTrue <- generateBindingWith "ctrlTrue"
+    ctrlFalse <- generateBindingWith "ctrlFalse"
+    trueBranch' <- liftIntoCtrlCtxt ctrlTrue trueBranch
+    falseBranch' <- liftIntoCtrlCtxt ctrlFalse falseBranch
+    -- return $
+    --     [ohualang|
+    --       let ($var:ctrlTrue, $var:ctrlFalse) = ohua.lang/ifFun $var:cond in
+    --         let trueResult = $expr:trueBranch' in
+    --          let falseResult = $expr:falseBranch' in
+    --           let result = ohua.lang/select cond trueResult falseResult in
+    --             result
+    --                |]
+    ctrls <- generateBindingWith "ctrls"
+    ctrlTrue <- generateBindingWith "ctrlTrue"
+    ctrlFalse <- generateBindingWith "ctrlFalse"
+    trueResult <- generateBindingWith "trueResult"
+    falseResult <- generateBindingWith "falseResult"
+    result <- generateBindingWith "result"
+    Let (Direct ctrls) (Apply ifFun cond) <$>
+        (mkDestructured [ctrlTrue, ctrlFalse] ctrls $
+         Let (Direct trueResult) trueBranch' $
+         Let (Direct falseResult) falseBranch' $
+         Let
+             (Direct result)
+             (Apply (Apply (Apply selectSf cond) $ Var $ Local trueResult) $
+              Var $ Local falseResult) $
+         Var $ Local result)
