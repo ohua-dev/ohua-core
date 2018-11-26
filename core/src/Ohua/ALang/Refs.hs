@@ -30,14 +30,20 @@ smapFun = "ohua.lang/smapFun"
 collect :: QualifiedBinding
 collect = "ohua.lang/collect"
 
+-- transforms into `seqFun`
+seq :: QualifiedBinding
+seq = "ohua.lang/seq"
+
+-- TODO: maybe these functions belong into the concrete passes
+-- semantically a different function from `seq`
+seqFun :: QualifiedBinding
+seqFun = "ohua.lang/seqFun"
+
 true :: QualifiedBinding
 true = "ohua.lang/true"
 
 false :: QualifiedBinding
 false = "ohua.lang/false"
-
-seq :: QualifiedBinding
-seq = "ohua.lang/seq"
 
 mkTuple :: QualifiedBinding
 mkTuple = QualifiedBinding ohuaLangNS "(,)"

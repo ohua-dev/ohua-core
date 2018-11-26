@@ -67,6 +67,92 @@ on it. A nice benefit: lowering for tail recursion is just an implementation of
 a HigherOrderFunction lowering. As such though, we can not access the lambda, i.e., f.
 So we need to do the lambda modifications on ALang before (which is nicer anyways).
 
+-- FIXME if we transform this into true tail recursion then nothing is performed on the branches.
+--       as a result, we remove the whole if statement and just send the input to the conditional,
+--       the output of this cycle and the final output to the recurFun. it will use the cond to
+--       understand which arcs to pull from!
+--       benefits: no array, left and right functions needed.
+-- FIXME the lambda expression from phase 2 must be lifted into control context.
+--       normally there are two operators (ifFun/select or smapFun/collect). this time the operator
+--       recurFun is both!
+
+The resulting code for a call is then:
+
+@
+let result =
+    let (recurCtrl,finalResult,recursionVars) = recurFun a1 ... an in
+     let ctxt = ctrl recurCtrl b c d in
+      let b0 = nth 0 ctxt in
+       ...
+        let x1 = nth 0 recursionVars in
+         ...
+          let y1 = ...
+           ...
+             if c then
+                 result
+             else
+                 recurFun y1 ... yn
+@
+
+The `recurFun` calls now encapsulate the recursion. The `recurFun` call only returns when the recursion finished.
+And then:
+
+@
+let result =
+    let (recurCtrl,finalResult,recursionVars) = recurFun () () a1 ... an in
+     let ctxt = ctrl recurCtrl b c d in
+      let b0 = nth 0 ctxt in
+       ...
+        let x1 = nth 0 recursionVars in
+         ...
+          let y1 = ...
+           ...
+            recurFun c result y1 ... yn
+@
+
+Here, recurFun and recurFun are actually the same operator.
+DFLowering must make that association.
+
+Maybe it should rather be:
+
+@
+let result =
+    let (recurCtrl,finalResult,recursionVars) = recurFun a1 ... an in
+     let ctxt = ctrl recurCtrl b c d in
+      let b0 = nth 0 ctxt in
+       ...
+        let x1 = nth 0 recursionVars in
+         ...
+          let y1 = ...
+           ...
+             if c then
+                 fix result
+             else
+                 recurFun y1 ... yn
+@
+
+Using the `Y` combinator, this would be:
+
+@
+
+let g = \f x1 x2 x3 -> ...
+                    let y1 = ...
+                     ...
+                      if c then
+                          fix result
+                      else
+                          f y1 y2 y3 in
+
+let result = Y g a b c in
+  result
+@
+
+TODO: rename `recur_hof` into `Y`
+
+The above is an inlining of the function `g`, which is inarguably impossible
+without additional semantics. That is, without knowing that the `recurFun` calls
+are actually one. However, at this point, it is not lambda calculus anymore.
+
 === Phase 3: (Performed on the expression in ALang-normalized form (ANF)!)
 Rewrite the code (for a call) such that:
 
