@@ -461,7 +461,7 @@ rewriteCallExpr e = do
                             Right bnds -> bnds
                     Right bnds -> bnds
          in fromListToApply (Sf "ohua.lang/recurFun" Nothing) $
-            [fixRef] ++ recurVars
+            [cond, fixRef] ++ recurVars
     rewriteCond _ =
         error
             "invariant broken: recursive function does not have the proper structure."

@@ -25,7 +25,6 @@ import Ohua.ALang.PPrint
 import Ohua.DFLang.HOF as HOF
 import Ohua.DFLang.HOF.Generate
 import Ohua.DFLang.HOF.SmapG
-import Ohua.DFLang.HOF.TailRec
 import Ohua.DFLang.Lang (DFExpr(..), DFFnRef(..), DFVar(..), LetExpr(..))
 import qualified Ohua.DFLang.Refs as Refs
 import Ohua.DFLang.Util
@@ -209,11 +208,7 @@ lowerHOF _ assign args = do
         "unexpected type of argument, expected var or lambda, got " <> show a
 
 hofs :: [WHOF]
-hofs =
-    [ WHOF (Proxy :: Proxy SmapGFn)
-    , WHOF (Proxy :: Proxy GenFn)
-    , WHOF (Proxy :: Proxy TailRecursion)
-    ]
+hofs = [WHOF (Proxy :: Proxy SmapGFn), WHOF (Proxy :: Proxy GenFn)]
 
 hofNames :: HM.HashMap QualifiedBinding WHOF
 hofNames = HM.fromList $ map (extractName &&& identity) hofs

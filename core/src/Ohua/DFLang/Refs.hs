@@ -6,19 +6,13 @@ import Ohua.DFLang.Lang
 import Prelude hiding (id)
 
 collect :: DFFnRef
-collect = DFFunction "ohua.lang/collect"
+collect = DFFunction Refs.collect
 
 smapFun :: DFFnRef
 smapFun = DFFunction Refs.smapFun
 
 id :: DFFnRef
 id = EmbedSf Refs.id
-
-true :: DFFnRef
-true = EmbedSf Refs.true
-
-false :: DFFnRef
-false = EmbedSf Refs.false
 
 ifFun :: DFFnRef
 ifFun = DFFunction Refs.ifFun
@@ -29,17 +23,8 @@ select = DFFunction Refs.select
 ctrl :: DFFnRef
 ctrl = EmbedSf Refs.ctrl
 
-seq :: DFFnRef
-seq = EmbedSf "ohua.lang/seq"
-
-recur :: DFFnRef
-recur = DFFunction TailRec.recur
-
-array :: DFFnRef
-array = EmbedSf Refs.array
-
-mkTuple :: DFFnRef
-mkTuple = EmbedSf Refs.mkTuple
+recurFun :: DFFnRef
+recurFun = DFFunction TailRec.recurFun
 
 smapGFun :: DFFnRef
 smapGFun = DFFunction "ohua.lang/smapGFun"

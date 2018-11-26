@@ -39,15 +39,6 @@ seq = "ohua.lang/seq"
 seqFun :: QualifiedBinding
 seqFun = "ohua.lang/seqFun"
 
-true :: QualifiedBinding
-true = "ohua.lang/true"
-
-false :: QualifiedBinding
-false = "ohua.lang/false"
-
-mkTuple :: QualifiedBinding
-mkTuple = QualifiedBinding ohuaLangNS "(,)"
-
 smapG :: QualifiedBinding
 smapG = "ohua.lang/smapG"
 
@@ -59,7 +50,3 @@ nth = "ohua.lang/nth"
 
 ctrl :: QualifiedBinding
 ctrl = "ohua.lang/ctrl"
-
--- needed by tail recursion (?)
-array :: QualifiedBinding
-array = "ohua.lang/array"

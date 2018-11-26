@@ -95,7 +95,6 @@ library:
   - Ohua.DFLang.HOF
   - Ohua.DFLang.Passes
   - Ohua.DFLang.PPrint
-  - Ohua.DFLang.HOF.TailRec
   - Ohua.DFLang.Optimizations
   - Ohua.DFGraph
   - Ohua.DFGraph.Show
