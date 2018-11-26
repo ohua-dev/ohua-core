@@ -96,6 +96,7 @@ library:
   - Ohua.DFLang.Optimizations
   - Ohua.DFGraph
   - Ohua.DFGraph.Show
+  - Ohua.Frontend.Lang
   - Ohua.Serialize.JSON
   - Ohua.Stage
   - Ohua.Util
