@@ -12,11 +12,12 @@ module Ohua.ALang.Util where
 
 import           Ohua.Prelude
 import           Ohua.ALang.Lang
+import qualified Ohua.ALang.Refs as Refs
 
 import           Data.Functor.Foldable
 import qualified Data.HashSet as HS
 import qualified Data.Text as T
-import Data.Generics.Uniplate.Operations (transform)
+import Data.Generics.Uniplate.Direct (transform, universe)
 
 
 
@@ -54,33 +55,48 @@ substitute !var val = cata f
 -- this is always true.
 -- This is also the readon why I keep this in Util into of making it an own pass.
 
+destructure :: Expr -> [Binding] -> Expr -> Expr
+destructure source bnds =
+    foldl (.) id $
+    map (\(idx, bnd0) -> Let bnd0 $ mkNthExpr idx source) (zip [0 ..] bnds)
+  where
+    mkNthExpr idx source =
+        Sf Refs.nth Nothing `Apply` (Lit $ NumericLit idx) `Apply` source
+
 lambdaLifting :: (Monad m, MonadGenBnd m) => Expression -> m (Expression, [Binding])
 lambdaLifting o@(Lambda v e) =
-  let inputVars = extractBindings v
-      freeVars  = HS.difference (findFreeVariables e) $ HS.fromList inputVars
+  let freeVars  = HS.delete v (findFreeVariables e)
       actuals   = sort $ HS.toList freeVars -- makes the list of args deterministic
   in case actuals of
       [] -> return (o,[])
       _  -> do
           formals <- mapM generateBindingWith actuals
           let rewrittenExp = foldl renameVar e $ zip actuals formals
-          return (flip Lambda rewrittenExp $ Destructure $ inputVars ++ formals, actuals)
+          input <- generateBinding
+          return (Lambda input $ destructure (Var input) (v : formals) rewrittenExp, actuals)
 lambdaLifting e = error $ T.pack $ "Invariant broken! Lambda lifting is only applicable to lambda expressions! Found: " ++ (show e)
 
 renameVar :: Expression -> (Binding, Binding) -> Expression
 renameVar e (old, new) = flip transform e $ \case Var v | v == old -> Var new; other -> other
 
+-- | All bindings defined in an expression *with duplicates*
+definedBindings :: Expression -> [Binding]
+definedBindings e =
+    [ v
+    | e' <- universe e
+    , v <-
+          case e of
+              Let v' _ _ -> [v']
+              Lambda v' _ -> [v']
+              _ -> []
+    ]
+
+-- | A very simple function that calculates all bindings that are used in an
+-- expression but not defined in it. This is implemented as a simple set
+-- intersection, therefore it relies on the fact that the expression is in SSA
+-- form.
 findFreeVariables :: Expression -> HS.HashSet Binding
-findFreeVariables (Let (Direct v) e ie) =
-  let ves  = findFreeVariables e
-      vies = findFreeVariables ie
-      in HS.union ves $ HS.delete v vies
-findFreeVariables (Let (Destructure vs) e ie) =
-  let ves  = findFreeVariables e
-      vies = findFreeVariables ie
-      in HS.union ves $ HS.difference vies $ HS.fromList vs
-findFreeVariables (Let (Recursive _) _ _) = error "Invariant broken! (Recursive binding detected.)"
-findFreeVariables (Apply a b) = HS.union (findFreeVariables a) $ findFreeVariables b
-findFreeVariables (Var v) = HS.singleton v
-findFreeVariables (Lit _) = HS.empty
-findFreeVariables (Lambda v e) = HS.difference (findFreeVariables e) $ HS.fromList $ extractBindings v
+findFreeVariables e =
+    HS.difference
+        (HS.fromList [v | Var v <- universe e])
+        (HS.fromList $ definedBindings e)

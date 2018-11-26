@@ -29,11 +29,6 @@ module Ohua.Types
     , QualifiedBinding(..)
     , SomeBinding(..)
     , symbolFromString
-    , ExtractBindings(..)
-    , AbstractAssignment(..), Assignment
-    , _Direct
-    , _Destructure
-    , _Recursive
     , HostExpr
     , Environment
     , options
@@ -250,63 +245,6 @@ symbolFromString s
                               bnd <- make symName
                               pure $ Qual $ QualifiedBinding ns bnd
             _ -> throwErrorDebugS $ "Leading slash expected after `break` in the binding " <> show s
-
-class ExtractBindings a where
-    extractBindings :: a -> [Binding]
-    default extractBindings :: (Container a, ExtractBindings (Element a)) => a -> [Binding]
-    extractBindings = foldMap extractBindings
-
-instance ExtractBindings a => ExtractBindings [a]
-
-instance ExtractBindings Binding where extractBindings = pure
-
--- | Allowed forms for the left hand side of a let binding or in a lambda input.
-data AbstractAssignment binding
-    = Direct !binding
-    | Recursive !binding
-    | Destructure ![binding]
-    deriving (Eq, Functor, Traversable, F.Foldable, Show, Lift)
-
-instance Container (AbstractAssignment binding)
-
-instance Uniplate (AbstractAssignment binding) where
-    uniplate = plate
-
-type Assignment = AbstractAssignment Binding
-
-instance IsString Assignment where
-    fromString = Direct . fromString
-
-instance IsList Assignment where
-    type Item Assignment = Binding
-    fromList = Destructure
-    toList (Destructure l) = l
-    toList _ = error "Direct return is not a list"
-
-instance ExtractBindings Assignment
-
-instance NFData binding => NFData (AbstractAssignment binding) where
-    rnf (Destructure ds) = rnf ds
-    rnf (Direct d) = rnf d
-    rnf (Recursive d) = rnf d
-
-_Direct :: Prism' (AbstractAssignment binding) binding
-_Direct =
-    prism' Direct $ \case
-        Direct a -> Just a
-        _ -> Nothing
-
-_Destructure :: Prism' (AbstractAssignment binding) [binding]
-_Destructure =
-    prism' Destructure $ \case
-        Destructure a -> Just a
-        _ -> Nothing
-
-_Recursive :: Prism' (AbstractAssignment binding) binding
-_Recursive =
-    prism' Recursive $ \case
-        Recursive r -> Just r
-        _ -> Nothing
 
 -- bindingType is the type of general bindings Binding is the type for
 -- function arguments and `let`s etc which we know to always be local

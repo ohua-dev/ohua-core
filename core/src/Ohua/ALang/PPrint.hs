@@ -1,9 +1,8 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module Ohua.ALang.PPrint
     ( Pretty(pretty)
-    , prettyAExpr
+    , prettyExpr
     , prettyLit
-    , prettyAbstractAssignment
     , prettyNS
     , quickRender
     , ohuaDefaultLayoutOpts
@@ -27,14 +26,9 @@ afterLetIndent = 0
 argumentIndent :: Int
 argumentIndent = 2
 
-prettyAExpr ::
-       (bndType -> Doc a)
-    -> ((bndType -> Doc a) -> AbstractAssignment bndType -> Doc a)
-    -> AExpr bndType
-    -> Doc a
-prettyAExpr prettyBnd prettyAbstractAssign0 = fst . histo worker
+prettyExpr :: Expr -> Doc a
+prettyExpr = fst . histo worker
   where
-    prettyAssign = prettyAbstractAssign0 prettyBnd
     parenthesize prec1 (e, prec0)
         | prec0 > prec1 = parens e
         | otherwise = e
@@ -53,7 +47,7 @@ prettyAExpr prettyBnd prettyAbstractAssign0 = fst . histo worker
                           align
                               (hang afterLetIndent $
                                sep
-                                   [ hsep (map prettyAssign $ assign : assigns) <+>
+                                   [ hsep (map pretty $ assign : assigns) <+>
                                      "="
                                    , discardParens e
                                    ]) <+>
@@ -69,7 +63,7 @@ prettyAExpr prettyBnd prettyAbstractAssign0 = fst . histo worker
                  in needParens 2 $
                     "λ" <+>
                     align
-                        (sep [ sep (map prettyAssign (assign : assigns) <>
+                        (sep [ sep (map pretty (assign : assigns) <>
                                     ["->"])
                              , discardParens e
                              ])
@@ -99,26 +93,15 @@ instance Pretty QualifiedBinding where
 instance Pretty NSRef where
     pretty = hcat . punctuate dot . map pretty . unwrap
 
-instance (Pretty bndType) =>
-         Pretty (AExpr bndType) where
-    pretty = prettyAExpr pretty prettyAbstractAssignment
+instance Pretty Expr where
+    pretty = prettyExpr
 
-instance (Pretty bndType) => Pretty (AbstractAssignment bndType) where
-    pretty = prettyAbstractAssignment pretty
 instance  Pretty Lit where
     pretty = prettyLit
 
 instance Pretty SomeBinding where
     pretty (Qual q) = pretty q
     pretty (Unqual b) = pretty b
-
-
-prettyAbstractAssignment :: (bndType -> Doc a) -> AbstractAssignment bndType -> Doc a
-prettyAbstractAssignment prettyBnd =
-    \case
-        Direct b -> prettyBnd b
-        Destructure bnds -> tupled $ map prettyBnd bnds
-        Recursive bnd -> "rec" <+> prettyBnd bnd
 
 ohuaDefaultLayoutOpts :: LayoutOptions
 ohuaDefaultLayoutOpts = defaultLayoutOptions {layoutPageWidth = AvailablePerLine 100 1.0}

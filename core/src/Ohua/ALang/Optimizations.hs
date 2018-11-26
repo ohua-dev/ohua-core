@@ -27,6 +27,6 @@ runOptimizations = return
 removeId :: Expression -> Expression
 removeId =
     para $ \case
-        LetF bnd@(Direct _) (Sf func _ `Apply` somevalue, _) (rest, _)
+        LetF bnd (Sf func _ `Apply` somevalue, _) (rest, _)
             | func == Refs.id -> Let bnd somevalue rest
         other0 -> embed $ snd <$> other0

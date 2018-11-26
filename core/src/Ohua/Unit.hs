@@ -17,10 +17,10 @@ unitSym :: Lit
 unitSym = UnitLit
 
 
-unitExpr :: AExpr s
+unitExpr :: Expr
 unitExpr = Lit unitSym
 
-someUnitExpr :: AExpr s
+someUnitExpr :: Expr
 someUnitExpr = unitExpr
 
 dfVarUnit :: DFVar

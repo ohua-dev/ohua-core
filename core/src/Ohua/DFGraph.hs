@@ -77,18 +77,14 @@ toGraph (DFExpr lets r) = OutGraph ops grArcs (getSource r)
         HM.fromList $
         toList lets >>= \l ->
             [ (var, Target (callSiteId l) idx)
-            | (var, idx) <-
-                  case returnAssignment l of
-                      Direct v -> [(v, -1)]
-                      Destructure vars -> zip vars [0 ..]
-                      g -> error $ "Found unsupported assignment: " <> show g
+            | (var, idx) <- zip (output l) [0 ..]
             ]
     grArcs = concatMap toArc (toList lets)
     getSource v =
         fromMaybe
             (error $
-             "Undefined Binding: DFVar " <>
-             show v <> " defined vars: " <> show sources) $
+             "Undefined Binding: DFVar " <> show v <> " defined vars: " <>
+             show sources) $
         HM.lookup v sources
     toArc l =
         [ Arc t $

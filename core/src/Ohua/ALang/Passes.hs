@@ -38,12 +38,7 @@ import qualified Ohua.ALang.Refs as Refs
 inlineLambdaRefs :: MonadOhua m => Expression -> m Expression
 inlineLambdaRefs = flip runReaderT mempty . para go
   where
-    go (LetF assignment (Lambda _ _, l) (_, body)) =
-        case assignment of
-            Direct bnd -> l >>= \l' -> local (HM.insert bnd l') body
-            Recursive _ -> Let assignment <$> l <*> body
-            Destructure _ ->
-                failWith "invariant broken, cannot destructure lambda"
+    go (LetF b (Lambda _ _, l) (_, body)) = l >>= \l' -> local (HM.insert b l') body
     go (VarF bnd) = asks (fromMaybe (Var bnd) . HM.lookup bnd)
     go e = embed <$> traverse snd e
 
@@ -118,17 +113,10 @@ letLift =
 inlineReassignments :: Expression -> Expression
 inlineReassignments = flip runReader HM.empty . cata go
   where
-    go (LetF assign val body) =
+    go (LetF bnd val body) =
         val >>= \case
-            v@(Var _) ->
-                case assign of
-                    Direct bnd -> local (HM.insert bnd v) body
-                    Destructure _ ->
-                        Let assign (Apply (Sf Refs.id Nothing) v) <$> body
-                    Recursive _ ->
-                        error
-                            "TODO implement inlining reassignments for recursive bindings"
-            v -> Let assign v <$> body
+            v@(Var _) -> local (HM.insert bnd v) body
+            v -> Let bnd v <$> body
     go (VarF val) = asks (fromMaybe (Var val) . HM.lookup val)
     go e = embed <$> sequence e
 
@@ -145,7 +133,7 @@ ensureFinalLet' (Let a e b) = Let a e <$> ensureFinalLet' b
 ensureFinalLet' v@(Var _) = return v
 ensureFinalLet' a = do
     newBnd <- generateBinding
-    return $ Let (Direct newBnd) a (Var  newBnd)
+    return $ Let newBnd a (Var newBnd)
 
 ensureFinalLetInLambdas :: MonadOhua m => Expression -> m Expression
 ensureFinalLetInLambdas =
@@ -157,7 +145,7 @@ ensureAtLeastOneCall :: (Monad m, MonadGenBnd m) => Expression -> m Expression
 ensureAtLeastOneCall e@(Var _) = do
     newBnd <- generateBinding
     pure $
-        Let (Direct newBnd) (Sf Refs.id Nothing `Apply` e) $
+        Let newBnd (Sf Refs.id Nothing `Apply` e) $
         Var newBnd
 ensureAtLeastOneCall e = cata f e
   where
@@ -167,7 +155,7 @@ ensureAtLeastOneCall e = cata f e
                 newBnd <- generateBinding
                 pure $
                     Lambda bnd $
-                    Let (Direct newBnd) (Sf Refs.id Nothing `Apply` v) $
+                    Let newBnd (Sf Refs.id Nothing `Apply` v) $
                     Var newBnd
             eInner -> pure $ Lambda bnd eInner
     f eInner = embed <$> sequence eInner
@@ -180,13 +168,13 @@ removeUnusedBindings :: Expression -> Expression
 removeUnusedBindings = fst . runWriter . cata go
   where
     go (VarF val) = tell (HS.singleton val) >> return (Var val)
-    go (LetF bnds val body) = do
+    go (LetF b val body) = do
         (inner, used) <- listen body
-        if not $ any (`HS.member` used) $ extractBindings bnds
+        if not $ b `HS.member` used
             then return inner
             else do
                 val' <- val
-                pure $ Let bnds val' inner
+                pure $ Let b val' inner
     go e = embed <$> sequence e
 
 -- | Reduce curried expressions.  aka `let f = some/sf a in f b`
@@ -204,7 +192,7 @@ removeCurrying ::
     -> m Expression
 removeCurrying e = fst <$> evalRWST (para inlinePartials e) mempty ()
   where
-    inlinePartials (LetF assign@(Direct bnd) (_, val) (_, body)) = do
+    inlinePartials (LetF bnd (_, val) (_, body)) = do
         val' <-
             val >>= \case
                 v@(Var bnd') ->
@@ -215,7 +203,7 @@ removeCurrying e = fst <$> evalRWST (para inlinePartials e) mempty ()
         pure $
             if bnd `HS.member` touched
                 then body'
-                else Let assign val' body'
+                else Let bnd val' body'
     inlinePartials (ApplyF (Var bnd, _) (_, arg)) = do
         tell $ HS.singleton bnd
         val <- asks (HM.lookup bnd)
@@ -261,14 +249,13 @@ applyToSf =
 noUndefinedBindings :: MonadOhua m => Expression -> m ()
 noUndefinedBindings = flip runReaderT mempty . cata go
   where
-    go (LetF (Recursive r) val body) = local (HS.insert r) $ val >> body
-    go (LetF assign val body) = val >> registerAssign assign body
+    go (LetF b val body) = val >> registerBinding b body
     go (VarF bnd) = do
         isDefined <- asks (HS.member bnd)
         unless isDefined $ failWith $ "Not in scope " <> show bnd
-    go (LambdaF assign body) = registerAssign assign body
+    go (LambdaF b body) = registerBinding b body
     go e = sequence_ e
-    registerAssign = local . HS.union . HS.fromList . extractBindings
+    registerBinding = local . HS.insert
 
 checkProgramValidity :: MonadOhua m => Expression -> m ()
 checkProgramValidity e = do
@@ -283,7 +270,7 @@ liftApplyToApply =
     lrPrewalkExprM $ \case
         Apply fn arg@(Apply _ _) -> do
             bnd <- generateBinding
-            return $ Let (Direct bnd) arg $ Apply fn (Var bnd)
+            return $ Let bnd arg $ Apply fn (Var bnd)
         a -> return a
 
 -- The canonical composition of the above transformations to create a
@@ -317,32 +304,3 @@ normalize e =
 -- letLift (Apply (Let assign expr function) argument) = letLift $ Let assign expr $ Apply function argument
 -- letLift (Apply function argument) =
 --     case letLift argument of
---         v'@()
-
-removeDestructuring ::
-       MonadOhua m
-    => (Int -> EnvExpr m)
-    -> Expression
-    -> m Expression
-removeDestructuring litToEnv =
-    rewriteM
-        (\case
-             Lambda (Destructure ds) body ->
-                 unstructure ds (\bnd f -> Lambda bnd $ f body)
-             Let (Destructure ds) expr body ->
-                 unstructure ds (\bnd f -> Let bnd expr $ f body)
-             _ -> pure Nothing)
-  where
-    unstructure bnds cont = do
-        bnd <- generateBinding
-        f <-
-            foldl (.) id <$>
-            mapM
-                (\(idx, bnd0) ->
-                     Let (Direct bnd0) <$> mkNthExpr idx (Var bnd))
-                (zip [0 ..] bnds)
-        pure $ Just $ cont (Direct bnd) f
-    mkNthExpr idx source = do
-        envLit <- litAsExpr idx
-        pure $ Sf Refs.nth Nothing `Apply` envLit `Apply` source
-    litAsExpr = pure . Lit . NumericLit . toInteger

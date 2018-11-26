@@ -34,7 +34,7 @@ data DFExpr = DFExpr
 
 data LetExpr = LetExpr
     { callSiteId :: !FnId
-    , returnAssignment :: !Assignment
+    , output :: ![Binding]
     , functionRef :: !DFFnRef
     , callArguments :: ![DFVar]
     , contextArg :: !(Maybe Binding)
