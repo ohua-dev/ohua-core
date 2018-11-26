@@ -24,7 +24,6 @@ import Ohua.ALang.Lang
 import Ohua.ALang.PPrint
 import Ohua.DFLang.HOF as HOF
 import Ohua.DFLang.HOF.Generate
-import Ohua.DFLang.HOF.Seq
 import Ohua.DFLang.HOF.SmapG
 import Ohua.DFLang.HOF.TailRec
 import Ohua.DFLang.Lang (DFExpr(..), DFFnRef(..), DFVar(..), LetExpr(..))
@@ -211,8 +210,7 @@ lowerHOF _ assign args = do
 
 hofs :: [WHOF]
 hofs =
-    [ WHOF (Proxy :: Proxy SeqFn)
-    , WHOF (Proxy :: Proxy SmapGFn)
+    [ WHOF (Proxy :: Proxy SmapGFn)
     , WHOF (Proxy :: Proxy GenFn)
     , WHOF (Proxy :: Proxy TailRecursion)
     ]
