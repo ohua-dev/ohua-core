@@ -3,7 +3,6 @@ module Ohua.Unit where
 import Ohua.Prelude
 
 import Ohua.ALang.Lang
-import Ohua.Constants.HostExpr as HEConst
 import Ohua.DFLang.Lang
 
 

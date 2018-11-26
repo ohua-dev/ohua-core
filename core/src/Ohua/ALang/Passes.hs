@@ -218,10 +218,10 @@ removeCurrying e = fst <$> evalRWST (para inlinePartials e) mempty ()
 -- | Ensures the expression is a sequence of let statements terminated
 -- with a local variable.
 hasFinalLet :: MonadOhua m => Expression -> m ()
-hasFinalLet = Plate.para $ \case
-    Let{} -> \[_, _, body] -> body
-    Var{} -> \[] -> return ()
-    _ -> \_ -> failWith "Final value is not a var"
+hasFinalLet = cata $ \case
+    LetF _ _ body -> body
+    VarF{} -> return ()
+    _ -> failWith "Final value is not a var"
 
 -- | Ensures all of the optionally provided stateful function ids are unique.
 noDuplicateIds :: MonadError Error m => Expression -> m ()
