@@ -16,9 +16,7 @@
 -- i.e., there are no function definitions.
 --
 {-# LANGUAGE CPP, DeriveLift #-}
-
 #include "compat.h"
-
 module Ohua.DFLang.Lang where
 
 import Ohua.Prelude
@@ -53,6 +51,7 @@ instance Hashable DFFnRef where
 data DFVar
     = DFEnvVar !HostExpr
     | DFVar !Binding
+    | Seq DFVar
     deriving (Eq, Show, Lift)
 
 instance Hashable DFVar where

@@ -59,7 +59,7 @@ Turn recursions into HOFs:
                                result
                            else
                                recur y1 ... yn
-  let f = recur_hof f'
+  let f = y f'
 @
 
 Lambda-inlinling will then just inline f' while still performing all other transformations
@@ -147,8 +147,6 @@ let result = Y g a b c in
   result
 @
 
-TODO: rename `recur_hof` into `Y`
-
 The above is an inlining of the function `g`, which is inarguably impossible
 without additional semantics. That is, without knowing that the `recurFun` calls
 are actually one. However, at this point, it is not lambda calculus anymore.
@@ -175,7 +173,7 @@ Rewrite the code (for a call) such that:
                 array a1 ... an
 @
 
-Note: recur_hof became recur
+Note: y became recur
 Either might be also implemented as:
 
 @
@@ -215,7 +213,7 @@ The ALang phase handles free variables via lambda lifting:
 We again pack them in an array to make the recur operator easier to implement for a backend.
 This way, it does not need to support variadic argument lists.
 
-=== Phase 5: (DF Lowering for recur_hof.)
+=== Phase 5: (DF Lowering for y.)
 Adds the following operator as a context op:
 
 @
@@ -244,8 +242,9 @@ import qualified Data.Text as T
 
 import Ohua.ALang.Lang
 import Ohua.ALang.PPrint (quickRender)
+import Ohua.ALang.Passes.Control (liftIntoCtrlCtxt)
 import qualified Ohua.ALang.Refs as ALangRefs
-import Ohua.ALang.Util (fromApplyToList, fromListToApply, lambdaLifting)
+import Ohua.ALang.Util (fromApplyToList, fromListToApply, mkDestructured)
 import Ohua.Configuration
 import Ohua.Unit
 
@@ -258,7 +257,7 @@ loadTailRecPasses True passes@(CustomPasses { passBeforeNormalize = bn
                                             }) =
     passes
         { passBeforeNormalize = (\e -> bn =<< (hoferize $ findTailRecs True e))
-        , passAfterNormalize = (\e -> an =<< (freeVarHandling <=< rewrite) e)
+        , passAfterNormalize = (\e -> an =<< rewrite e)
         }
 
 -- Currently not exposed by the frontend but only as the only part of recursion
@@ -266,15 +265,21 @@ loadTailRecPasses True passes@(CustomPasses { passBeforeNormalize = bn
 recur :: QualifiedBinding
 recur = "ohua.lang/recur"
 
--- This is a compiler-internal higher-order function.
-recur_hof :: QualifiedBinding
-recur_hof = "ohua.lang/recur_hof"
-
 recur_sf :: Expression
 recur_sf = Var $ Sf recur Nothing
 
-recur_hof_sf :: Expression
-recur_hof_sf = Var $ Sf recur_hof Nothing
+-- The Y combinator from Haskell Curry
+y :: QualifiedBinding
+y = "ohua.lang/Y"
+
+y_sf :: Expression
+y_sf = Var $ Sf y Nothing
+
+recurFun :: QualifiedBinding
+recurFun = "ohua.lang/recurFun"
+
+recurFunSf :: Expression
+recurFunSf = Var $ Sf recurFun Nothing
 
 -- Phase 1:
 findTailRecs :: Bool -> Expression -> Expression
@@ -326,7 +331,7 @@ hoferize (Let (Recursive f) expr inExpr) = do
     f' <- generateBindingWith f
     return $
         Let (Direct f') expr $
-        Let (Direct f) (Apply recur_hof_sf (Var (Local f'))) inExpr
+        Let (Direct f) (Apply y_sf (Var (Local f'))) inExpr
 hoferize (Let v expr inExpr) = Let v <$> hoferize expr <*> hoferize inExpr
 hoferize (Apply a b) = Apply <$> hoferize a <*> hoferize b
 hoferize (Lambda a e) = Lambda a <$> hoferize e
@@ -336,7 +341,7 @@ hoferize e = error $ show e
 -- performed after normalization
 verifyTailRecursion :: (Monad m, MonadGenBnd m) => Expression -> m Expression
 verifyTailRecursion e
-    | isCall recur_hof e = (performChecks $ fromApplyToList e) >> return e
+    | isCall y e = (performChecks $ fromApplyToList e) >> return e
   where
     performChecks (_:((Lambda a e):_)) = traverseToLastCall checkIf e
     performChecks (_:(e:_)) =
@@ -399,7 +404,7 @@ verifyTailRecursion e =
 -- Phase 3:
 rewrite :: (MonadGenBnd m, MonadError Error m) => Expression -> m Expression
 rewrite e
-    | isCall recur_hof e = rewriteCallExpr e
+    | isCall y e = rewriteCallExpr e
 rewrite (Let v expr inExpr) = Let v <$> rewrite expr <*> rewrite inExpr
 rewrite (Apply a b) = Apply <$> rewrite a <*> rewrite b
 rewrite (Lambda a e) = Lambda a <$> rewrite e
@@ -413,94 +418,62 @@ isCall _ _ = False
 rewriteCallExpr ::
        (MonadGenBnd m, MonadError Error m) => Expression -> m Expression
 rewriteCallExpr e = do
-    let ((Var (Sf recur_hof _)):(lamExpr:initialArgs)) = fromApplyToList e
-    let arrayfiedArgs = fromListToApply (Sf ALangRefs.array Nothing) initialArgs
-    lamExpr' <- rewriteLambdaExpr lamExpr
-    return $ Apply (Apply recur_sf lamExpr') arrayfiedArgs
-
-rewriteLambdaExpr ::
-       (MonadGenBnd m, MonadError Error m) => Expression -> m Expression
-rewriteLambdaExpr (Lambda vars expr) = do
-    x <- generateBinding
-    expr' <- rewriteLastCond expr
-    return $
-        Lambda (Direct x) $
-        Let (Destructure (extractBindings vars)) (Var (Local x)) expr'
+    let ((Var (Sf y _)):(l@(Lambda vars expr):callArgs)) = fromApplyToList e
+    recurCtrl <- generateBindingWith "ctrl"
+    l' <- liftIntoCtrlCtxt recurCtrl l
+    let l'' = rewriteLastCond l'
+  --   [ohualang|
+  --     let (recurCtrl, b1 , ..., bn) = recurFun () () a1 ... an in
+  --      let ctxt = ctrl recurCtrl b c d in
+  --       let b0 = nth 0 ctxt in
+  --        ...
+  --         let x1 = nth 0 recursionVars in
+  --          ...
+  --           let y1 = ...
+  --            ...
+  --             let r = recurFun c result y1 ... yn in
+  --               r
+  -- |]
+    ctrls <- generateBindingWith "ctrls"
+    let recurVars = extractBindings vars
+    Let (Direct ctrls) (fromListToApply (Sf recurFun Nothing) callArgs) <$>
+        mkDestructured ([recurCtrl] ++ recurVars) ctrls l''
   where
-    rewriteLastCond ::
-           (MonadGenBnd m, MonadError Error m) => Expression -> m Expression
-    rewriteLastCond (Let v e o@(Var _)) = (\e' -> Let v e' o) <$> rewriteCond e
-    rewriteLastCond (Let v e ie) = Let v e <$> rewriteLastCond ie
-    rewriteCond ::
-           (MonadGenBnd m, MonadError Error m) => Expression -> m Expression
-    rewriteCond (Apply (Apply c@(Apply (Var (Sf "ohua.lang/if" Nothing)) cond) (Lambda a trueB)) (Lambda b falseB)) = do
-        trueB' <- rewriteBranch trueB
-        falseB' <- rewriteBranch falseB
-        return $ Apply (Apply c (Lambda a trueB')) (Lambda b falseB')
+    rewriteLastCond :: Expression -> Expression
+    rewriteLastCond (Let v e o@(Var _)) = (\e' -> Let v e' o) $ rewriteCond e
+    rewriteLastCond (Let v e ie) = Let v e $ rewriteLastCond ie
+    rewriteCond :: Expression -> Expression
+    rewriteCond (Apply (Apply (Apply (Var (Sf "ohua.lang/if" Nothing)) cond) (Lambda a trueB)) (Lambda b falseB)) =
+        let trueB' = rewriteBranch trueB
+            falseB' = rewriteBranch falseB
+            fixRef =
+                case trueB' of
+                    Left f -> f
+                    Right _ ->
+                        case falseB' of
+                            Left f -> f
+                            Right _ -> error "invariant broken"
+            recurVars =
+                case trueB' of
+                    Left _ ->
+                        case falseB' of
+                            Left _ -> error "invariant broken"
+                            Right bnds -> bnds
+                    Right bnds -> bnds
+         in fromListToApply (Sf "ohua.lang/recurFun" Nothing) $
+            [fixRef] ++ recurVars
     rewriteCond _ =
         error
             "invariant broken: recursive function does not have the proper structure."
-    rewriteBranch ::
-           (MonadGenBnd m, MonadError Error m) => Expression -> m Expression
-    rewriteBranch (Let v e@(Apply (Var (Sf "ohua.lang/id" Nothing)) _) o) =
-        return $ Let v (rewriteTerminationBranch e) o
-    rewriteBranch (Let v e o) =
-        (\e' -> Let v e' o) <$> (rewriteRecursionBranch e $ fromApplyToList e)
-    rewriteTerminationBranch e =
-        (Apply
-             (Apply
-                  (Var (Sf ALangRefs.mkTuple Nothing))
-                  (Apply (Var (Sf ALangRefs.false Nothing)) unitExpr))
-             e)
-    rewriteRecursionBranch e ((Var (Sf recur _)):vars) =
-        return
-            (Apply
-                 (Apply
-                      (Var (Sf ALangRefs.mkTuple Nothing))
-                      (Apply (Var (Sf ALangRefs.true Nothing)) unitExpr)) $
-             replaceFn (Sf ALangRefs.array Nothing) e)
-                  -- fromListToApply (Sf "ohua.lang/array") $ reverse vars)
-    rewriteRecursionBranch _ _ = error "invariant broken"
+    rewriteBranch :: Expression -> Either Expression [Expression]
+    -- normally this is "fix" instead of `id`
+    rewriteBranch (Let v (Apply (Var (Sf "ohua.lang/id" _)) result) _) =
+        Left result
+    rewriteBranch (Let v e _)
+        | isCall recur e = Right $ tail $ NE.fromList $ fromApplyToList e
+    rewriteBranch _ = error "invariant broken"
+
 rewriteLambdaExpr _ = error "invariant broken"
-
-replaceFn fn (Apply (Var (Sf _ _)) v) = Apply (Var fn) v
-replaceFn fn (Apply f v) = Apply (replaceFn fn f) v
-
--- | Phase 4: Free variable handling via lambda lifting
-freeVarHandling :: (Monad m, MonadGenBnd m) => Expression -> m Expression
-freeVarHandling e
-    | isCall recur e = liftLambda e
-freeVarHandling (Let v expr inExpr) =
-    Let v <$> freeVarHandling expr <*> freeVarHandling inExpr
-freeVarHandling (Apply a b) = Apply <$> freeVarHandling a <*> freeVarHandling b
-freeVarHandling (Lambda a e) = Lambda a <$> freeVarHandling e
-freeVarHandling v@(Var _) = return v
-
-liftLambda :: (Monad m, MonadGenBnd m) => Expression -> m Expression
-liftLambda e = do
-    let ((Var (Sf recur _)):(lamExpr:callArgs)) = fromApplyToList e
-    let (callArg:[]) = callArgs -- due to the previous rewrite
-    (Lambda formals liftedExpr, actuals) <- lambdaLifting lamExpr
-    case actuals of
-        [] -> return e
-        _ -> do
-            let (initialFormal:freeFormals) = extractBindings formals
-            b <- generateBindingWith "b"
-            freeArgs <- generateBindingWith "freeArgs"
-            let lam =
-                    Lambda
-                        (Direct b)
-                        (Let (Destructure [initialFormal, freeArgs])
-                             (Apply (Var (Sf "ohua.lang/id" Nothing)) $
-                              Var $ Local b)
-                             (Let (Destructure freeFormals)
-                                  (Apply (Var (Sf "ohua.lang/id" Nothing)) $
-                                   Var $ Local freeArgs)
-                                  liftedExpr))
-            return $
-                Apply (Apply (Apply recur_sf lam) callArg) $
-                fromListToApply (Sf ALangRefs.array Nothing) $
-                map (Var . Local) actuals
 
 --  ==== Implementation ends here
 markRecursiveBindings :: Expression -> Expression
