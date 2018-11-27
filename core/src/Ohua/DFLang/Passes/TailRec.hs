@@ -6,15 +6,16 @@ import Ohua.DFLang.Lang
 import Ohua.DFLang.Refs as Refs
 import Ohua.DFLang.Util
 
-import Data.Sequence ((><))
+import qualified Data.List.NonEmpty as NE
+import Data.Sequence as DS ((><), filter, fromList)
 
 recurLowering :: DFExpr -> DFExpr
 recurLowering (DFExpr letExprs returnVar)
   -- 1. Find the recurFun with two outputs
  =
     let recurFuns =
-            filter ((2 ==) . length . extractBindings . returnAssignment) $
-            toList $ findAllExprs Refs.recurFun letExprs
+            DS.filter ((2 ==) . length . extractBindings . returnAssignment) $
+            findAllExprs Refs.recurFun letExprs
   -- 2. traverse the subtree to find the corresponding recurFun with only a single output
         pairs =
             flip map recurFuns $ \recurFunStart ->
@@ -29,13 +30,23 @@ recurLowering (DFExpr letExprs returnVar)
                          (extractBindings $ returnAssignment recurFunStart) ++
                          (extractBindings $ returnAssignment recurFunEnd))
                         (functionRef recurFunStart)
-                        [(callArguments recurFunStart), fixRef, cond, recurArgs]
+                        [ DFVarList
+                              (extractBindings $ callArguments recurFunStart)
+                        , fixRef
+                        , cond
+                        , DFVarList (extractBindings recurArgs)
+                        ]
                         Nothing
-     in finalRecurFuns >< removeAllExprs recurFuns letExprs
+     in flip DFExpr returnVar $
+        finalRecurFuns >< removeAllExprs recurFuns letExprs
   where
-    findEnd LetExpr {functionRef = f}
-        | f == Refs.recurFun = letExpr
+    findEnd l@(LetExpr {functionRef = f})
+        | f == Refs.recurFun = l
     -- all paths lead to the final recurFun because this is a connected component where
     -- the recurFun at the very end has the only outgoing arc.
-    findEnd = findEnd . anySuccessor
-    anySuccessor = head . findUsages . head . extractBindings . returnAssignment
+    findEnd e = (findEnd . anySuccessor) e
+    anySuccessor =
+        head .
+        NE.fromList .
+        (flip findUsages letExprs) .
+        head . NE.fromList . extractBindings . returnAssignment

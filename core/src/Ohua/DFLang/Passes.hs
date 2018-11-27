@@ -93,9 +93,9 @@ handleDefinitionalExpr _ e _ =
 
 -- | Lower any not specially treated function type.
 lowerDefault :: MonadOhua env m => Pass m
-lowerDefault "ohua.lang/recur" fnId assign args =
-    mapM expectVar args <&> \args' ->
-        [LetExpr fnId assign Refs.recur args' Nothing]
+-- lowerDefault "ohua.lang/recur" fnId assign args =
+--     mapM expectVar args <&> \args' ->
+--         [LetExpr fnId assign Refs.recur args' Nothing]
 lowerDefault fn fnId assign args =
     mapM expectVar args <&> \args' ->
         [LetExpr fnId assign (EmbedSf fn) args' Nothing]

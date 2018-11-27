@@ -51,7 +51,7 @@ instance Hashable DFFnRef where
 data DFVar
     = DFEnvVar !HostExpr
     | DFVar !Binding
-    | Seq DFVar
+    | DFVarList ![Binding]
     deriving (Eq, Show, Lift)
 
 instance Hashable DFVar where
@@ -83,3 +83,8 @@ instance NFData DFFnRef where
 instance NFData DFVar where
     rnf (DFEnvVar e) = rnf e
     rnf (DFVar v) = rnf v
+
+instance ExtractBindings DFVar where
+    extractBindings (DFEnvVar _) = []
+    extractBindings (DFVar b) = [b]
+    extractBindings (DFVarList bs) = bs
