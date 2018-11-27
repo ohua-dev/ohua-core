@@ -77,10 +77,10 @@ instance NFData DFVar where
     rnf (DFEnvVar e) = rnf e
     rnf (DFVar v) = rnf v
 
-instance ExtractBindings DFVar where
-    extractBindings (DFEnvVar _) = []
-    extractBindings (DFVar b) = [b]
-    extractBindings (DFVarList bs) = bs
+extractBindings :: DFVar -> [Binding]
+extractBindings (DFEnvVar _) = []
+extractBindings (DFVar b) = [b]
+extractBindings (DFVarList bs) = bs
 
 dfEnvExpr :: HostExpr -> DFVar
 dfEnvExpr = DFEnvVar . EnvRefLit

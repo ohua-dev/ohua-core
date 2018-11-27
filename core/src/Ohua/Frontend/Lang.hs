@@ -1,24 +1,24 @@
 {-# LANGUAGE TemplateHaskell #-}
+
 module Ohua.Frontend.Lang
-  ( Pat(..)
-  , Expr(..)
-  , PatF(..)
-  , ExprF(..)
-  , toAlang
-  ) where
+    ( Pat(..)
+    , Expr(..)
+    , PatF(..)
+    , ExprF(..)
+    , toAlang
+    ) where
 
 import Ohua.Prelude
 
+import Control.Category ((>>>))
 import Data.Functor.Foldable (cata)
 import Data.Functor.Foldable.TH (makeBaseFunctor)
 import Data.Generics.Uniplate.Direct
-import Control.Category ((>>>))
 
 import Ohua.ALang.Lang hiding (Expr, ExprF)
 import qualified Ohua.ALang.Lang as AL
 import qualified Ohua.ALang.Refs as Refs
-import Ohua.ParseTools.Refs (smapBuiltin, ifBuiltin)
-
+import Ohua.ParseTools.Refs (ifBuiltin, mkTuple, smapBuiltin)
 
 data Pat
     = VarP Binding
@@ -29,59 +29,71 @@ data Pat
 data Expr
     = VarE Binding
     | LitE Lit
-    | LetE Pat Expr Expr
-    | AppE Expr [Expr]
-    | LamE [Pat] Expr -- ^ An expression creating a function
-    | IfE Expr Expr Expr
-    | MapE Expr Expr
-    | BindE Expr Expr -- ^ Bind a state value to a function
-    | StmtE Expr Expr -- ^ An expression with the return value ignored
-    | SeqE Expr Expr
+    | LetE Pat
+           Expr
+           Expr
+    | AppE Expr
+           [Expr]
+    | LamE [Pat]
+           Expr -- ^ An expression creating a function
+    | IfE Expr
+          Expr
+          Expr
+    | MapE Expr
+           Expr
+    | BindE Expr
+            Expr -- ^ Bind a state value to a function
+    | StmtE Expr
+            Expr -- ^ An expression with the return value ignored
+    | SeqE Expr
+           Expr
     | TupE [Expr] -- ^ create a tuple value that can be destructured
     deriving (Show, Eq, Generic)
-
-
 
 makeBaseFunctor ''Pat
 
 instance Uniplate Pat where
-    uniplate = \case
-        TupP ps -> plate TupP ||* ps
-        other -> plate other
+    uniplate =
+        \case
+            TupP ps -> plate TupP ||* ps
+            other -> plate other
 
 instance Hashable Pat
-instance NFData Pat
 
+instance NFData Pat
 
 makeBaseFunctor ''Expr
 
 instance Uniplate Expr where
-    uniplate = \case
-        LetE p e1 e2 -> plate (LetE p) |* e1 |* e2
-        AppE e1 e2 -> plate AppE |* e1 ||* e2
-        LamE p e -> plate (LamE p) |* e
-        IfE e1 e2 e3 -> plate IfE |* e1 |* e2 |* e3
-        MapE e1 e2 -> plate MapE |* e1 |* e2
-        BindE e1 e2 -> plate BindE |* e1 |* e2
-        StmtE e1 e2 -> plate StmtE |* e1 |* e2
-        TupE es -> plate TupE ||* es
-        SeqE e1 e2 -> plate SeqE |* e1 |* e2
-        other -> plate other
+    uniplate =
+        \case
+            LetE p e1 e2 -> plate (LetE p) |* e1 |* e2
+            AppE e1 e2 -> plate AppE |* e1 ||* e2
+            LamE p e -> plate (LamE p) |* e
+            IfE e1 e2 e3 -> plate IfE |* e1 |* e2 |* e3
+            MapE e1 e2 -> plate MapE |* e1 |* e2
+            BindE e1 e2 -> plate BindE |* e1 |* e2
+            StmtE e1 e2 -> plate StmtE |* e1 |* e2
+            TupE es -> plate TupE ||* es
+            SeqE e1 e2 -> plate SeqE |* e1 |* e2
+            other -> plate other
 
 instance Biplate Expr Pat where
-    biplate = \case
-        LetE p e1 e2 -> plate LetE |* p |+ e1 |+ e2
-        AppE e1 e2 -> plate AppE |+ e1 ||+ e2
-        LamE p e -> plate LamE ||* p |+ e
-        IfE e1 e2 e3 -> plate IfE |+ e1 |+ e2 |+ e3
-        MapE e1 e2 -> plate MapE |+ e1 |+ e2
-        BindE e1 e2 -> plate BindE |+ e1 |+ e2
-        StmtE e1 e2 -> plate StmtE |+ e1 |+ e2
-        TupE es -> plate TupE ||+ es
-        SeqE e1 e2 -> plate SeqE |+ e1 |+ e2
-        other -> plate other
+    biplate =
+        \case
+            LetE p e1 e2 -> plate LetE |* p |+ e1 |+ e2
+            AppE e1 e2 -> plate AppE |+ e1 ||+ e2
+            LamE p e -> plate LamE ||* p |+ e
+            IfE e1 e2 e3 -> plate IfE |+ e1 |+ e2 |+ e3
+            MapE e1 e2 -> plate MapE |+ e1 |+ e2
+            BindE e1 e2 -> plate BindE |+ e1 |+ e2
+            StmtE e1 e2 -> plate StmtE |+ e1 |+ e2
+            TupE es -> plate TupE ||+ es
+            SeqE e1 e2 -> plate SeqE |+ e1 |+ e2
+            other -> plate other
 
 instance Hashable Expr
+
 instance NFData Expr
 
 -- | Not sure this traversal is necessary, but it makes every smap argument into
@@ -116,9 +128,10 @@ removeDestructuring =
         _ -> pure Nothing
 
 giveEmptyLambdaUnitArgument :: Expr -> Expr
-giveEmptyLambdaUnitArgument = rewrite $ \case
-    LamE [] e -> Just $ LamE [UnitP] e
-    _ -> Nothing
+giveEmptyLambdaUnitArgument =
+    rewrite $ \case
+        LamE [] e -> Just $ LamE [UnitP] e
+        _ -> Nothing
 
 nthFun :: Expr
 nthFun = LitE $ FunRefLit $ FunRef "ohua.lang/nth" Nothing
@@ -154,7 +167,7 @@ trans =
         BindEF e1 e2 -> error "State binding not yet implemented in ALang"
         StmtEF e1 cont -> Let "_" e1 cont
         SeqEF source target -> error "Seq not yet implemented"
-        TupEF parts -> foldl Apply (Sf Refs.mkTuple Nothing) parts
+        TupEF parts -> foldl Apply (Sf mkTuple Nothing) parts
   where
     patToBnd =
         \case
