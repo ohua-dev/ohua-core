@@ -23,8 +23,9 @@ import Data.Sequence (Seq)
 import Ohua.ALang.Lang
 import Ohua.ALang.PPrint
 import Ohua.DFLang.HOF as HOF
-import Ohua.DFLang.HOF.Generate
 import Ohua.DFLang.HOF.SmapG
+
+--import Ohua.DFLang.HOF.Generate
 import Ohua.DFLang.Lang (DFExpr(..), DFFnRef(..), DFVar(..), LetExpr(..))
 import qualified Ohua.DFLang.Refs as Refs
 import Ohua.DFLang.Util
@@ -33,7 +34,7 @@ type Pass m
      = QualifiedBinding -> FnId -> Assignment -> [Expression] -> m (Seq LetExpr)
 
 -- | Check that a sequence of let expressions does not redefine bindings.
-checkSSA :: (Container c, Element c ~ LetExpr, MonadOhua envExpr m) => c -> m ()
+checkSSA :: (Container c, Element c ~ LetExpr, MonadOhua m) => c -> m ()
 checkSSA = flip evalStateT mempty . mapM_ go
   where
     go le = do
@@ -49,14 +50,14 @@ checkSSA = flip evalStateT mempty . mapM_ go
     addAll = flip $ foldr' HS.insert
 
 -- | Check that a DFExpression is in SSA form.
-checkSSAExpr :: MonadOhua envExpr m => DFExpr -> m ()
+checkSSAExpr :: MonadOhua m => DFExpr -> m ()
 checkSSAExpr (DFExpr l _) = checkSSA l
 
 -- | Transform an ALang expression into a DFExpression.
 -- This assumes a certain structure in the expression.
 -- This can be achieved with the 'normalize' and 'performSSA' functions and tested with
 -- 'checkProgramValidity'.
-lowerALang :: MonadOhua envExpr m => Expression -> m DFExpr
+lowerALang :: MonadOhua m => Expression -> m DFExpr
 lowerALang expr = do
     logDebugN $ "Lowering alang expr: " <> quickRender expr
     (var, exprs) <- runWriterT $ lowerToDF expr
@@ -64,9 +65,8 @@ lowerALang expr = do
 
 --    (var, exprs) <- runWriterT (go expr)
 lowerToDF ::
-       (MonadOhua env m, MonadWriter (Seq LetExpr) m) => Expression -> m Binding
-lowerToDF (Var (Local bnd)) = pure bnd
-lowerToDF (Var v) = failWith $ "Non local return binding: " <> show v
+       (MonadOhua m, MonadWriter (Seq LetExpr) m) => Expression -> m Binding
+lowerToDF (Var bnd) = pure bnd
 lowerToDF (Let assign expr rest) = do
     logDebugN "Lowering Let -->"
     handleDefinitionalExpr assign expr continuation
@@ -75,7 +75,7 @@ lowerToDF (Let assign expr rest) = do
 lowerToDF g = failWith $ "Expected `let` or binding: " <> show g
 
 handleDefinitionalExpr ::
-       (MonadOhua env m, MonadWriter (Seq LetExpr) m)
+       (MonadOhua m, MonadWriter (Seq LetExpr) m)
     => Assignment
     -> Expression
     -> m Binding
@@ -92,7 +92,7 @@ handleDefinitionalExpr _ e _ =
     "Definitional expressions in a let can only be 'apply' but got: " <> show e
 
 -- | Lower any not specially treated function type.
-lowerDefault :: MonadOhua env m => Pass m
+lowerDefault :: MonadOhua m => Pass m
 -- lowerDefault "ohua.lang/recur" fnId assign args =
 --     mapM expectVar args <&> \args' ->
 --         [LetExpr fnId assign Refs.recur args' Nothing]
@@ -104,29 +104,35 @@ lowerDefault fn fnId assign args =
 -- function and the nested arguments as a list.  Also generates a new
 -- function id for the inner function should it not have one yet.
 handleApplyExpr ::
-       (MonadOhua env m)
-    => Expression
-    -> m (QualifiedBinding, FnId, [Expression])
-handleApplyExpr l@(Apply _ _) = go l []
+       (MonadOhua m) => Expression -> m (QualifiedBinding, FnId, [Expression])
+handleApplyExpr l@(Apply _ _) = go [] l
   where
-    go ve@(Var v) args =
-        case v of
-            Sf fn fnId -> (fn, , args) <$> maybe generateId return fnId
-            Local _ ->
+    go args =
+        \case
+            ve@Var {} ->
                 fromEnv (options . callLocalFunction) >>= \case
                     Nothing ->
                         failWith
                             "Calling local functions is not supported in this adapter"
                     Just fn -> (fn, , ve : args) <$> generateId
-            Env _ ->
-                fromEnv (options . callEnvExpr) >>= \case
-                    Nothing ->
-                        failWith
-                            "Calling environment functions is not supported in this adapter"
-                    Just fn -> (fn, , ve : args) <$> generateId
-    go (Apply fn arg) args = go fn (arg : args)
-    go x _ = failWith $ "Expected Apply or Var but got: " <> show x
-handleApplyExpr (Var (Sf fn fnId)) = (fn, , []) <$> maybe generateId return fnId
+            Sf fn fnId -> (fn, , args) <$> maybe generateId return fnId
+            ve@(Lit v) ->
+                case v of
+                    EnvRefLit _ ->
+                        fromEnv (options . callEnvExpr) >>= \case
+                            Nothing ->
+                                failWith
+                                    "Calling environment functions is not supported in this adapter"
+                            Just fn -> (fn, , ve : args) <$> generateId
+                    other ->
+                        throwError $
+                        "This literal cannot be used as a function :" <>
+                        show (pretty other)
+            Apply fn arg -> go (arg : args) fn
+            x ->
+                failWith $
+                "Expected Apply or Var but got: " <> show (x :: Expression)
+handleApplyExpr (Sf fn fnId) = (fn, , []) <$> maybe generateId return fnId
                                                                                  -- what is this?
 handleApplyExpr g = failWith $ "Expected apply but got: " <> show g
 
@@ -163,14 +169,18 @@ tieContext0 initExpr lets
 -- | Inspect an expression expecting something which can be captured
 -- in a DFVar otherwise throws appropriate errors.
 expectVar :: MonadError Error m => Expression -> m DFVar
-expectVar (Var (Local bnd)) = pure $ DFVar bnd
-expectVar (Var (Env i)) = pure $ DFEnvVar i
-expectVar (Var v) = failWith $ "Var must be local or env, was " <> show v
-expectVar a = failWith $ "Argument must be var, was " <> show a
+expectVar (Var bnd) = pure $ DFVar bnd
+expectVar r@Sf {} =
+    throwError $
+    "Stateful function references are not yet supported as arguments: " <>
+    show (pretty r)
+expectVar (Lit l) = pure $ DFEnvVar l
+expectVar a =
+    failWith $ "Argument must be local binding or literal, was " <> show a
 
 lowerHOF ::
-       forall f m envExpr.
-       (MonadOhua envExpr m, HigherOrderFunction f, MonadWriter (Seq LetExpr) m)
+       forall f m.
+       (MonadOhua m, HigherOrderFunction f, MonadWriter (Seq LetExpr) m)
     => TaggedFnName f
     -> Assignment
     -> [Expression]
@@ -198,8 +208,8 @@ lowerHOF _ assign args = do
                     (renameWith (HM.fromList renaming) body)
         createContextExit assign >>= tell
   where
-    handleArg (Var (Local v)) = return $ Left $ DFVar v
-    handleArg (Var (Env e)) = return $ Left $ DFEnvVar e
+    handleArg (Var v) = return $ Left $ DFVar v
+    handleArg (Lit e) = return $ Left $ DFEnvVar e
     handleArg (Lambda assign' body) = do
         DFExpr lets bnd <- lowerALang body
         return $ Right (Lam assign' bnd, lets)
@@ -208,7 +218,10 @@ lowerHOF _ assign args = do
         "unexpected type of argument, expected var or lambda, got " <> show a
 
 hofs :: [WHOF]
-hofs = [WHOF (Proxy :: Proxy SmapGFn), WHOF (Proxy :: Proxy GenFn)]
+hofs =
+    [ WHOF (Proxy :: Proxy SmapGFn)
+        --, WHOF (Proxy :: Proxy GenFn)
+    ]
 
 hofNames :: HM.HashMap QualifiedBinding WHOF
 hofNames = HM.fromList $ map (extractName &&& identity) hofs

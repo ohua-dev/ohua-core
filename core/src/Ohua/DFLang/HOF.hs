@@ -72,19 +72,19 @@ type Renaming = [(Binding, Binding)]
 class HigherOrderFunction f where
     hofName :: TaggedFnName f
     -- | Initialize the state for a single lowering from the arguments given to the HOF call
-    parseCallAndInitState :: MonadOhua envExpr m => [Argument] -> m f
+    parseCallAndInitState :: MonadOhua m => [Argument] -> m f
     -- | Generate the entry node(s) for this HOF context
     createContextEntry ::
-           (MonadOhua envExpr m, MonadState f m) => m (Seq LetExpr)
+           (MonadOhua m, MonadState f m) => m (Seq LetExpr)
     -- | Generate the exit node(s) for this HOF context
     createContextExit ::
-           (MonadOhua envExpr m, MonadState f m)
+           (MonadOhua m, MonadState f m)
         => Assignment
         -> m (Seq LetExpr)
     -- | Create scope nodes for __all__ free variables of __one of the lambdas__ that were input to 'parseCallAndInitState'.
     -- This methiod is never called with a lambda which was not in the list given to 'parseCallAndInitState'.
     scopeFreeVariables ::
-           (MonadOhua envExpr m, MonadState f m)
+           (MonadOhua m, MonadState f m)
         => Lambda
         -> [Binding]
         -> m (Seq LetExpr, Renaming)
@@ -93,7 +93,7 @@ class HigherOrderFunction f where
     -- As an invariant, since 'scopeFreeVariables' makes all free variables local ones
     -- this should only apply to functions with no inputs at all or only env arg inputs.
     contextifyUnboundFunctions ::
-           (MonadOhua envExpr m, MonadState f m)
+           (MonadOhua m, MonadState f m)
         => Lambda
         -> m (Maybe (Seq LetExpr, Binding))
 

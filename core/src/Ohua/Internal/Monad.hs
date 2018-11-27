@@ -28,6 +28,7 @@ import qualified Data.HashSet as HS
 import qualified Data.Text as T
 import qualified Data.Vector as V
 import Lens.Micro.Mtl
+import Data.Generics.Uniplate.Direct
 
 import Ohua.Types as Ty
 import Ohua.ALang.Lang
@@ -236,8 +237,9 @@ class HasEnvExpr m =>
 instance MonadRecordEnvExpr (OhuaM env) where
     addEnvExpression expr =
         OhuaM $ do
+            he <- makeThrow . V.length <$> use envExpressions
             envExpressions %= (`V.snoc` expr)
-            makeThrow . V.length <$> use envExpressions
+            pure he
 
 instance (MonadRecordEnvExpr m, Monad m) =>
          MonadRecordEnvExpr (ReaderT e m)
@@ -288,7 +290,7 @@ instance (MonadReadEnvironment m, Monad m, Monoid w) =>
 instance (MonadReadEnvironment m, Monad m, Monoid w) =>
          MonadReadEnvironment (Control.Monad.RWS.Strict.RWST e w s m)
 
-type MonadOhua env m
+type MonadOhua m
      = ( MonadGenId m
        , MonadGenBnd m
        , MonadReadEnvExpr m
@@ -296,7 +298,6 @@ type MonadOhua env m
        , MonadError Error m
        , MonadIO m
        , MonadReadEnvironment m
-       , EnvExpr m ~ env
        , MonadLogger m)
 
 -- | Run a compiler
@@ -308,7 +309,7 @@ runFromExpr ::
     -> Expression
     -> LoggingT IO (Either Error result)
 runFromExpr opts f tree =
-    runFromBindings opts (f tree) $ HS.fromList $ extractBindings tree
+    runFromBindings opts (f tree) $ HS.fromList $ [b | Var b <- universe tree]
 
 runFromBindings ::
        Options

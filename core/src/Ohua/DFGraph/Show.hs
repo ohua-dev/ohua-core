@@ -8,7 +8,8 @@ module Ohua.DFGraph.Show where
 import Ohua.Prelude
 
 import qualified Data.Text as T
-import Text.PrettyPrint.Boxes
+import Text.PrettyPrint.Boxes hiding ((<>))
+import Ohua.ALang.Lang (Lit(..))
 
 import Ohua.DFGraph
 
@@ -33,7 +34,11 @@ asTable (OutGraph ops arcs' _) =
         vcat left $
         (text "source" :) $
         (`map` map source arcs') $ \case
-            EnvSource i -> text $ show (unwrap i)
+            EnvSource i -> case i of
+                UnitLit -> "()"
+                NumericLit n -> text $ show n
+                EnvRefLit n -> text $ "$" <> show (unwrap n)
+                FunRefLit fr -> error "Not supported"
             LocalSource t -> targetToBox t
     targetList =
         vcat left $ (text "target" :) $ (targetToBox . target) `map` arcs'

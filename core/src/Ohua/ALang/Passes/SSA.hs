@@ -17,8 +17,10 @@ import Ohua.Prelude
 import Data.Functor.Foldable
 import qualified Data.HashMap.Strict as HM
 import qualified Data.HashSet as HS
+import Control.Category ((>>>))
 
 import Ohua.ALang.Lang
+import Ohua.ALang.Util
 
 type LocalScope = HM.HashMap Binding Binding
 
@@ -45,66 +47,32 @@ ssaRename oldBnd cont = do
     newBnd <- generateBindingWith oldBnd
     local (HM.insert oldBnd newBnd) $ cont newBnd
 
-ssaRenameMany ::
-       (MonadGenBnd m, MonadReader LocalScope m)
-    => [Binding]
-    -> ([Binding] -> m a)
-    -> m a
-ssaRenameMany oldBnds cont = do
-    newBnds <- traverse generateBindingWith oldBnds
-    local (HM.union $ HM.fromList $ zip oldBnds newBnds) $ cont newBnds
-
-performSSA :: MonadOhua envExpr m => Expression -> m Expression
+performSSA :: MonadOhua m => Expression -> m Expression
 performSSA = flip runReaderT mempty . ssa
 
-flattenTuple :: (a, ([a], b)) -> ([a], b)
-flattenTuple (a, (as, r)) = (a : as, r)
-
-ssa :: (MonadOhua envExpr m, MonadReader LocalScope m)
+ssa :: (MonadOhua m, MonadReader LocalScope m)
     => Expression
     -> m Expression
 ssa =
     cata $ \case
-        VarF (Local bnd) -> Var . Local <$> ssaResolve bnd
-        LambdaF args body ->
-            handleAssignment args $ \assign -> Lambda assign <$> body
-        LetF assignment val body ->
-            handleAssignment assignment $ \assign ->
-                Let assign <$> val <*> body
+        VarF bnd -> Var <$> ssaResolve bnd
+        LambdaF v body -> ssaRename v $ \v' -> Lambda v' <$> body
+        LetF v val body -> ssaRename v $ \v' -> Let v' <$> val <*> body
         e -> embed <$> sequence e
-
--- As you can see the destructuring makes writing some stuff quite
--- difficult.  I wonder if it might not be easier to represent
--- destructuring with a builtin function instead and collapse it down
--- at the very end ...
-handleAssignment ::
-       (MonadOhua envExpr m, MonadReader LocalScope m)
-    => Assignment
-    -> (Assignment -> m t)
-    -> m t
-handleAssignment (Direct d) = ssaRename d . (. Direct)
-handleAssignment (Recursive d) = ssaRename d . (. Recursive)
-handleAssignment (Destructure ds) = ssaRenameMany ds . (. Destructure)
 
 -- Check if an expression is in ssa form. Returns @Nothing@ if it is
 -- SSA Returns @Just aBinding@ where @aBinding@ is a binding which was
 -- defined (at least) twice
-isSSA :: Expression -> Maybe Binding
-isSSA =
-    either Just (const Nothing) . flip evalState mempty . runExceptT . cata go
+isSSA :: Expression -> [Binding]
+isSSA e = [b | (b, count) <- HM.toList counts, count > 1]
   where
-    failOrInsert bnd = do
-        isDefined <- gets (HS.member bnd)
-        when isDefined $ throwErrorDebugS bnd
-        modify (HS.insert bnd)
-    go e = do
-        case e of
-            LetF assign _ _ -> mapM_ failOrInsert $ extractBindings assign
-            LambdaF assign _ -> mapM_ failOrInsert $ extractBindings assign
-            _ -> pure ()
-        sequence_ e
+    counts = HM.fromListWith (+) [(b, 1) | b <- definedBindings e]
 
-checkSSA :: MonadOhua envExpr m => Expression -> m ()
-checkSSA = maybe (return ()) (throwErrorDebugS . mkMsg) . isSSA
+
+
+checkSSA :: MonadOhua m => Expression -> m ()
+checkSSA = isSSA >>> \case
+    [] -> return ()
+    other -> throwErrorDebugS $ mkMsg other
   where
-    mkMsg bnd = "Redefinition of binding " <> show bnd
+    mkMsg bnd = "Redefinition of bindings " <> show bnd

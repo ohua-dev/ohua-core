@@ -14,6 +14,7 @@ import Ohua.Prelude
 import qualified Data.HashMap.Strict as HM
 
 import           Ohua.DFLang.Lang
+import Ohua.ALang.Lang (Lit (..))
 
 data Operator = Operator
     { operatorId   :: !FnId
@@ -43,7 +44,7 @@ data AbstractOutGraph envExpr = OutGraph
     , returnArc :: Target
     } deriving (Eq, Generic, Show)
 
-type OutGraph = AbstractOutGraph HostExpr
+type OutGraph = AbstractOutGraph Lit
 
 
 instance Functor Source where
@@ -76,18 +77,14 @@ toGraph (DFExpr lets r) = OutGraph ops grArcs (getSource r)
         HM.fromList $
         toList lets >>= \l ->
             [ (var, Target (callSiteId l) idx)
-            | (var, idx) <-
-                  case returnAssignment l of
-                      Direct v -> [(v, -1)]
-                      Destructure vars -> zip vars [0 ..]
-                      g -> error $ "Found unsupported assignment: " <> show g
+            | (var, idx) <- zip (output l) [0 ..]
             ]
     grArcs = concatMap toArc (toList lets)
     getSource v =
         fromMaybe
             (error $
-             "Undefined Binding: DFVar " <>
-             show v <> " defined vars: " <> show sources) $
+             "Undefined Binding: DFVar " <> show v <> " defined vars: " <>
+             show sources) $
         HM.lookup v sources
     toArc l =
         [ Arc t $
@@ -103,5 +100,5 @@ toGraph (DFExpr lets r) = OutGraph ops grArcs (getSource r)
         ]
 
 
-spliceEnv :: (Int -> a) -> OutGraph -> AbstractOutGraph a
-spliceEnv lookupExpr = fmap f where f i = lookupExpr $ unwrap i
+-- spliceEnv :: (Int -> a) -> OutGraph -> AbstractOutGraph a
+-- spliceEnv lookupExpr = fmap f where f i = lookupExpr $ unwrap i

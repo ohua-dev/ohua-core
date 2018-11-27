@@ -75,15 +75,20 @@ pipeline CustomPasses {..} e = do
 
 
 -- | Run the pipeline in an arbitrary monad that supports error reporting.
-compile :: (MonadError Error m, MonadLoggerIO m) => Options -> CustomPasses env -> Expression -> m OutGraph
+compile ::
+       (MonadError Error m, MonadLoggerIO m)
+    => Options
+    -> CustomPasses env
+    -> Expression
+    -> m OutGraph
 compile opts passes exprs = do
     logFn <- askLoggerIO
     let passes' = flip loadTailRecPasses passes $ view transformRecursiveFunctions opts
     either throwError pure =<< liftIO (runLoggingT (runFromExpr opts (pipeline passes') exprs) logFn)
 
 
--- | Verify that only higher order fucntions have lambdas as arguments
-checkHigherOrderFunctionSupport :: MonadOhua envExpr m => Expression -> m ()
+-- | Verify that only higher order functions have lambdas as arguments
+checkHigherOrderFunctionSupport :: MonadOhua m => Expression -> m ()
 checkHigherOrderFunctionSupport (Let _ e rest) = do
     void $ checkNestedExpr e
     checkHigherOrderFunctionSupport rest
@@ -95,7 +100,7 @@ checkHigherOrderFunctionSupport (Let _ e rest) = do
             "Lambdas may only be input to higher order functions, not " <>
             show f
         pure True
-    checkNestedExpr (Var (Sf n _)) = pure $ HM.member n hofNames
+    checkNestedExpr (Sf n _) = pure $ HM.member n hofNames
     checkNestedExpr (Var _) = pure False
     checkNestedExpr a = failWith $ "Expected var or apply expr, got " <> show a
     isLambda (Lambda _ _) = True

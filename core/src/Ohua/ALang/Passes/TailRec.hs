@@ -266,20 +266,20 @@ recur :: QualifiedBinding
 recur = "ohua.lang/recur"
 
 recur_sf :: Expression
-recur_sf = Var $ Sf recur Nothing
+recur_sf = Sf recur Nothing
 
 -- The Y combinator from Haskell Curry
 y :: QualifiedBinding
 y = "ohua.lang/Y"
 
 y_sf :: Expression
-y_sf = Var $ Sf y Nothing
+y_sf = Sf y Nothing
 
 recurFun :: QualifiedBinding
 recurFun = "ohua.lang/recurFun"
 
 recurFunSf :: Expression
-recurFunSf = Var $ Sf recurFun Nothing
+recurFunSf = Sf recurFun Nothing
 
 -- Phase 1:
 findTailRecs :: Bool -> Expression -> Expression
@@ -303,7 +303,7 @@ findRecCall (Let (Direct a) expr inExpr) algosInScope
 findRecCall (Let a expr inExpr) algosInScope = do
     (iFound, iExpr) <- findRecCall inExpr algosInScope
     return (iFound, Let a expr iExpr)
-findRecCall (Apply (Var (Local binding)) a) algosInScope
+findRecCall (Apply (Var binding) a) algosInScope
     | HS.member binding algosInScope
      -- no recursion here because if the expression is correct then these can be only nested APPLY statements
      = do
@@ -317,21 +317,19 @@ findRecCall (Apply a b) algosInScope = do
     (aFound, aExpr) <- findRecCall a algosInScope
     (bFound, bExpr) <- findRecCall b algosInScope
     return (HS.union aFound bFound, Apply aExpr bExpr)
-findRecCall (Var b) _ = return (HS.empty, Var b)
 findRecCall (Lambda a e) algosInScope = do
     (eFound, eExpr) <- findRecCall e algosInScope
     return $
         if HS.size eFound == 0
             then (eFound, Lambda a eExpr)
             else (eFound, Lambda a eExpr)
+findRecCall other _ = return (HS.empty, other)
 
 -- Phase 2:
 hoferize :: (Monad m, MonadGenBnd m) => Expression -> m Expression
 hoferize (Let (Recursive f) expr inExpr) = do
     f' <- generateBindingWith f
-    return $
-        Let (Direct f') expr $
-        Let (Direct f) (Apply y_sf (Var (Local f'))) inExpr
+    return $ Let (Direct f') expr $ Let (Direct f) (Apply y_sf (Var f')) inExpr
 hoferize (Let v expr inExpr) = Let v <$> hoferize expr <*> hoferize inExpr
 hoferize (Apply a b) = Apply <$> hoferize a <*> hoferize b
 hoferize (Lambda a e) = Lambda a <$> hoferize e
@@ -357,7 +355,7 @@ verifyTailRecursion e
     -- failOnRecur (Let _ e ie) | isCall recur e || isCall recur ie = error "Recursion is not tail recursive!"
     failOnRecur (Let _ e ie) = failOnRecur e >> failOnRecur ie
     failOnRecur (Lambda v e) = failOnRecur e -- TODO maybe throw a better error message when this happens
-    failOnRecur (Apply (Var (Sf recur _)) _) =
+    failOnRecur (Apply (Sf recur _) _) =
         error "Recursion is not tail recursive!"
     failOnRecur (Apply a b) = return ()
     failOnRecur e =
@@ -372,7 +370,7 @@ verifyTailRecursion e
             let lastFnOnBranch =
                     traverseToLastCall
                         (return .
-                         (\(Var (Sf f _)) -> f :: QualifiedBinding) .
+                         (\(Sf f _) -> f :: QualifiedBinding) .
                          head . NE.fromList . fromApplyToList)
             tFn <- lastFnOnBranch et
             fFn <- lastFnOnBranch ef
@@ -410,7 +408,7 @@ rewrite (Apply a b) = Apply <$> rewrite a <*> rewrite b
 rewrite (Lambda a e) = Lambda a <$> rewrite e
 rewrite v@(Var _) = return v
 
-isCall f (Apply (Var (Sf f' _)) _)
+isCall f (Apply (Sf f' _) _)
     | f == f' = True
 isCall f (Apply e@(Apply _ _) _) = isCall f e
 isCall _ _ = False
@@ -443,7 +441,7 @@ rewriteCallExpr e = do
     rewriteLastCond (Let v e o@(Var _)) = (\e' -> Let v e' o) $ rewriteCond e
     rewriteLastCond (Let v e ie) = Let v e $ rewriteLastCond ie
     rewriteCond :: Expression -> Expression
-    rewriteCond (Apply (Apply (Apply (Var (Sf "ohua.lang/if" Nothing)) cond) (Lambda a trueB)) (Lambda b falseB)) =
+    rewriteCond (Apply (Apply (Apply (Sf "ohua.lang/if" Nothing) cond) (Lambda a trueB)) (Lambda b falseB)) =
         let trueB' = rewriteBranch trueB
             falseB' = rewriteBranch falseB
             fixRef =
@@ -467,13 +465,10 @@ rewriteCallExpr e = do
             "invariant broken: recursive function does not have the proper structure."
     rewriteBranch :: Expression -> Either Expression [Expression]
     -- normally this is "fix" instead of `id`
-    rewriteBranch (Let v (Apply (Var (Sf "ohua.lang/id" _)) result) _) =
-        Left result
+    rewriteBranch (Let v (Apply (Sf "ohua.lang/id" _) result) _) = Left result
     rewriteBranch (Let v e _)
         | isCall recur e = Right $ tail $ NE.fromList $ fromApplyToList e
     rewriteBranch _ = error "invariant broken"
-
-rewriteLambdaExpr _ = error "invariant broken"
 
 --  ==== Implementation ends here
 markRecursiveBindings :: Expression -> Expression
@@ -494,7 +489,7 @@ markRecursiveBindings = fst . runWriter . cata go
                          Direct bnd -> Let (Recursive bnd) e' <$> b
                          _ -> error "Cannot use destrutured binding recursively"
                 else Let assign e' <$> b
-    go (VarF val@(Local bnd)) = tell (HS.singleton bnd) >> pure (Var val)
+    go (VarF val) = tell (HS.singleton val) >> pure (Var val)
     go e@(LambdaF assign _) = shadowAssign assign $ embed <$> sequence e
     go e = embed <$> sequence e
     shadowAssign (Direct b) = censor (HS.delete b)

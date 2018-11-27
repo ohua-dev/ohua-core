@@ -15,6 +15,7 @@ import Ohua.ALang.Lang
 import qualified Ohua.ALang.Refs as Refs (nth)
 
 import Data.Functor.Foldable
+import Data.Generics.Uniplate.Direct (transform, universe)
 import qualified Data.HashSet as HS
 import qualified Data.Text as T
 
@@ -23,9 +24,14 @@ substitute :: Binding -> Expression -> Expression -> Expression
 -- `var` binding.  This should never happen but might if this
 -- invariant is violated for some reason and the violation is not
 -- caught.
+substitute !var val =
+    transform $ \case
+        Var v
+            | v == var -> val
+        other -> other
 substitute !var val = cata f
   where
-    f (VarF (Local v))
+    f (VarF v)
         | var == v = val
     f e = embed e
 
@@ -49,21 +55,29 @@ substitute !var val = cata f
 -- This is due to the fact that we often want to package the freeVars via a call to
 -- ohua.lang/array to make the backend implementation easier and I'm not sure whether
 -- this is always true.
--- This is also the readon why I keep this in Util instead of making it an own pass.
+-- This is also the readon why I keep this in Util into of making it an own pass.
+destructure :: Expr -> [Binding] -> Expr -> Expr
+destructure source bnds =
+    foldl (.) id $
+    map (\(idx, bnd0) -> Let bnd0 $ mkNthExpr idx source) (zip [0 ..] bnds)
+  where
+    mkNthExpr idx source =
+        Sf Refs.nth Nothing `Apply` (Lit $ NumericLit idx) `Apply` source
+
 lambdaLifting ::
        (Monad m, MonadGenBnd m) => Expression -> m (Expression, [Binding])
 lambdaLifting o@(Lambda v e) =
-    let inputVars = extractBindings v
-        freeVars = HS.difference (findFreeVariables e) $ HS.fromList inputVars
+    let freeVars = HS.delete v (findFreeVariables e)
         actuals = sort $ HS.toList freeVars -- makes the list of args deterministic
      in case actuals of
             [] -> return (o, [])
             _ -> do
                 formals <- mapM generateBindingWith actuals
                 let rewrittenExp = foldl renameVar e $ zip actuals formals
+                input <- generateBinding
                 return
-                    ( flip Lambda rewrittenExp $
-                      Destructure $ inputVars ++ formals
+                    ( Lambda input $
+                      destructure (Var input) (v : formals) rewrittenExp
                     , actuals)
 lambdaLifting e =
     error $
@@ -72,30 +86,33 @@ lambdaLifting e =
     (show e)
 
 renameVar :: Expression -> (Binding, Binding) -> Expression
-renameVar (Var (Local v)) (old, new)
-    | old == v = Var $ Local new
-renameVar v@(Var _) _ = v
-renameVar (Let v e ie) m = Let v (renameVar e m) $ renameVar ie m
-renameVar (Lambda v e) m = Lambda v $ renameVar e m
-renameVar (Apply a b) m = Apply (renameVar a m) $ renameVar b m
+renameVar e (old, new) =
+    flip transform e $ \case
+        Var v
+            | v == old -> Var new
+        other -> other
 
+-- | All bindings defined in an expression *with duplicates*
+definedBindings :: Expression -> [Binding]
+definedBindings e =
+    [ v
+    | e' <- universe e
+    , v <-
+          case e of
+              Let v' _ _ -> [v']
+              Lambda v' _ -> [v']
+              _ -> []
+    ]
+
+-- | A very simple function that calculates all bindings that are used in an
+-- expression but not defined in it. This is implemented as a simple set
+-- intersection, therefore it relies on the fact that the expression is in SSA
+-- form.
 findFreeVariables :: Expression -> HS.HashSet Binding
-findFreeVariables (Let (Direct v) e ie) =
-    let ves = findFreeVariables e
-        vies = findFreeVariables ie
-     in HS.union ves $ HS.delete v vies
-findFreeVariables (Let (Destructure vs) e ie) =
-    let ves = findFreeVariables e
-        vies = findFreeVariables ie
-     in HS.union ves $ HS.difference vies $ HS.fromList vs
-findFreeVariables (Let (Recursive _) _ _) =
-    error "Invariant broken! (Recursive binding detected.)"
-findFreeVariables (Apply a b) =
-    HS.union (findFreeVariables a) $ findFreeVariables b
-findFreeVariables (Var (Local v)) = HS.singleton v
-findFreeVariables (Var _) = HS.empty
-findFreeVariables (Lambda v e) =
-    HS.difference (findFreeVariables e) $ HS.fromList $ extractBindings v
+findFreeVariables e =
+    HS.difference
+        (HS.fromList [v | Var v <- universe e])
+        (HS.fromList $ definedBindings e)
 
 fromListToApply :: refType -> [Expr refType] -> Expr refType
 fromListToApply f (v:[]) = Apply (Var f) v

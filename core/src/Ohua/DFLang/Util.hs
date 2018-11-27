@@ -14,11 +14,7 @@ findUsages binding = toList . DS.filter (elem (DFVar binding) . callArguments)
 
 -- | Find the definition of a binding
 findDefinition :: Binding -> Seq LetExpr -> Maybe LetExpr
-findDefinition binding = find (g . returnAssignment)
-  where
-    g (Direct b) = b == binding
-    g (Destructure bindings) = binding `elem` bindings
-    g (Recursive r) = r == binding
+findDefinition binding = find ((binding `elem`) . output)
 
 -- | Find the first call site of an expression by function reference.
 findExpr :: DFFnRef -> Seq LetExpr -> Maybe LetExpr
@@ -41,8 +37,7 @@ removeAllExprs toRemove allExprs =
 -- TODO: remove all the code below once the function `Ohua.DFLang.Passes.lowerHOF` is gone
 -- | Find all locally bound variables.
 findBoundVars :: (Container c, Element c ~ LetExpr) => c -> HS.HashSet Binding
-findBoundVars =
-    HS.fromList . concatMap (extractBindings . returnAssignment) . toList
+findBoundVars = HS.fromList . concatMap output . toList
 
 -- | Find the free variables inside a set of expressions (i.e. a lambda expression).
 findFreeVars :: (Container c, Element c ~ LetExpr) => c -> HS.HashSet Binding

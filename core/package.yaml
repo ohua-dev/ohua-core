@@ -79,7 +79,6 @@ library:
   - Ohua.ParseTools.Refs
   - Ohua.ALang.Lang
   - Ohua.ALang.Refs
-  - Ohua.ALang.NS
   - Ohua.ALang.PPrint
   - Ohua.ALang.Passes
   - Ohua.ALang.Passes.SSA
@@ -98,7 +97,8 @@ library:
   - Ohua.DFLang.Optimizations
   - Ohua.DFGraph
   - Ohua.DFGraph.Show
-  - Ohua.Constants.HostExpr
+  - Ohua.Frontend.Lang
+  - Ohua.Frontend.NS
   - Ohua.Serialize.JSON
   - Ohua.Stage
   - Ohua.Util

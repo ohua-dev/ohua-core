@@ -19,6 +19,7 @@
 #include "compat.h"
 module Ohua.DFLang.Lang where
 
+import Ohua.ALang.Lang (Lit(..))
 import Ohua.Prelude
 
 import Language.Haskell.TH.Syntax (Lift)
@@ -31,7 +32,7 @@ data DFExpr = DFExpr
 
 data LetExpr = LetExpr
     { callSiteId :: !FnId
-    , returnAssignment :: !Assignment
+    , output :: ![Binding]
     , functionRef :: !DFFnRef
     , callArguments :: ![DFVar]
     , contextArg :: !(Maybe Binding)
@@ -49,7 +50,7 @@ instance Hashable DFFnRef where
             EmbedSf f -> (1, f)
 
 data DFVar
-    = DFEnvVar !HostExpr
+    = DFEnvVar !Lit
     | DFVar !Binding
     | DFVarList ![Binding]
     deriving (Eq, Show, Lift)
@@ -60,14 +61,6 @@ instance Hashable DFVar where
 
 instance IsString DFVar where
     fromString = DFVar . fromString
-
-instance Num DFVar where
-    fromInteger = DFEnvVar . fromInteger
-    (+) = intentionally_not_implemented
-    (-) = intentionally_not_implemented
-    (*) = intentionally_not_implemented
-    abs = intentionally_not_implemented
-    signum = intentionally_not_implemented
 
 instance NFData DFExpr where
     rnf (DFExpr a b) = a `deepseq` rnf b
@@ -88,3 +81,6 @@ instance ExtractBindings DFVar where
     extractBindings (DFEnvVar _) = []
     extractBindings (DFVar b) = [b]
     extractBindings (DFVarList bs) = bs
+
+dfEnvExpr :: HostExpr -> DFVar
+dfEnvExpr = DFEnvVar . EnvRefLit
