@@ -64,26 +64,32 @@ destructure source bnds =
     mkNthExpr idx source =
         Sf Refs.nth Nothing `Apply` (Lit $ NumericLit idx) `Apply` source
 
+-- FIXME lambda lifting for an expression that is not a lambda should also work!
+--       it just creates the lambda!
 lambdaLifting ::
        (Monad m, MonadGenBnd m) => Expression -> m (Expression, [Binding])
-lambdaLifting o@(Lambda v e) =
-    let freeVars = HS.delete v (findFreeVariables e)
-        actuals = sort $ HS.toList freeVars -- makes the list of args deterministic
+lambdaLifting o@(Lambda _ _) =
+    let (formalVars, _) = lambdaArgsAndBody o
+        freeVars = findFreeVariables o
+        actuals = sort $ toList freeVars -- makes the list of args deterministic
      in case actuals of
             [] -> return (o, [])
             _ -> do
-                formals <- mapM generateBindingWith actuals
-                let rewrittenExp = foldl renameVar e $ zip actuals formals
-                input <- generateBinding
+                newFormals <- mapM generateBindingWith actuals
+                let rewrittenExp = foldl renameVar o $ zip actuals newFormals
                 return
-                    ( Lambda input $
-                      destructure (Var input) (v : formals) rewrittenExp
-                    , actuals)
+                    (mkLambda (formalVars ++ newFormals) rewrittenExp, actuals)
 lambdaLifting e =
     error $
     T.pack $
     "Invariant broken! Lambda lifting is only applicable to lambda expressions! Found: " ++
     (show e)
+
+mkLambda :: [Binding] -> Expression -> Expression
+mkLambda args expr = go expr $ reverse args
+  where
+    go e (a:as) = flip go as $ Lambda a e
+    go e [] = e
 
 renameVar :: Expression -> (Binding, Binding) -> Expression
 renameVar e (old, new) =
@@ -114,27 +120,32 @@ findFreeVariables e =
         (HS.fromList [v | Var v <- universe e])
         (HS.fromList $ definedBindings e)
 
-fromListToApply :: refType -> [Expr refType] -> Expr refType
-fromListToApply f (v:[]) = Apply (Var f) v
+fromListToApply :: FunRef -> [Expr] -> Expr
+fromListToApply f (v:[]) = Apply (Lit $ FunRefLit f) v
 fromListToApply f (v:vs) = Apply (fromListToApply f vs) v
 
-fromApplyToList :: Expr refType -> [Expr refType]
-fromApplyToList (Apply f@(Var _) v) = [f, v]
-fromApplyToList (Apply a b) = fromApplyToList a ++ [b]
+fromApplyToList :: Expr -> (FunRef, [Expr])
+fromApplyToList (Apply (Lit (FunRefLit f)) v) = (f, [v])
+fromApplyToList (Apply a b) =
+    let (f, args) = fromApplyToList a
+     in (f, args ++ [b])
 
-mkDestructured ::
-       (Monad m) => [Binding] -> Binding -> Expression -> m Expression
+mkDestructured :: [Binding] -> Binding -> Expression -> Expression
 mkDestructured formals compound e = do
     let lastIdx = (length formals) - 1
-    foldM go e $ reverse $ zip formals [0 .. lastIdx]
+    foldl go e $ reverse $ zip formals [0 .. lastIdx]
   where
-    go :: (Monad m) => Expression -> (Binding, Int) -> m Expression
-    go expr (f, i) = do
-        idx <- mkIntLiteral i
-        return $
-            Let
-                (Direct f)
-                (Apply (Apply (Var $ Sf Refs.nth Nothing) $ Var $ Env idx) $
-                 Var $ Local compound)
-                expr
-    mkIntLiteral = undefined -- FIXME waiting for issue #17
+    go :: Expression -> (Binding, Int) -> Expression
+    go expr (f, i) =
+        Let
+            f
+            (Apply
+                 (Apply (Sf Refs.nth Nothing) $ Lit $ NumericLit $ toInteger i) $
+             Var compound)
+            expr
+
+lambdaArgsAndBody :: Expression -> ([Binding], Expression)
+lambdaArgsAndBody (Lambda arg l@(Lambda _ _)) =
+    let (args, body) = lambdaArgsAndBody l
+     in (args ++ [arg], body)
+lambdaArgsAndBody (Lambda arg body) = ([arg], body)

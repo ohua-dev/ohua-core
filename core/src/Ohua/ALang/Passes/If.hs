@@ -113,13 +113,13 @@ import Ohua.Unit
 import Control.Monad (foldM)
 
 ifSf :: Expression
-ifSf = Var $ Sf Refs.ifThenElse Nothing
+ifSf = Lit $ FunRefLit $ FunRef Refs.ifThenElse Nothing
 
 selectSf :: Expression
-selectSf = Var $ Sf Refs.select Nothing
+selectSf = Lit $ FunRefLit $ FunRef Refs.select Nothing
 
 ifFunSf :: Expression
-ifFunSf = Var $ Sf "ohua.lang/ifFun" Nothing
+ifFunSf = Lit $ FunRefLit $ FunRef "ohua.lang/ifFun" Nothing
 
 ifRewrite :: (Monad m, MonadGenBnd m) => Expression -> m Expression
 ifRewrite (Let v a b) = Let v <$> ifRewrite a <*> ifRewrite b
@@ -143,12 +143,13 @@ ifRewrite (Apply (Apply (Apply ifSf cond) trueBranch) falseBranch) = do
     trueResult <- generateBindingWith "trueResult"
     falseResult <- generateBindingWith "falseResult"
     result <- generateBindingWith "result"
-    Let (Direct ctrls) (Apply ifFunSf cond) <$>
-        (mkDestructured [ctrlTrue, ctrlFalse] ctrls $
-         Let (Direct trueResult) trueBranch' $
-         Let (Direct falseResult) falseBranch' $
-         Let
-             (Direct result)
-             (Apply (Apply (Apply selectSf cond) $ Var $ Local trueResult) $
-              Var $ Local falseResult) $
-         Var $ Local result)
+    return $
+        Let ctrls (Apply ifFunSf cond) $
+        mkDestructured [ctrlTrue, ctrlFalse] ctrls $
+        Let trueResult trueBranch' $
+        Let falseResult falseBranch' $
+        Let
+            result
+            (Apply (Apply (Apply selectSf cond) $ Var trueResult) $
+             Var falseResult) $
+        Var result

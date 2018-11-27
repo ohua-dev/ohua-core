@@ -32,10 +32,10 @@ import Ohua.ALang.Util (mkDestructured)
 import Ohua.Prelude
 
 smapSf :: Expression
-smapSf = Var $ Sf Refs.smapFun Nothing
+smapSf = Lit $ FunRefLit $ FunRef Refs.smapFun Nothing
 
 collectSf :: Expression
-collectSf = Var $ Sf Refs.collect Nothing
+collectSf = Lit $ FunRefLit $ FunRef Refs.collect Nothing
 
 smapRewrite :: (Monad m, MonadGenBnd m) => Expression -> m Expression
 smapRewrite (Let v a b) = Let v <$> smapRewrite a <*> smapRewrite b
@@ -55,10 +55,9 @@ smapRewrite (Apply (Apply smapSf body) dataGen) = do
     ctrls <- generateBindingWith "ctrls"
     result <- generateBindingWith "result"
     resultList <- generateBindingWith "resultList"
-    Let (Direct ctrls) (Apply smapSf dataGen) <$>
-        (mkDestructured [d, ctrlVar, size] ctrls $
-         Let (Direct result) body' $
-         Let
-             (Direct resultList)
-             (Apply (Apply collectSf $ Var $ Local size) $ Var $ Local result) $
-         Var $ Local resultList)
+    return $
+        Let ctrls (Apply smapSf dataGen) $
+        mkDestructured [d, ctrlVar, size] ctrls $
+        Let result body' $
+        Let resultList (Apply (Apply collectSf $ Var size) $ Var result) $
+        Var resultList

@@ -24,20 +24,19 @@ import Ohua.Prelude
 import Ohua.ALang.Lang
 import Ohua.ALang.Passes.Control
 import qualified Ohua.ALang.Refs as Refs (seq, seqFun)
-import Ohua.Unit (unitBinding)
 
 seqSf :: Expression
-seqSf = Var $ Sf Refs.seq Nothing
+seqSf = Lit $ FunRefLit $ FunRef Refs.seq Nothing
 
 seqFunSf :: Expression
-seqFunSf = Var $ Sf Refs.seqFun Nothing
+seqFunSf = Lit $ FunRefLit $ FunRef Refs.seqFun Nothing
 
 seqRewrite :: (Monad m, MonadGenBnd m) => Expression -> m Expression
 seqRewrite (Let v a b) = Let v <$> seqRewrite a <*> seqRewrite b
 seqRewrite (Lambda v e) = Lambda v <$> seqRewrite e
 seqRewrite (Apply (Apply seqSf dep) expr) = do
     ctrl <- generateBindingWith "ctrl"
-    expr' <- liftIntoCtrlCtxt ctrl $ Lambda (Direct unitBinding) expr
+    expr' <- liftIntoCtrlCtxt ctrl expr
     -- return $
     --     [ohualang|
     --       let $var:ctrl = ohua.lang/seqFun $var:dep in
@@ -45,6 +44,4 @@ seqRewrite (Apply (Apply seqSf dep) expr) = do
     --             result
     --                |]
     result <- generateBindingWith "result"
-    return $
-        Let (Direct ctrl) (Apply seqFunSf dep) $
-        Let (Direct result) expr' $ Var $ Local result
+    return $ Let ctrl (Apply seqFunSf dep) $ Let result expr' $ Var result

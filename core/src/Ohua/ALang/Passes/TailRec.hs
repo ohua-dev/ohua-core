@@ -281,6 +281,8 @@ recurFun = "ohua.lang/recurFun"
 recurFunSf :: Expression
 recurFunSf = Sf recurFun Nothing
 
+idSf = Lit $ FunRefLit $ FunRef "ohua.lang/id" Nothing
+
 -- Phase 1:
 findTailRecs :: Bool -> Expression -> Expression
 findTailRecs enabled = snd . flip runReader enabled . flip findRecCall HS.empty
@@ -289,7 +291,7 @@ findRecCall ::
        Expression
     -> HS.HashSet Binding
     -> Reader Bool (HS.HashSet Binding, Expression)
-findRecCall (Let (Direct a) expr inExpr) algosInScope
+findRecCall (Let a expr inExpr) algosInScope
     -- for the assigment expr I add the reference and check the expression for references to the identifier
  = do
     (found, e) <- findRecCall expr $ HS.insert a algosInScope
@@ -299,7 +301,7 @@ findRecCall (Let (Direct a) expr inExpr) algosInScope
     return $
         if HS.member a found
             then (iFound, Let (Recursive a) e iExpr)
-            else (HS.union found iFound, Let (Direct a) e iExpr)
+            else (HS.union found iFound, Let a e iExpr)
 findRecCall (Let a expr inExpr) algosInScope = do
     (iFound, iExpr) <- findRecCall inExpr algosInScope
     return (iFound, Let a expr iExpr)
@@ -329,7 +331,7 @@ findRecCall other _ = return (HS.empty, other)
 hoferize :: (Monad m, MonadGenBnd m) => Expression -> m Expression
 hoferize (Let (Recursive f) expr inExpr) = do
     f' <- generateBindingWith f
-    return $ Let (Direct f') expr $ Let (Direct f) (Apply y_sf (Var f')) inExpr
+    return $ Let f' expr $ Let f (Apply y_sf (Var f')) inExpr
 hoferize (Let v expr inExpr) = Let v <$> hoferize expr <*> hoferize inExpr
 hoferize (Apply a b) = Apply <$> hoferize a <*> hoferize b
 hoferize (Lambda a e) = Lambda a <$> hoferize e
@@ -391,7 +393,7 @@ verifyTailRecursion e
         error $
         T.pack $
         "Recursion is not tail recursive! Last stmt: " ++ (show $ quickRender e)
-    isLastStmt (Var (Local _)) = True
+    isLastStmt (Var _) = True
     isLastStmt _ = False
 verifyTailRecursion e@(Let v expr inExpr) =
     verifyTailRecursion expr >> verifyTailRecursion inExpr >> return e
@@ -441,7 +443,7 @@ rewriteCallExpr e = do
     rewriteLastCond (Let v e o@(Var _)) = (\e' -> Let v e' o) $ rewriteCond e
     rewriteLastCond (Let v e ie) = Let v e $ rewriteLastCond ie
     rewriteCond :: Expression -> Expression
-    rewriteCond (Apply (Apply (Apply (Sf "ohua.lang/if" Nothing) cond) (Lambda a trueB)) (Lambda b falseB)) =
+    rewriteCond (Apply (Apply (Apply idSf cond) (Lambda a trueB)) (Lambda b falseB)) =
         let trueB' = rewriteBranch trueB
             falseB' = rewriteBranch falseB
             fixRef =
@@ -458,7 +460,7 @@ rewriteCallExpr e = do
                             Left _ -> error "invariant broken"
                             Right bnds -> bnds
                     Right bnds -> bnds
-         in fromListToApply (Sf "ohua.lang/recurFun" Nothing) $
+         in fromListToApply (FunRef "ohua.lang/recurFun" Nothing) $
             [cond, fixRef] ++ recurVars
     rewriteCond _ =
         error
