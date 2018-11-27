@@ -91,7 +91,6 @@ library:
   - Ohua.DFLang.Lang
   - Ohua.DFLang.Refs
   - Ohua.DFLang.Util
-  - Ohua.DFLang.HOF
   - Ohua.DFLang.Passes
   - Ohua.DFLang.PPrint
   - Ohua.DFLang.Optimizations

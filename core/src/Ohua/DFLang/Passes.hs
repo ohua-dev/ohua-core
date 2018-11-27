@@ -22,10 +22,7 @@ import Data.Sequence (Seq)
 
 import Ohua.ALang.Lang
 import Ohua.ALang.PPrint
-import Ohua.DFLang.HOF as HOF
-import Ohua.DFLang.HOF.SmapG
 
---import Ohua.DFLang.HOF.Generate
 import Ohua.DFLang.Lang (DFExpr(..), DFFnRef(..), DFVar(..), LetExpr(..))
 import qualified Ohua.DFLang.Refs as Refs
 import Ohua.DFLang.Util
@@ -82,10 +79,7 @@ handleDefinitionalExpr ::
     -> m Binding
 handleDefinitionalExpr assign l@(Apply _ _) cont = do
     (fn, fnId, args) <- handleApplyExpr l
-    case HM.lookup fn hofNames of
-        Just (WHOF (_ :: Proxy p)) ->
-            lowerHOF (hofName :: TaggedFnName p) assign args
-        Nothing -> tell =<< lowerDefault fn fnId assign args
+    tell =<< lowerDefault fn fnId assign args
     cont
 handleDefinitionalExpr _ e _ =
     failWith $
@@ -216,14 +210,3 @@ lowerHOF _ assign args = do
     handleArg a =
         failWith $
         "unexpected type of argument, expected var or lambda, got " <> show a
-
-hofs :: [WHOF]
-hofs =
-    [ WHOF (Proxy :: Proxy SmapGFn)
-        --, WHOF (Proxy :: Proxy GenFn)
-    ]
-
-hofNames :: HM.HashMap QualifiedBinding WHOF
-hofNames = HM.fromList $ map (extractName &&& identity) hofs
-  where
-    extractName (WHOF (_ :: Proxy p)) = unTagFnName (hofName :: TaggedFnName p)
