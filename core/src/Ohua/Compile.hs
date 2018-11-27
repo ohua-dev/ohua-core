@@ -6,73 +6,61 @@
 -- Maintainer  : sebastian.ertel@gmail.com, dev@justus.science
 -- Stability   : experimental
 -- Portability : portable
-
 -- This source code is licensed under the terms described in the associated LICENSE.TXT file
-{-# LANGUAGE CPP             #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE RecordWildCards #-}
+
 module Ohua.Compile where
 
 import Ohua.Prelude
 
-import qualified Data.HashMap.Strict as HM
+import qualified Data.HashSet as HS
 
 import Ohua.ALang.Lang
 import Ohua.ALang.Optimizations
 import Ohua.ALang.Passes
 import Ohua.ALang.Passes.SSA
 import Ohua.ALang.Passes.TailRec (loadTailRecPasses)
+import Ohua.ALang.Refs as Refs
+import Ohua.Configuration
 import Ohua.DFGraph
 import Ohua.DFLang.Optimizations
 import Ohua.DFLang.PPrint ()
 import Ohua.DFLang.Passes
 import qualified Ohua.DFLang.Verify
-import Ohua.Configuration
 import Ohua.Stage
-
-
 
 forceLog :: (MonadLogger m, NFData a) => Text -> a -> m ()
 forceLog msg a = a `deepseq` logDebugN msg
-
 
 -- | The canonical order of transformations and lowerings performed in a full compilation.
 pipeline :: CustomPasses env -> Expression -> OhuaM env OutGraph
 pipeline CustomPasses {..} e = do
     stage resolvedAlang e
-
     ssaE <- performSSA e
     stage ssaAlang ssaE
-
     normalizedE <- normalize =<< passBeforeNormalize ssaE
     stage normalizedAlang normalizedE
-
     whenDebug $ do
         checkProgramValidity normalizedE
         checkHigherOrderFunctionSupport normalizedE
         Ohua.ALang.Passes.SSA.checkSSA normalizedE
-
     customAfterNorm <- passAfterNormalize normalizedE
     stage customAlangPasses customAfterNorm
-
     optimizedE <-
         Ohua.ALang.Optimizations.runOptimizations =<< normalize customAfterNorm
     stage optimizedAlang optimizedE
-
     whenDebug $ Ohua.ALang.Passes.SSA.checkSSA optimizedE
     dfE <- lowerALang =<< normalize optimizedE
     stage initialDflang dfE
-
     Ohua.DFLang.Verify.verify dfE
     whenDebug $ Ohua.DFLang.Passes.checkSSAExpr dfE
     dfAfterCustom <- passAfterDFLowering dfE
     stage customDflang dfAfterCustom
-
     optimizedDfE <- Ohua.DFLang.Optimizations.runOptimizations dfAfterCustom
     stage optimizedDflang optimizedE
-
     whenDebug $ Ohua.DFLang.Passes.checkSSAExpr optimizedDfE
     pure $ toGraph optimizedDfE
-
 
 -- | Run the pipeline in an arbitrary monad that supports error reporting.
 compile ::
@@ -83,9 +71,14 @@ compile ::
     -> m OutGraph
 compile opts passes exprs = do
     logFn <- askLoggerIO
-    let passes' = flip loadTailRecPasses passes $ view transformRecursiveFunctions opts
-    either throwError pure =<< liftIO (runLoggingT (runFromExpr opts (pipeline passes') exprs) logFn)
+    let passes' =
+            flip loadTailRecPasses passes $
+            view transformRecursiveFunctions opts
+    either throwError pure =<<
+        liftIO (runLoggingT (runFromExpr opts (pipeline passes') exprs) logFn)
 
+hofNames :: HashSet QualifiedBinding
+hofNames = HS.fromList [Refs.smap, Refs.ifThenElse, Refs.seq, Refs.recur]
 
 -- | Verify that only higher order functions have lambdas as arguments
 checkHigherOrderFunctionSupport :: MonadOhua m => Expression -> m ()
@@ -100,10 +93,11 @@ checkHigherOrderFunctionSupport (Let _ e rest) = do
             "Lambdas may only be input to higher order functions, not " <>
             show f
         pure True
-    checkNestedExpr (Sf n _) = pure $ HM.member n hofNames
+    checkNestedExpr (Sf n _) = pure $ HS.member n hofNames
     checkNestedExpr (Var _) = pure False
     checkNestedExpr a = failWith $ "Expected var or apply expr, got " <> show a
     isLambda (Lambda _ _) = True
     isLambda _ = False
 checkHigherOrderFunctionSupport (Var _) = pure ()
-checkHigherOrderFunctionSupport a = failWith $ "Expected let or var, got " <> show a
+checkHigherOrderFunctionSupport a =
+    failWith $ "Expected let or var, got " <> show a

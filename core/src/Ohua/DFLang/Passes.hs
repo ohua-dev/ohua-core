@@ -28,7 +28,7 @@ import qualified Ohua.DFLang.Refs as Refs
 import Ohua.DFLang.Util
 
 type Pass m
-     = QualifiedBinding -> FnId -> Assignment -> [Expression] -> m (Seq LetExpr)
+     = QualifiedBinding -> FnId -> Binding -> [Expression] -> m (Seq LetExpr)
 
 -- | Check that a sequence of let expressions does not redefine bindings.
 checkSSA :: (Container c, Element c ~ LetExpr, MonadOhua m) => c -> m ()
@@ -36,7 +36,7 @@ checkSSA = flip evalStateT mempty . mapM_ go
   where
     go le = do
         defined <- get
-        let produced = extractBindings (returnAssignment le)
+        let produced = output le
             f a
                 | HS.member a defined = Just a
             f _ = Nothing
@@ -73,7 +73,7 @@ lowerToDF g = failWith $ "Expected `let` or binding: " <> show g
 
 handleDefinitionalExpr ::
        (MonadOhua m, MonadWriter (Seq LetExpr) m)
-    => Assignment
+    => Binding
     -> Expression
     -> m Binding
     -> m Binding
@@ -87,12 +87,9 @@ handleDefinitionalExpr _ e _ =
 
 -- | Lower any not specially treated function type.
 lowerDefault :: MonadOhua m => Pass m
--- lowerDefault "ohua.lang/recur" fnId assign args =
---     mapM expectVar args <&> \args' ->
---         [LetExpr fnId assign Refs.recur args' Nothing]
 lowerDefault fn fnId assign args =
     mapM expectVar args <&> \args' ->
-        [LetExpr fnId assign (EmbedSf fn) args' Nothing]
+        [LetExpr fnId [assign] (EmbedSf fn) args' Nothing]
 
 -- | Analyze an apply expression, extracting the inner stateful
 -- function and the nested arguments as a list.  Also generates a new
@@ -171,42 +168,3 @@ expectVar r@Sf {} =
 expectVar (Lit l) = pure $ DFEnvVar l
 expectVar a =
     failWith $ "Argument must be local binding or literal, was " <> show a
-
-lowerHOF ::
-       forall f m.
-       (MonadOhua m, HigherOrderFunction f, MonadWriter (Seq LetExpr) m)
-    => TaggedFnName f
-    -> Assignment
-    -> [Expression]
-    -> m ()
-lowerHOF _ assign args = do
-    simpleArgs <- mapM handleArg args
-    let newFnArgs = map (either Variable LamArg . fmap fst) simpleArgs
-    f <- HOF.parseCallAndInitState newFnArgs :: m f
-    flip evalStateT f $ do
-        createContextEntry >>= tell
-        let lambdas = rights simpleArgs
-        for_ lambdas $ \(lam, body) -> do
-            let boundVars =
-                    findBoundVars body `mappend`
-                    HS.fromList (extractBindings $ beginAssignment lam)
-            let freeVars = HS.toList $ findFreeVars0 boundVars body
-            (scopers, renaming) <-
-                if null freeVars
-                    then return ([], [])
-                    else scopeFreeVariables lam freeVars
-            tell scopers
-            tell =<<
-                tieContext0
-                    (contextifyUnboundFunctions lam)
-                    (renameWith (HM.fromList renaming) body)
-        createContextExit assign >>= tell
-  where
-    handleArg (Var v) = return $ Left $ DFVar v
-    handleArg (Lit e) = return $ Left $ DFEnvVar e
-    handleArg (Lambda assign' body) = do
-        DFExpr lets bnd <- lowerALang body
-        return $ Right (Lam assign' bnd, lets)
-    handleArg a =
-        failWith $
-        "unexpected type of argument, expected var or lambda, got " <> show a

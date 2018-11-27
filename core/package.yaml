@@ -2,9 +2,9 @@ name: ohua-core
 version: '0.2.0'
 synopsis: Fundamental, platform independent functionality of the ohua compiler.
 description: |
-  Components for compiling a portable dataflow graph from an expression based language.
-  Performs tasks such as rewriting, lowering and optimisations.
-  Resuling graphs can be executed by any runtime, regardles of platform or language
+  Components for compiling a portable dataflow graph from an expression-based language.
+  Performs tasks such as rewriting, lowering and optimizations.
+  Resulting graphs can be executed by any runtime, regardles of platform or language
   that implements the ohua core operators and execution semantics.
 
   For the standalone executable compiler see https://github.com/ohua-dev/ohuac

@@ -244,29 +244,33 @@ import Ohua.ALang.Lang
 import Ohua.ALang.PPrint (quickRender)
 import Ohua.ALang.Passes.Control (liftIntoCtrlCtxt)
 import qualified Ohua.ALang.Refs as ALangRefs
-import Ohua.ALang.Util (fromApplyToList, fromListToApply, mkDestructured)
+import Ohua.ALang.Util
+    ( fromApplyToList
+    , fromListToApply
+    , lambdaArgsAndBody
+    , mkDestructured
+    )
 import Ohua.Configuration
 import Ohua.Unit
 
 --  ==== Implementation starts here
 loadTailRecPasses :: Bool -> CustomPasses env -> CustomPasses env
 loadTailRecPasses False passes@(CustomPasses {passBeforeNormalize = bn}) =
-    passes {passBeforeNormalize = (bn . findTailRecs False)}
+    passes {passBeforeNormalize = (\e -> bn =<< (findTailRecs False e))}
 loadTailRecPasses True passes@(CustomPasses { passBeforeNormalize = bn
                                             , passAfterNormalize = an
                                             }) =
     passes
-        { passBeforeNormalize = (\e -> bn =<< (hoferize $ findTailRecs True e))
+        { passBeforeNormalize = (\e -> bn =<< (findTailRecs True e))
         , passAfterNormalize = (\e -> an =<< rewrite e)
         }
 
 -- Currently not exposed by the frontend but only as the only part of recursion
 -- at the backend.
-recur :: QualifiedBinding
-recur = "ohua.lang/recur"
+recur = ALangRefs.recur -- allows me to use it in binding position
 
 recur_sf :: Expression
-recur_sf = Sf recur Nothing
+recur_sf = Sf ALangRefs.recur Nothing
 
 -- The Y combinator from Haskell Curry
 y :: QualifiedBinding
@@ -284,13 +288,15 @@ recurFunSf = Sf recurFun Nothing
 idSf = Lit $ FunRefLit $ FunRef "ohua.lang/id" Nothing
 
 -- Phase 1:
-findTailRecs :: Bool -> Expression -> Expression
-findTailRecs enabled = snd . flip runReader enabled . flip findRecCall HS.empty
+findTailRecs :: (Monad m, MonadGenBnd m) => Bool -> Expression -> m Expression
+findTailRecs enabled e =
+    snd <$> (flip runReaderT enabled . flip findRecCall HS.empty) e
 
 findRecCall ::
-       Expression
+       (Monad m, MonadGenBnd m)
+    => Expression
     -> HS.HashSet Binding
-    -> Reader Bool (HS.HashSet Binding, Expression)
+    -> ReaderT Bool m (HS.HashSet Binding, Expression)
 findRecCall (Let a expr inExpr) algosInScope
     -- for the assigment expr I add the reference and check the expression for references to the identifier
  = do
@@ -298,10 +304,12 @@ findRecCall (Let a expr inExpr) algosInScope
     -- proceed normally into the next expression
     (iFound, iExpr) <- findRecCall inExpr algosInScope
     -- did I detect a reference to this binding in the assignment expr?
-    return $
-        if HS.member a found
-            then (iFound, Let (Recursive a) e iExpr)
-            else (HS.union found iFound, Let a e iExpr)
+    if HS.member a found
+        -- hoferize right away:
+        then do
+            a' <- generateBindingWith a
+            return (iFound, Let a' e $ Let a (Apply y_sf (Var a')) iExpr)
+        else return (HS.union found iFound, Let a e iExpr)
 findRecCall (Let a expr inExpr) algosInScope = do
     (iFound, iExpr) <- findRecCall inExpr algosInScope
     return (iFound, Let a expr iExpr)
@@ -327,24 +335,13 @@ findRecCall (Lambda a e) algosInScope = do
             else (eFound, Lambda a eExpr)
 findRecCall other _ = return (HS.empty, other)
 
--- Phase 2:
-hoferize :: (Monad m, MonadGenBnd m) => Expression -> m Expression
-hoferize (Let (Recursive f) expr inExpr) = do
-    f' <- generateBindingWith f
-    return $ Let f' expr $ Let f (Apply y_sf (Var f')) inExpr
-hoferize (Let v expr inExpr) = Let v <$> hoferize expr <*> hoferize inExpr
-hoferize (Apply a b) = Apply <$> hoferize a <*> hoferize b
-hoferize (Lambda a e) = Lambda a <$> hoferize e
-hoferize v@(Var _) = return v
-hoferize e = error $ show e
-
 -- performed after normalization
 verifyTailRecursion :: (Monad m, MonadGenBnd m) => Expression -> m Expression
 verifyTailRecursion e
-    | isCall y e = (performChecks $ fromApplyToList e) >> return e
+    | isCall y e = (performChecks $ snd $ fromApplyToList e) >> return e
   where
-    performChecks (_:((Lambda a e):_)) = traverseToLastCall checkIf e
-    performChecks (_:(e:_)) =
+    performChecks ((Lambda a e):_) = traverseToLastCall checkIf e
+    performChecks (e:_) =
         error $ T.pack $ "Recursion is not inside a lambda but: " ++ (show e)
     traverseToLastCall check (Let v e ie)
         | isLastStmt ie = check e
@@ -366,14 +363,14 @@ verifyTailRecursion e
         | isCall "ohua.lang/if" e
       -- assumes well-structured if
          = do
-            let (_:(_:(tBranch:(fBranch:_)))) = fromApplyToList e
+            let (_:(tBranch:(fBranch:_))) = snd $ fromApplyToList e
             let (Lambda v et) = tBranch
             let (Lambda v ef) = fBranch
             let lastFnOnBranch =
                     traverseToLastCall
                         (return .
-                         (\(Sf f _) -> f :: QualifiedBinding) .
-                         head . NE.fromList . fromApplyToList)
+                         (\(FunRef f _) -> f :: QualifiedBinding) .
+                         fst . fromApplyToList)
             tFn <- lastFnOnBranch et
             fFn <- lastFnOnBranch ef
             if tFn == recur
@@ -418,9 +415,10 @@ isCall _ _ = False
 rewriteCallExpr ::
        (MonadGenBnd m, MonadError Error m) => Expression -> m Expression
 rewriteCallExpr e = do
-    let ((Var (Sf y _)):(l@(Lambda vars expr):callArgs)) = fromApplyToList e
+    let (lam@(Lambda _ _):callArgs) = snd $ fromApplyToList e
+    let (recurVars, expr) = lambdaArgsAndBody lam
     recurCtrl <- generateBindingWith "ctrl"
-    l' <- liftIntoCtrlCtxt recurCtrl l
+    l' <- liftIntoCtrlCtxt recurCtrl lam
     let l'' = rewriteLastCond l'
   --   [ohualang|
   --     let (recurCtrl, b1 , ..., bn) = recurFun () () a1 ... an in
@@ -435,8 +433,8 @@ rewriteCallExpr e = do
   --               r
   -- |]
     ctrls <- generateBindingWith "ctrls"
-    let recurVars = extractBindings vars
-    Let (Direct ctrls) (fromListToApply (Sf recurFun Nothing) callArgs) <$>
+    return $
+        Let ctrls (fromListToApply (FunRef recurFun Nothing) callArgs) $
         mkDestructured ([recurCtrl] ++ recurVars) ctrls l''
   where
     rewriteLastCond :: Expression -> Expression
@@ -469,32 +467,5 @@ rewriteCallExpr e = do
     -- normally this is "fix" instead of `id`
     rewriteBranch (Let v (Apply (Sf "ohua.lang/id" _) result) _) = Left result
     rewriteBranch (Let v e _)
-        | isCall recur e = Right $ tail $ NE.fromList $ fromApplyToList e
+        | isCall recur e = (Right . snd . fromApplyToList) e
     rewriteBranch _ = error "invariant broken"
-
---  ==== Implementation ends here
-markRecursiveBindings :: Expression -> Expression
-markRecursiveBindings = fst . runWriter . cata go
-  where
-    go (LetF assign e b)
-      -- We censor here as this binding would shadow bindings from outside
-     =
-        shadowAssign assign $ do
-            (e', isUsed) <-
-                listens
-                    (not .
-                     null .
-                     HS.intersection (HS.fromList (extractBindings assign)))
-                    e
-            if isUsed
-                then case assign of
-                         Direct bnd -> Let (Recursive bnd) e' <$> b
-                         _ -> error "Cannot use destrutured binding recursively"
-                else Let assign e' <$> b
-    go (VarF val) = tell (HS.singleton val) >> pure (Var val)
-    go e@(LambdaF assign _) = shadowAssign assign $ embed <$> sequence e
-    go e = embed <$> sequence e
-    shadowAssign (Direct b) = censor (HS.delete b)
-    shadowAssign (Destructure bnds) = censor (`HS.difference` HS.fromList bnds)
-    shadowAssign (Recursive _) =
-        error "TODO implement `shadowAssign` for `Recursive`"

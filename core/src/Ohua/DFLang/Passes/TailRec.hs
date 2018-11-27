@@ -14,7 +14,7 @@ recurLowering (DFExpr letExprs returnVar)
   -- 1. Find the recurFun with two outputs
  =
     let recurFuns =
-            DS.filter ((2 ==) . length . extractBindings . returnAssignment) $
+            DS.filter ((2 ==) . length . output) $
             findAllExprs Refs.recurFun letExprs
   -- 2. traverse the subtree to find the corresponding recurFun with only a single output
         pairs =
@@ -26,15 +26,14 @@ recurLowering (DFExpr letExprs returnVar)
                 let (fixRef:(cond:recurArgs)) = callArguments recurFunEnd
                  in LetExpr
                         (callSiteId recurFunStart)
-                        (Destructure $
-                         (extractBindings $ returnAssignment recurFunStart) ++
-                         (extractBindings $ returnAssignment recurFunEnd))
+                        ((output recurFunStart) ++ (output recurFunEnd))
                         (functionRef recurFunStart)
                         [ DFVarList
-                              (extractBindings $ callArguments recurFunStart)
+                              (join $
+                               map extractBindings $ callArguments recurFunStart)
                         , fixRef
                         , cond
-                        , DFVarList (extractBindings recurArgs)
+                        , DFVarList (join $ map extractBindings recurArgs)
                         ]
                         Nothing
      in flip DFExpr returnVar $
@@ -47,6 +46,7 @@ recurLowering (DFExpr letExprs returnVar)
     findEnd e = (findEnd . anySuccessor) e
     anySuccessor =
         head .
-        NE.fromList .
-        (flip findUsages letExprs) .
-        head . NE.fromList . extractBindings . returnAssignment
+        NE.fromList . (flip findUsages letExprs) . head . NE.fromList . output
+    extractBindings (DFEnvVar _) = []
+    extractBindings (DFVar b) = [b]
+    extractBindings (DFVarList bs) = bs

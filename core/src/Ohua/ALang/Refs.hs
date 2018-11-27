@@ -39,11 +39,8 @@ seq = "ohua.lang/seq"
 seqFun :: QualifiedBinding
 seqFun = "ohua.lang/seqFun"
 
-smapG :: QualifiedBinding
-smapG = "ohua.lang/smapG"
-
-generate :: QualifiedBinding
-generate = "ohua.lang/generate"
+recur :: QualifiedBinding
+recur = "ohua.lang/recur"
 
 nth :: QualifiedBinding
 nth = "ohua.lang/nth"
