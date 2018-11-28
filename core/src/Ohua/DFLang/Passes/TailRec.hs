@@ -7,7 +7,7 @@ import Ohua.DFLang.Refs as Refs
 import Ohua.DFLang.Util
 
 import qualified Data.List.NonEmpty as NE
-import Data.Sequence as DS ((><), filter, fromList)
+import Data.Sequence as DS ((><), filter)
 
 recurLowering :: DFExpr -> DFExpr
 recurLowering (DFExpr letExprs returnVar)

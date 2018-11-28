@@ -25,24 +25,3 @@ ctrl = EmbedSf Refs.ctrl
 
 recurFun :: DFFnRef
 recurFun = DFFunction TailRec.recurFun
-
-smapGFun :: DFFnRef
-smapGFun = DFFunction "ohua.lang/smapGFun"
-
-collectG :: DFFnRef
-collectG = DFFunction "ohua.lang/collectG"
-
--- TODO Why do we need this?
-repeat :: DFFnRef
-repeat = DFFunction "ohua.lang/repeat"
-
--- TODO Why do we need this?
-isJust :: DFFnRef
-isJust = EmbedSf "ohua.lang/isJust"
-
--- FIXME I don't think we need this as of now.
-ndMerge :: DFFnRef
-ndMerge = DFFunction "ohua.lang/ndMerge"
-
-toGen :: DFFnRef
-toGen = DFFunction "ohua.lang/toGen"
