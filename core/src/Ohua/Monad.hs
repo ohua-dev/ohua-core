@@ -18,6 +18,7 @@ module Ohua.Monad
     , logWarnN, logErrorN, logOtherN
     , MonadOhua
     -- ** Helper functions for building instances of 'MonadGenBnd'
+    , GenBndT, runGenBndT
     , generateBindingIn, generateBindingWithIn
     , generateBindingFromGenerator, generateBindingFromGeneratorWith
     , initNameGen
