@@ -14,7 +14,6 @@ import Ohua.Prelude
 import qualified Data.HashMap.Strict as HM
 
 import           Ohua.DFLang.Lang
-import Ohua.ALang.Lang (Lit (..))
 
 data Operator = Operator
     { operatorId   :: !FnId

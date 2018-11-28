@@ -37,9 +37,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 
 module Ohua.ALang.Lang
-  ( Lit(..)
-  , FunRef(..)
-  , Expr(..)
+  ( Expr(..)
   , AExpr
   , Expression
   -- ** Convenience patterns
@@ -66,16 +64,6 @@ import Ohua.LensClasses
 
 -------------------- Basic ALang types --------------------
 
-data FunRef = FunRef QualifiedBinding (Maybe FnId)
-    deriving (Show, Eq, Generic, Lift)
-
--- | Literals of kinds we expect any host language to support
-data Lit
-    = NumericLit !Integer -- ^ an integer literal
-    | UnitLit -- ^ aka @()@
-    | EnvRefLit !HostExpr -- ^ A reference to some value from the environment
-    | FunRefLit FunRef -- ^ Reference to an external function
-    deriving (Show, Eq, Lift, Generic)
 
 -- IMPORTANT: we need this to be polymorphic over `bindingType` or at
 -- least I would very much recommend that, because then we can

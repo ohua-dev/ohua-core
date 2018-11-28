@@ -19,7 +19,6 @@
 #include "compat.h"
 module Ohua.DFLang.Lang where
 
-import Ohua.ALang.Lang (Lit(..))
 import Ohua.Prelude
 
 import Language.Haskell.TH.Syntax (Lift)

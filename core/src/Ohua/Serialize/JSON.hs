@@ -26,7 +26,6 @@ import Ohua.Prelude hiding (Options)
 import Data.Aeson
 import Data.Aeson.Types
 import Data.List
-import Ohua.ALang.Lang (Lit (..), FunRef(..))
 
 import Ohua.DFGraph
 

@@ -30,6 +30,8 @@ module Ohua.Types
     , SomeBinding(..)
     , symbolFromString
     , HostExpr
+    , FunRef(..)
+    , Lit(..)
     , Environment
     , options
     , Options
@@ -284,6 +286,16 @@ instance Unwrap HostExpr where
     unwrap (HostExpr i) = i
 
 type Error = Text
+data FunRef = FunRef QualifiedBinding (Maybe FnId)
+    deriving (Show, Eq, Generic, Lift)
+
+-- | Literals of kinds we expect any host language to support
+data Lit
+    = NumericLit !Integer -- ^ an integer literal
+    | UnitLit -- ^ aka @()@
+    | EnvRefLit !HostExpr -- ^ A reference to some value from the environment
+    | FunRefLit FunRef -- ^ Reference to an external function
+    deriving (Show, Eq, Lift, Generic)
 type StageName = Text
 type AbortCompilation = Bool
 data DumpCode

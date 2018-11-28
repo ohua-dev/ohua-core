@@ -11,7 +11,7 @@ import qualified Data.HashSet as HS
 
 import Ohua.ALang.Lang
 import Ohua.DFGraph
-import Ohua.ALang.NS
+import Ohua.Frontend.NS
 import Ohua.DFLang.Lang
 
 genFromMake :: (HasCallStack, Make t, Arbitrary (SourceType t)) => Gen t
@@ -71,29 +71,24 @@ instance Arbitrary NSRef where
     arbitrary = genFromMake `suchThat` (not . null . unwrap)
 instance Arbitrary FnId where arbitrary = genFromMake
 instance Arbitrary HostExpr where arbitrary = genFromMake
-instance Arbitrary a => Arbitrary (Symbol a) where
+instance Arbitrary FunRef where arbitrary = liftM2 FunRef arbitrary arbitrary
+instance Arbitrary Lit where
     arbitrary = oneof
-        [ Local <$> arbitrary
-        , Sf <$> arbitrary <*> arbitrary
-        , Env <$> arbitrary
+        [ NumericLit <$> arbitrary
+        , FunRefLit <$> arbitrary
+        , EnvRefLit <$> arbitrary
+        , pure UnitLit
         ]
-instance Arbitrary Assignment where
-    arbitrary =
-        oneof
-            [ Direct <$> arbitrary
-            , Destructure <$> (arbitrary `suchThat` ((/= 1) . length))
-            ]
-    shrink (Destructure ds) = map Destructure $ shrink ds
-    shrink _ = []
-instance Arbitrary a => Arbitrary (Expr a) where
+instance Arbitrary Expr where
     arbitrary = sized expr
       where
-        expr :: Int -> Gen (Expr a)
+        expr :: Int -> Gen Expr
         expr 0 = Var <$> arbitrary
         expr n = oneof
             [ liftM3 Let arbitrary nestExpr nestExpr
             , liftM2 Apply nestExpr nestExpr
             , liftM2 Lambda arbitrary nestExpr
+            , Lit <$> arbitrary
             , Var <$> arbitrary
             ]
           where
