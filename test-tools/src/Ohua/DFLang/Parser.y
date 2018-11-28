@@ -89,15 +89,19 @@ Exp :: { DFExpr }
 Exp : many(LetExpr) id { DFExpr (Seq.fromList $1) $2 }
 
 FnId :: { FnId }
-FnId : int { makeThrow $1 }
+FnId : int { makeThrow $ fromInteger $1 }
 
 LetExpr :: { LetExpr }
 LetExpr : let Pat '=' FnRef '<' FnId '>' tuple(DFVar) opt(CtxRef) in { LetExpr $6 $2 $4 $8 $9 }
 
 DFVar :: { DFVar }
 DFVar
-    : env_ref { DFEnvVar $1 }
+    : Lit { DFEnvVar $1 }
     | id      { DFVar $1 }
+
+Lit :: { Lit }
+    : int { NumericLit $1 }
+    | env_ref { EnvRefLit $1 }
 
 FnRef :: { DFFnRef }
 FnRef : opt(dataflow) qualid { maybe EmbedSf (const DFFunction) $1 $2 }
@@ -106,16 +110,11 @@ CtxRef :: { Binding }
 CtxRef : '[' id ']' { $2 }
 
 Pat :: { Pat }
-Pat
-    : Destructure { $1 }
-    | id          { Direct $1 }
-
-Destructure :: { Pat }
-Destructure : tuple(id) { case $1 of [x] -> Direct x; xs -> Destructure xs }
+Pat : tuple(id) { $1 }
 
 {
 
-type Pat = Assignment
+type Pat = [Binding]
 type PM = Alex
 
 nextToken :: PM Lexeme

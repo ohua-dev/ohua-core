@@ -25,18 +25,21 @@ toFGLGraph :: OutGraph -> OhuaGrGraph
 toFGLGraph (OutGraph ops arcs _) = OhuaGrGraph $ mkGraph grNodes grEdges
   where
     regularNodes = map (\(Operator oid type_) -> (unwrap oid, type_)) ops
-
     envId = succ $ maximum $ map fst regularNodes -- one fresh id for an env node
-
+    numLitId = succ envId
     grNodes = (envId, "ohua.internal/env") : regularNodes
-
     grEdges = map arcToEdge arcs
-
-    arcToEdge (Arc t s) = (sourceOp, unwrap $ operator t, OhuaGrEdgeLabel sourceIdx (index t))
+    arcToEdge (Arc t s) =
+        (sourceOp, unwrap $ operator t, OhuaGrEdgeLabel sourceIdx (index t))
       where
-        (sourceOp, sourceIdx) = case s of
-            LocalSource (Target op idx) -> (unwrap op, idx)
-            EnvSource e                 -> (envId, unwrap e)
+        (sourceOp, sourceIdx) =
+            case s of
+                LocalSource (Target op idx) -> (unwrap op, idx)
+                EnvSource e ->
+                    case e of
+                        EnvRefLit he -> (envId, unwrap he)
+                        NumericLit n -> (numLitId, fromInteger n)
+                        _ -> error "Unsupported literal for this function"
 
 
 isIsomorphic :: (Eq a, Ord b) => Gr a b -> Gr a b -> Bool
