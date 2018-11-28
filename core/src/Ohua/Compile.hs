@@ -17,14 +17,12 @@ import Ohua.Prelude
 import qualified Data.HashSet as HS
 
 import Ohua.ALang.Lang
-import Ohua.ALang.Optimizations
 import Ohua.ALang.Passes
 import Ohua.ALang.Passes.SSA
 import Ohua.ALang.Passes.TailRec (loadTailRecPasses)
 import Ohua.ALang.Refs as Refs
 import Ohua.Configuration
 import Ohua.DFGraph
-import Ohua.DFLang.Optimizations
 import Ohua.DFLang.PPrint ()
 import Ohua.DFLang.Passes
 import qualified Ohua.DFLang.Verify
@@ -47,20 +45,19 @@ pipeline CustomPasses {..} e = do
         Ohua.ALang.Passes.SSA.checkSSA normalizedE
     customAfterNorm <- passAfterNormalize normalizedE
     stage customAlangPasses customAfterNorm
-    optimizedE <-
-        Ohua.ALang.Optimizations.runOptimizations =<< normalize customAfterNorm
-    stage optimizedAlang optimizedE
-    whenDebug $ Ohua.ALang.Passes.SSA.checkSSA optimizedE
-    dfE <- lowerALang =<< normalize optimizedE
+    coreE <- Ohua.ALang.Passes.runCorePasses =<< normalize customAfterNorm
+    stage coreAlang coreE
+    whenDebug $ Ohua.ALang.Passes.SSA.checkSSA coreE
+    dfE <- lowerALang =<< normalize coreE
     stage initialDflang dfE
     Ohua.DFLang.Verify.verify dfE
     whenDebug $ Ohua.DFLang.Passes.checkSSAExpr dfE
     dfAfterCustom <- passAfterDFLowering dfE
     stage customDflang dfAfterCustom
-    optimizedDfE <- Ohua.DFLang.Optimizations.runOptimizations dfAfterCustom
-    stage optimizedDflang optimizedE
-    whenDebug $ Ohua.DFLang.Passes.checkSSAExpr optimizedDfE
-    pure $ toGraph optimizedDfE
+    coreDfE <- Ohua.DFLang.Passes.runCorePasses dfAfterCustom
+    stage coreDflang coreDfE
+    whenDebug $ Ohua.DFLang.Passes.checkSSAExpr coreDfE
+    pure $ toGraph coreDfE
 
 -- | Run the pipeline in an arbitrary monad that supports error reporting.
 compile ::

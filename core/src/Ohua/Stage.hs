@@ -2,13 +2,17 @@ module Ohua.Stage where
 
 import Ohua.Prelude
 
+import qualified Data.Text.Lazy.IO as LT
 import Data.Text.Prettyprint.Doc
 import Data.Text.Prettyprint.Doc.Render.Text
-import qualified Data.Text.Lazy.IO as LT
 
 import Ohua.ALang.PPrint
 
-stage :: (MonadReadEnvironment m, MonadIO m, Pretty code) => StageName -> code -> m ()
+stage ::
+       (MonadReadEnvironment m, MonadIO m, Pretty code)
+    => StageName
+    -> code
+    -> m ()
 stage stName code = do
     stageH <- fromEnv $ options . stageHandling
     let (dumpInstructions, shouldAbort) = stageH stName
@@ -32,8 +36,8 @@ normalizedAlang = "alang-normalized"
 customAlangPasses :: StageName
 customAlangPasses = "alang-custom"
 
-optimizedAlang :: StageName
-optimizedAlang = "alang-optimized"
+coreAlang :: StageName
+coreAlang = "alang-core"
 
 initialDflang :: StageName
 initialDflang = "dflang-initial"
@@ -41,8 +45,8 @@ initialDflang = "dflang-initial"
 customDflang :: StageName
 customDflang = "dflang-custom"
 
-optimizedDflang :: StageName
-optimizedDflang = "dflang-optimized"
+coreDflang :: StageName
+coreDflang = "dflang-core"
 
 knownStages :: [StageName]
 knownStages =
@@ -50,8 +54,8 @@ knownStages =
     , ssaAlang
     , normalizedAlang
     , customAlangPasses
-    , optimizedAlang
+    , coreAlang
     , initialDflang
     , customDflang
-    , optimizedDflang
+    , coreDflang
     ]

@@ -31,7 +31,21 @@ import qualified Data.HashMap.Strict as HM
 import qualified Data.HashSet as HS
 
 import Ohua.ALang.Lang
+import Ohua.ALang.Passes.If
+import Ohua.ALang.Passes.Seq
+import Ohua.ALang.Passes.Smap
 import qualified Ohua.ALang.Refs as Refs
+import Ohua.Stage
+
+runCorePasses :: MonadOhua m => Expression -> m Expression
+runCorePasses expr = do
+    smapE <- smapRewrite expr
+    stage "smap-transformation" smapE
+    ifE <- ifRewrite smapE
+    stage "conditionals-transformation" ifE
+    seqE <- seqRewrite ifE
+    stage "seq-transformation" seqE
+    return seqE
 
 -- | Inline all references to lambdas.
 -- Aka `let f = (\a -> E) in f N` -> `(\a -> E) N`

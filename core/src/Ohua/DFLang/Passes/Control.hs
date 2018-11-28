@@ -13,7 +13,11 @@ import Ohua.DFLang.Util (findAllExprs, findUsages, removeAllExprs)
 --   is an operator and as such we can remove the destructuring and do that
 --   directly in the operator.
 optimizeCtrl :: DFExpr -> DFExpr
-optimizeCtrl (DFExpr letExprs returnVar) =
+optimizeCtrl (DFExpr letExprs returnVar)
+   -- FIXME we can only perform this optimization when the vars are all just used once.
+   --       feels like we need something more efficient in the backend for saying that
+   --       we want to send the same value to a set of channels instead of just one.
+ =
     let ctrls = toList $ findAllExprs Refs.ctrl letExprs
         (newCtrls, orphanedNths) = unzip $ toList $ map updateCtrl ctrls
         orphanedNths' = catMaybes $ join orphanedNths

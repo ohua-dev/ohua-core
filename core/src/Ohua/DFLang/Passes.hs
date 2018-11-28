@@ -24,11 +24,19 @@ import Ohua.ALang.Lang
 import Ohua.ALang.PPrint
 
 import Ohua.DFLang.Lang (DFExpr(..), DFFnRef(..), DFVar(..), LetExpr(..))
+import Ohua.DFLang.Passes.Control
 import qualified Ohua.DFLang.Refs as Refs
 import Ohua.DFLang.Util
+import Ohua.Stage
 
 type Pass m
      = QualifiedBinding -> FnId -> Binding -> [Expression] -> m (Seq LetExpr)
+
+runCorePasses :: (MonadOhua m, Pretty DFExpr) => DFExpr -> m DFExpr
+runCorePasses expr =
+    let ctrlOptimized = optimizeCtrl expr
+     in do stage "ctrl-optimization" ctrlOptimized
+           return ctrlOptimized
 
 -- | Check that a sequence of let expressions does not redefine bindings.
 checkSSA :: (Container c, Element c ~ LetExpr, MonadOhua m) => c -> m ()

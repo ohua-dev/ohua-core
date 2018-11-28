@@ -12,41 +12,8 @@ This source code is licensed under the terms described in the associated LICENSE
 
 The tail recursion implementation for the ohua-core compiler encompasses the following phases:
 
+
 === Phase 1: (Performed directly on the initial ALang form.)
-Find recursions and mark them, i.e., perform the following transformation:
-
-@
-  let f = \x1 ... xn -> ...
-                       let y1 = ....
-                       ...
-                       let yn = ...
-                       ...
-                       if c then
-                           result
-                       else
-                           f y1 ... yn
-@
-
-into this:
-
-@
-  letrec f = \x1 ... xn -> ...
-                           let y1 = ....
-                           ...
-                           let yn = ...
-                           ...
-                           if c then
-                               result
-                           else
-                               recur y1 ... yn
-@
-
-This turns the recursive function into a non-recursive one. But it would still
-not be possible to let the other transformations run. Especially, the lambda-inlining
-transformation would actually lose the `letrec` marker.
-
-
-=== Phase 2: (Performed on the output of Phase 1.)
 Turn recursions into HOFs:
 
 @
@@ -59,7 +26,7 @@ Turn recursions into HOFs:
                                result
                            else
                                recur y1 ... yn
-  let f = y f'
+  let f = Y f'
 @
 
 Lambda-inlinling will then just inline f' while still performing all other transformations
@@ -67,14 +34,15 @@ on it. A nice benefit: lowering for tail recursion is just an implementation of
 a HigherOrderFunction lowering. As such though, we can not access the lambda, i.e., f.
 So we need to do the lambda modifications on ALang before (which is nicer anyways).
 
--- FIXME if we transform this into true tail recursion then nothing is performed on the branches.
---       as a result, we remove the whole if statement and just send the input to the conditional,
---       the output of this cycle and the final output to the recurFun. it will use the cond to
---       understand which arcs to pull from!
---       benefits: no array, left and right functions needed.
--- FIXME the lambda expression from phase 2 must be lifted into control context.
---       normally there are two operators (ifFun/select or smapFun/collect). this time the operator
---       recurFun is both!
+We transform this into true tail recursion and hence nothing is performed on the branches.
+As a result, we remove the whole if statement and just send the input to the conditional,
+the output of the cycle (recursion) and the final output to the recurFun. It will use the `cond` to
+understand which arcs to pull from!
+Benefits: no array, left and right functions needed.
+
+The lambda expression from phase 2 is lifted into a control context.
+Normally there are two operators (ifFun/select or smapFun/collect). this time the operator
+recurFun is both!
 
 The resulting code for a call is then:
 
