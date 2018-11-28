@@ -14,11 +14,10 @@ author:
 - Justus Adam
 maintainer: dev@justus.science
 license: OtherLicense
-license-file: ../LICENSE.txt
+license-file: LICENSE
 homepage: https://ohua-dev.github.io/ohua
 github: ohua-dev/ohua-core
 extra-source-files:
-- ../README.md
 - cbits/compat.h
 dependencies:
 - base >=4.8 && <5
