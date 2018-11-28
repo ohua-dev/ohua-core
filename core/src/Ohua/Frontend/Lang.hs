@@ -6,6 +6,7 @@ module Ohua.Frontend.Lang
     , PatF(..)
     , ExprF(..)
     , toAlang
+    , patterns
     ) where
 
 import Ohua.Prelude
@@ -13,7 +14,8 @@ import Ohua.Prelude
 import Control.Category ((>>>))
 import Data.Functor.Foldable (cata)
 import Data.Functor.Foldable.TH (makeBaseFunctor)
-import Data.Generics.Uniplate.Direct
+import Control.Lens.Plated (Plated, plate, gplate)
+import Control.Lens (Traversal')
 
 import Ohua.ALang.Lang hiding (Expr, ExprF)
 import qualified Ohua.ALang.Lang as AL
@@ -50,13 +52,15 @@ data Expr
     | TupE [Expr] -- ^ create a tuple value that can be destructured
     deriving (Show, Eq, Generic)
 
+patterns :: Traversal' Expr Pat
+patterns f = \case
+    LamE ps e -> flip LamE e <$> traverse f ps
+    LetE p e1 e2 -> (\p' -> LetE p' e1 e2) <$> f p
+    o -> pure o
+
 makeBaseFunctor ''Pat
 
-instance Uniplate Pat where
-    uniplate =
-        \case
-            TupP ps -> plate TupP ||* ps
-            other -> plate other
+instance Plated Pat where plate = gplate
 
 instance Hashable Pat
 
@@ -64,36 +68,8 @@ instance NFData Pat
 
 makeBaseFunctor ''Expr
 
-instance Uniplate Expr where
-    uniplate =
-        \case
-            LetE p e1 e2 -> plate (LetE p) |* e1 |* e2
-            AppE e1 e2 -> plate AppE |* e1 ||* e2
-            LamE p e -> plate (LamE p) |* e
-            IfE e1 e2 e3 -> plate IfE |* e1 |* e2 |* e3
-            MapE e1 e2 -> plate MapE |* e1 |* e2
-            BindE e1 e2 -> plate BindE |* e1 |* e2
-            StmtE e1 e2 -> plate StmtE |* e1 |* e2
-            TupE es -> plate TupE ||* es
-            SeqE e1 e2 -> plate SeqE |* e1 |* e2
-            other -> plate other
-
-instance Biplate Expr Pat where
-    biplate =
-        \case
-            LetE p e1 e2 -> plate LetE |* p |+ e1 |+ e2
-            AppE e1 e2 -> plate AppE |+ e1 ||+ e2
-            LamE p e -> plate LamE ||* p |+ e
-            IfE e1 e2 e3 -> plate IfE |+ e1 |+ e2 |+ e3
-            MapE e1 e2 -> plate MapE |+ e1 |+ e2
-            BindE e1 e2 -> plate BindE |+ e1 |+ e2
-            StmtE e1 e2 -> plate StmtE |+ e1 |+ e2
-            TupE es -> plate TupE ||+ es
-            SeqE e1 e2 -> plate SeqE |+ e1 |+ e2
-            other -> plate other
-
+instance Plated Expr where plate = gplate
 instance Hashable Expr
-
 instance NFData Expr
 
 -- | Not sure this traversal is necessary, but it makes every smap argument into
@@ -173,6 +149,7 @@ trans =
         \case
             VarP v -> v
             UnitP -> "_"
+
             p -> error $ "Invariant broken, invalid pattern: " <> show p
 
 toAlang :: (Monad m, MonadGenBnd m) => Expr -> m AL.Expr

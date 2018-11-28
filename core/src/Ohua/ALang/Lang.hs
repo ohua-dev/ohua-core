@@ -53,12 +53,11 @@ import Universum
 
 import Data.Functor.Foldable as RS
 import Data.Functor.Foldable.TH (makeBaseFunctor)
-import Data.Generics.Uniplate.Direct
+import Control.Lens.Plated
 import Language.Haskell.TH.Syntax (Lift)
 import Control.Category ((>>>))
 
 import Ohua.Types
-import Ohua.LensClasses
 
 #include "compat.h"
 
@@ -121,7 +120,7 @@ data Expr
     | Let Binding Expr Expr
     | Apply Expr Expr
     | Lambda Binding Expr
-    deriving (Show, Eq, Lift)
+    deriving (Show, Eq, Lift, Generic)
 
 type AExpr = Expr
 -- | Backward compatibility alias
@@ -169,16 +168,7 @@ instance NFData AExpr where
             ApplyF a b -> a `deepseq` rnf b
             LambdaF assign b -> assign `deepseq` rnf b
 
--------------------- Uniplate support --------------------
-
-instance Uniplate AExpr where
-    uniplate (Let assign val body) = plate (Let assign) |* val |* body
-    uniplate (Apply f v) = plate Apply |* f |* v
-    uniplate (Lambda assign body) = plate (Lambda assign) |* body
-    uniplate o = plate o
-
-instance Biplate AExpr AExpr where
-    biplate = plateSelf
+instance Plated AExpr where plate = gplate
 
 -------------------- Additional Traversals --------------------
 

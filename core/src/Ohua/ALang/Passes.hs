@@ -25,8 +25,6 @@ import Ohua.Prelude
 import Control.Monad.RWS.Lazy (evalRWST)
 import Control.Monad.Writer (listen, runWriter, tell)
 import Data.Functor.Foldable
-import Data.Generics.Uniplate.Direct (rewriteM)
-import qualified Data.Generics.Uniplate.Direct as Plate
 import qualified Data.HashMap.Strict as HM
 import qualified Data.HashSet as HS
 

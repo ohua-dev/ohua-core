@@ -78,21 +78,23 @@ import Control.Monad.Error.Class (MonadError)
 import Data.Bifoldable
 import Data.Bitraversable
 import Data.Default.Class
-import Data.Foldable as F (Foldable, foldr)
-import Data.Functor.Foldable as RS hiding (fold)
-import Data.Generics.Uniplate.Direct
+import Data.Foldable as F (Foldable)
+import Data.Functor.Foldable.TH (makeBaseFunctor)
+import Control.Lens.Plated
 import qualified Data.HashSet as HS
 import qualified Data.Text as T
 import qualified Data.Vector as V
 import GHC.Exts
 import Language.Haskell.TH.Syntax (Lift)
 import Instances.TH.Lift ()
-import Lens.Micro.TH (makeLenses)
+import Control.Lens.TH
 
 import Ohua.LensClasses
 import Ohua.Util
 
 type family SourceType t
+
+type Error = Text
 
 -- | Though it may seem innocuous, this class, as well as 'Unwrap',
 -- are instrumental to the types defined in these modules. 'Make'
@@ -124,6 +126,8 @@ newtype FnId =
 
 type instance SourceType FnId = Int
 
+instance Plated FnId where plate = gplate
+
 instance UnsafeMake FnId where
     unsafeMake = FnId
 
@@ -141,6 +145,8 @@ instance Unwrap FnId where
 newtype Binding =
     Binding Text
     deriving (Eq, Hashable, Generic, Ord, Monoid, NFData, Show, Lift)
+
+instance Plated Binding where plate = gplate
 
 deriving instance Semigroup Binding
 
@@ -163,6 +169,8 @@ instance IsString Binding where
 newtype NSRef =
     NSRef (V.Vector Binding)
     deriving (Eq, Generic, NFData, Ord, Show, Lift)
+
+instance Plated NSRef where plate = gplate
 
 instance IsList NSRef where
   type Item NSRef = Binding
@@ -187,21 +195,17 @@ instance Hashable NSRef where
 
 -- | A qualified binding. References a particular bound value inside a
 -- namespace.
-data QualifiedBinding = QualifiedBinding
-    { qbNamespace :: NSRef
-    , qbName      :: Binding
-    } deriving (Eq, Generic, Ord, Show, Lift)
+declareFields [d|
+    data QualifiedBinding = QualifiedBinding
+        { qualifiedBindingNamespace :: NSRef
+        , qualifiedBindingName      :: Binding
+        } deriving (Eq, Generic, Ord, Show, Lift)
+  |]
 
-instance HasNamespace QualifiedBinding NSRef where
-    namespace f s = (\ns' -> s {qbNamespace = ns'}) <$> f (qbNamespace s)
-instance HasName QualifiedBinding Binding where
-    name f s = (\n' -> s {qbName = n'}) <$> f (qbName s)
+instance Plated QualifiedBinding where plate = gplate
+instance NFData QualifiedBinding
 
-instance Hashable QualifiedBinding where
-    hashWithSalt s (QualifiedBinding a b) = hashWithSalt s (a, b)
-
-instance NFData QualifiedBinding where
-    rnf (QualifiedBinding ns n) = ns `deepseq` rnf n
+instance Hashable QualifiedBinding
 
 instance IsString QualifiedBinding where
     fromString s = case fromString s of
@@ -213,11 +217,9 @@ instance IsString QualifiedBinding where
 data SomeBinding
     = Unqual Binding
     | Qual QualifiedBinding
-    deriving (Eq, Show, Lift)
+    deriving (Eq, Show, Lift, Generic)
 
-instance Hashable SomeBinding where
-    hashWithSalt s (Unqual b) = hashWithSalt s (0 :: Int, b)
-    hashWithSalt s (Qual b)   = hashWithSalt s (1 :: Int, b)
+instance Hashable SomeBinding
 
 instance IsString SomeBinding where
     fromString = either error identity . symbolFromString . toText
@@ -258,6 +260,8 @@ newtype HostExpr = HostExpr
     { unwrapHostExpr :: Int
     } deriving (Eq, Ord, Generic, Show, Lift)
 
+instance Plated HostExpr where plate = gplate
+
 -- Only exists to allow literal integers to be interpreted as host expressions
 instance Num HostExpr where
     fromInteger = makeThrow . fromInteger
@@ -285,7 +289,6 @@ instance Make HostExpr where
 instance Unwrap HostExpr where
     unwrap (HostExpr i) = i
 
-type Error = Text
 data FunRef = FunRef QualifiedBinding (Maybe FnId)
     deriving (Show, Eq, Generic, Lift)
 
@@ -296,6 +299,7 @@ data Lit
     | EnvRefLit !HostExpr -- ^ A reference to some value from the environment
     | FunRefLit FunRef -- ^ Reference to an external function
     deriving (Show, Eq, Lift, Generic)
+
 type StageName = Text
 type AbortCompilation = Bool
 data DumpCode
@@ -303,14 +307,14 @@ data DumpCode
     | DumpPretty
 type StageHandling = StageName -> (DumpCode, AbortCompilation)
 
-data Options = Options
-    { _callEnvExpr :: !(Maybe QualifiedBinding)
-    , _callLocalFunction :: !(Maybe QualifiedBinding)
-    , _transformRecursiveFunctions :: Bool
-    , _stageHandling :: StageHandling
-    }
-
-makeLenses ''Options
+declareLenses [d|
+    data Options = Options
+        { callEnvExpr :: !(Maybe QualifiedBinding)
+        , callLocalFunction :: !(Maybe QualifiedBinding)
+        , transformRecursiveFunctions :: Bool
+        , stageHandling :: StageHandling
+        }
+  |]
 
 instance Default Options where
     def =
@@ -321,12 +325,12 @@ instance Default Options where
             (const (Don'tDump, False))
 
 -- | Stateful name generator
-data NameGenerator = NameGenerator
-    { _takenNames :: !(HS.HashSet Binding)
-    , _simpleNameList :: [Binding]
-    }
-
-makeLenses ''NameGenerator
+declareLenses [d|
+    data NameGenerator = NameGenerator
+        { takenNames :: !(HS.HashSet Binding)
+        , simpleNameList :: [Binding]
+        }
+  |]
 
 type instance SourceType NameGenerator = (HS.HashSet Binding, [Binding])
 
@@ -337,13 +341,13 @@ instance Make NameGenerator where
     make = pure . unsafeMake
 
 -- | State of the ohua compiler monad.
-data OhuaState envExpr = OhuaState
-    { _nameGenerator :: !NameGenerator
-    , _idCounter :: !FnId
-    , _envExpressions :: !(V.Vector envExpr)
-    }
-
-makeLenses ''OhuaState
+declareLenses [d|
+    data OhuaState envExpr = OhuaState
+        { nameGenerator :: !NameGenerator
+        , idCounter :: !FnId
+        , envExpressions :: !(V.Vector envExpr)
+        }
+  |]
 
 type instance SourceType (OhuaState envExpr) =
      (NameGenerator, FnId, V.Vector envExpr)
@@ -353,9 +357,9 @@ instance Make (OhuaState envExpr) where
 
 
 -- | The read only compiler environment
-newtype Environment = Environment { _options :: Options }
-
-makeLenses ''Environment
+declareLenses [d|
+    newtype Environment = Environment { options :: Options }
+  |]
 
 instance Default Environment where
     def = Environment def
@@ -371,11 +375,12 @@ instance Default Environment where
 data Annotated annotation value =
     Annotated !annotation
               !value
-    deriving (Eq, Show, Lift)
+    deriving (Eq, Show, Lift, Functor, Foldable, Traversable, Generic)
+
+instance Plated (Annotated annotation value) where plate = gplate
 
 instance (NFData annotation, NFData value) =>
-         NFData (Annotated annotation value) where
-    rnf (Annotated ann val) = ann `deepseq` rnf val
+         NFData (Annotated annotation value)
 
 instance HasValue (Annotated annotation value) (Annotated annotation value') value value' where
     value f (Annotated ann val) = Annotated ann <$> f val
@@ -391,15 +396,6 @@ instance Bifoldable Annotated where
 
 instance Bitraversable Annotated where
     bitraverse f g (Annotated ann val) = Annotated <$> f ann <*> g val
-
-instance Functor (Annotated ann) where
-    fmap = bimap identity
-
-instance F.Foldable (Annotated ann) where
-    foldr = bifoldr (flip const)
-
-instance Traversable (Annotated ann) where
-    traverse = bitraverse pure
 
 instance Comonad (Annotated ann) where
     extract (Annotated _ val) = val

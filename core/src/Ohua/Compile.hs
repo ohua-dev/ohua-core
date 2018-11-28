@@ -22,6 +22,7 @@ import Ohua.ALang.Passes
 import Ohua.ALang.Passes.SSA
 import Ohua.ALang.Passes.TailRec (loadTailRecPasses)
 import Ohua.ALang.Refs as Refs
+import Control.Lens (view)
 import Ohua.Configuration
 import Ohua.DFGraph
 import Ohua.DFLang.Optimizations

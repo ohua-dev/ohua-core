@@ -15,7 +15,6 @@ import Ohua.ALang.Lang
 import qualified Ohua.ALang.Refs as Refs (nth)
 
 import Data.Functor.Foldable
-import Data.Generics.Uniplate.Direct (transform, universe)
 import qualified Data.HashSet as HS
 import qualified Data.Text as T
 

@@ -27,8 +27,8 @@ import Data.Default.Class
 import qualified Data.HashSet as HS
 import qualified Data.Text as T
 import qualified Data.Vector as V
-import Lens.Micro.Mtl
-import Data.Generics.Uniplate.Direct
+import Control.Lens.Plated
+import Control.Lens.Operators ((%=), (.=))
 
 import Ohua.Types as Ty
 import Ohua.ALang.Lang

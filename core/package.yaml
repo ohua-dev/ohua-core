@@ -24,11 +24,12 @@ dependencies:
 - text
 - mtl
 - aeson # >= 1.0.0.0
-- microlens
-- microlens-mtl
+- lens
+#- microlens
+#- microlens-mtl
 - containers
 - bytestring
-- deepseq
+#- deepseq
 - data-default-class
 - universum >= 1.0
 default-extensions:
@@ -51,6 +52,7 @@ default-extensions:
 - DeriveFoldable
 - DeriveTraversable
 - DeriveGeneric
+- DeriveDataTypeable
 - PatternSynonyms
 - NamedFieldPuns
 - RecordWildCards
@@ -105,16 +107,15 @@ library:
   - transformers
   - unordered-containers
   - hashable
-  - monad-loops
+  #- monad-loops
   - vector
   - bifunctors
   - recursion-schemes
   - free
   - boxes
   - transformers-base
-  - monad-control
+  #- monad-control
   - comonad
-  - uniplate
   - fgl
   - monad-logger
   - fast-logger
@@ -122,7 +123,6 @@ library:
   - safe-exceptions
   - template-haskell
   - th-lift-instances
-  - microlens-th
   include-dirs:
     cbits
   when:
