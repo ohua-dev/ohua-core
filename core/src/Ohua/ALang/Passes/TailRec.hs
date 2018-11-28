@@ -152,7 +152,7 @@ without additional semantics. That is, without knowing that the `recurFun` calls
 are actually one. However, at this point, it is not lambda calculus anymore.
 
 === Phase 3: (Performed on the expression in ALang-normalized form (ANF)!)
-Rewrite the code (for a call) such that:
+RewriteAll the code (for a call) such that:
 
 @
   let g = recur (\args -> let (x1 ... xn) = args
@@ -262,7 +262,7 @@ loadTailRecPasses True passes@(CustomPasses { passBeforeNormalize = bn
                                             }) =
     passes
         { passBeforeNormalize = (\e -> bn =<< (findTailRecs True e))
-        , passAfterNormalize = (\e -> an =<< rewrite e)
+        , passAfterNormalize = (\e -> an =<< rewriteAll e)
         }
 
 -- Currently not exposed by the frontend but only as the only part of recursion
@@ -399,13 +399,15 @@ verifyTailRecursion e =
     error $ T.pack $ "Invariant broken! Found stmt: " ++ (show e)
 
 -- Phase 3:
-rewrite :: (MonadGenBnd m, MonadError Error m) => Expression -> m Expression
-rewrite e
+rewriteAll :: (MonadGenBnd m, MonadError Error m) => Expression -> m Expression
+rewriteAll e
     | isCall y e = rewriteCallExpr e
-rewrite (Let v expr inExpr) = Let v <$> rewrite expr <*> rewrite inExpr
-rewrite (Apply a b) = Apply <$> rewrite a <*> rewrite b
-rewrite (Lambda a e) = Lambda a <$> rewrite e
-rewrite v@(Var _) = return v
+rewriteAll (Let v expr inExpr) = Let v <$> rewriteAll expr <*> rewriteAll inExpr
+rewriteAll (Apply a b) = Apply <$> rewriteAll a <*> rewriteAll b
+rewriteAll (Lambda a e) = Lambda a <$> rewriteAll e
+rewriteAll v@(Var _) = return v
+-- With `plated` this would be
+-- rewriteAll = transformM $ \e -> if isCall y e then rewriteCallExpr r else pure e
 
 isCall f (Apply (Sf f' _) _)
     | f == f' = True
