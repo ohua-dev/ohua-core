@@ -52,12 +52,8 @@ module Ohua.Types
     , simpleNameList
     , takenNames
     , Annotated(Annotated)
+    , TyExpr(TyApp, TyRef)
     , TyExprF(..)
-#if GHC_HAS_BUNDLED_PATTERN_SYNONYMS
-    , TyExpr(unTyExpr, TyApp, TyRef)
-#else
-    , TyExpr(unTyExpr), pattern TyApp, pattern TyRef
-#endif
     , TyVar(..)
     , SomeTyVar
     , DefaultTyExpr
@@ -408,84 +404,34 @@ instance Comonad (Annotated ann) where
 -- The actual expression type is 'TyExpr' and its associated patterns, 'TyRef'
 -- and 'TyApp'. The 'TyExprF' type is its base functor, encountered when using
 -- the @recursion-schemes@ library functions, such as 'RS.cata'.
-data TyExprF binding a
-    = TyRefF binding -- ^ A primitive referece to a type
-    | TyAppF a a -- ^ A type application
-    deriving (Show, Eq, Functor, Traversable, F.Foldable, Lift)
+data TyExpr binding
+    = TyRef binding -- ^ A primitive referece to a type
+    | TyApp (TyExpr binding)
+            (TyExpr binding) -- ^ A type application
+    deriving (Show, Eq, Ord, Functor, Traversable, F.Foldable, Lift, Generic)
 
-newtype TyExpr binding = TyExpr
-    { unTyExpr :: TyExprF binding (TyExpr binding)
-    } deriving (Eq, Show, Lift)
+instance Plated (TyExpr binding) where plate = gplate
+instance NFData binding => NFData (TyExpr binding)
 
-pattern TyRef :: binding -> TyExpr binding
-pattern TyRef b = TyExpr (TyRefF b)
-
-pattern TyApp :: TyExpr binding -> TyExpr binding -> TyExpr binding
-pattern TyApp f v = TyExpr (TyAppF f v)
-
-#if COMPLETE_PRAGMA_WORKS
-{-# COMPLETE TyRef, TyApp #-}
-#endif
-
-type instance Base (TyExpr binding) = TyExprF binding
-
-instance RS.RECURSION_SCHEMES_RECURSIVE_CLASS (TyExpr binding) where
-    project (TyExpr e) = e
-instance RS.RECURSION_SCHEMES_CORECURSIVE_CLASS (TyExpr binding) where
-    embed = TyExpr
-
-instance Uniplate (TyExpr bnd) where
-    uniplate (TyRef r) = plate (TyRef r)
-    uniplate (TyApp a b) = plate TyApp |* a |* b
-
-instance Biplate (TyExpr bnd) (TyExpr bnd) where
-    biplate = plateSelf
-
-instance Uniplate bnd => Biplate (TyExpr bnd) bnd where
-    biplate (TyRef r) = plate TyRef |* r
-    biplate (TyApp a b) = plate TyApp |+ a |+ b
-
-instance (NFData binding, NFData a) => NFData (TyExprF binding a) where
-    rnf (TyRefF v) = rnf v
-    rnf (TyAppF f v) = f `deepseq` rnf v
-
-instance NFData binding => NFData (TyExpr binding) where
-    rnf (TyExpr e) = rnf e
-
-instance Functor TyExpr where
-    fmap f (TyRef r) = TyRef $ f r
-    fmap f (TyApp e1 e2) = recur e1 `TyApp` recur e2
-      where recur = fmap f
-
-instance F.Foldable TyExpr where
-    foldr f =
-        flip $
-        cata $ \case
-            TyRefF r -> f r
-            TyAppF a b -> a . b
-
-instance Traversable TyExpr where
-    traverse f =
-        cata $ \case
-            TyRefF r -> TyRef <$> f r
-            TyAppF a b -> TyApp <$> a <*> b
+makeBaseFunctor ''TyExpr
 
 -- | Default primitive type references (type variables and constructors)
 data TyVar tyConRef tyVarRef
     = TyCon tyConRef
     | TyVar tyVarRef
-    deriving (Show, Eq, Lift)
+    deriving (Show, Eq, Functor, Lift, Generic)
+
+instance Plated (TyVar a b) where
+    plate = gplate
 
 instance (NFData tyConRef, NFData tyVarRef) =>
-         NFData (TyVar tyConRef tyVarRef) where
-    rnf (TyCon c) = rnf c
-    rnf (TyVar v) = rnf v
+         NFData (TyVar tyConRef tyVarRef)
+instance (Hashable tyConRef, Hashable tyVarRef) =>
+         Hashable (TyVar tyConRef tyVarRef)
 
 instance Bifunctor TyVar where
     bimap f _ (TyCon c) = TyCon (f c)
     bimap _ g (TyVar v) = TyVar (g v)
-
-instance Functor (TyVar a) where fmap = bimap identity
 
 -- | Typical instantiation of a @TyVar@
 type SomeTyVar = TyVar SomeBinding SomeBinding
