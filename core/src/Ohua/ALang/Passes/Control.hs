@@ -153,9 +153,6 @@ let cond :: Bool = ...
                                ... true branch expression ... ) in ...
 @
 
-TODO: replace the `recur` operator in the tail recursion with a `ctrl` operator.
-TODO: provide an optimization pass on DFLang that removes the `nth` nodes knowning that
-the `ctrl` operator can provide this destructuring easily in its implementation.
 -}
 module Ohua.ALang.Passes.Control where
 
