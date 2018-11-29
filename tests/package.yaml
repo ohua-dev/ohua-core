@@ -49,6 +49,7 @@ default-extensions:
 - NoImplicitPrelude
 - RankNTypes
 - ViewPatterns
+- QuasiQuotes
 executables:
   ohua-test-exec:
     main: Main.hs

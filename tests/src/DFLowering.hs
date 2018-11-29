@@ -16,6 +16,7 @@ import Ohua.DFGraph
 import Ohua.DFLang.Lang
 import Ohua.DFLang.Passes
 import qualified Ohua.DFLang.Refs as Refs
+import Ohua.Test (embedALang)
 import Ohua.Test.DFGraph
 
 sf :: a -> AExpr bndType (Symbol a)
@@ -53,14 +54,22 @@ lowerAndValidate sourceExpr targetExpr statementType = do
 smapLowering :: Spec
 smapLowering =
     describe "lowering smap constructs" $ do
-        let sourceExpr =
-                Let "coll" (sf ALangRefs.id `Apply` 0) $
-                Let
-                    "x"
-                    (sf ALangRefs.smap `Apply`
-                     Lambda "y" (Let "z" ("some.module/inc" `Apply` "y") "z") `Apply`
-                     "coll")
-                    "x"
+        let sourceExpr
+                -- Let "coll" (sf ALangRefs.id `Apply` 0) $
+                -- Let
+                --     "x"
+                --     (sf ALangRefs.smap `Apply`
+                --      Lambda "y" (Let "z" ("some.module/inc" `Apply` "y") "z") `Apply`
+                --      "coll")
+                --     "x"
+             =
+                [embedALang|
+                        let coll = ohua.lang/id 0 in
+                          let x = ohua.lang/smap
+                                    (\y -> let z = some.module/inc y in z)
+                                    coll in
+                            x
+                               |]
         let targetExpr =
                 DFExpr
                     [ LetExpr 0 "coll" Refs.id [0] Nothing
@@ -80,24 +89,35 @@ smapSpec = smapLowering
 ifLowering :: Spec
 ifLowering =
     describe "lowering conditionals" $ do
-        let sourceExpr =
-                Let "a" (sf ALangRefs.id `Apply` 0) $
-                Let "b" (sf ALangRefs.id `Apply` 1) $
-                Let "c" (sf ALangRefs.id `Apply` 2) $
-                Let
-                    "z"
-                    (Apply
-                         (Apply
-                              (Apply (sf ALangRefs.ifThenElse) "c")
-                              (Lambda
-                                   "then"
-                                   (Let "f"
-                                        (Apply (Apply "some-ns/+" "a") "b")
-                                        "f")))
-                         (Lambda
-                              "else"
-                              (Let "f0" (Apply (Apply "some-ns/-" "a") "b") "f0")))
-                    "z"
+        let sourceExpr
+                -- Let "a" (sf ALangRefs.id `Apply` 0) $
+                -- Let "b" (sf ALangRefs.id `Apply` 1) $
+                -- Let "c" (sf ALangRefs.id `Apply` 2) $
+                -- Let
+                --     "z"
+                --     (Apply
+                --          (Apply
+                --               (Apply (sf ALangRefs.ifThenElse) "c")
+                --               (Lambda
+                --                    "then"
+                --                    (Let "f"
+                --                         (Apply (Apply "some-ns/+" "a") "b")
+                --                         "f")))
+                --          (Lambda
+                --               "else"
+                --               (Let "f0" (Apply (Apply "some-ns/-" "a") "b") "f0")))
+                --     "z"
+             =
+                [embedALang|
+                  let a = ohua.lang/id 0 in
+                  let b = ohua.lang/id 1 in
+                  let c = ohua.lang/id 2 in
+                  let z = ohua.lang/if
+                            c
+                           (\then -> let f = some-ns/+ a b in f)
+                           (\else -> let f0 = some-ns/- a b in f0) in
+                    z
+                |]
         let targetExpr =
                 DFExpr
                     [ LetExpr 0 "a" Refs.id [0] Nothing
@@ -122,17 +142,24 @@ generalLowering :: Spec
 generalLowering = do
     describe "lowering a stateful function" $ do
         it "lowers a function with one argument" $
-            Let
-                "a"
-                (sf ALangRefs.id `Apply` 0)
-                (Let "x" ("some/function" `Apply` "a") "x") `shouldLowerTo`
+            -- Let
+            --     "a"
+            --     (sf ALangRefs.id `Apply` 0)
+            --     (Let "x" ("some/function" `Apply` "a") "x")
+            [embedALang|
+              let a = ohua.lang/id 0 in let x = some/function a in x
+              |] `shouldLowerTo`
             DFExpr
                 [ LetExpr 1 "a" Refs.id [0] Nothing
                 , LetExpr 0 "x" "some/function" ["a"] Nothing
                 ]
                 "x"
         it "lowers a function with one env argument" $
-            Let "x" ("some/function" `Apply` 0) "x" `shouldLowerTo`
+            -- Let
+            --     "x"
+            --     ("some/function" `Apply` 0)
+            --     "x"
+            [embedALang| let x = some/function 0 in x |] `shouldLowerTo`
             DFExpr [LetExpr 0 "x" "some/function" [0] Nothing] "x"
         -- left out for the moment one we merge the unit stuff into the core we can add it back
         -- it "lowers a function with no arguments" $
@@ -150,16 +177,21 @@ seqSpec :: Spec
 seqSpec = do
     describe "seq lowering" $ do
         it "lowers a simple seq" $
-            (Let "y" (sf ALangRefs.id `Apply` 0) $
-             Let
-                 "x"
-                 (sf ALangRefs.seq `Apply` "y" `Apply`
-                  Lambda
-                      "_"
-                      (Let "p"
-                           ("some/function" `Apply` (Var (Env (1 :: HostExpr))))
-                           "p"))
-                 "x") `shouldLowerTo`
+            -- (Let "y" (sf ALangRefs.id `Apply` 0) $
+            --  Let
+            --      "x"
+            --      (sf ALangRefs.seq `Apply` "y" `Apply`
+            --       Lambda
+            --           "_"
+            --           (Let "p"
+            --                ("some/function" `Apply` (Var (Env (1 :: HostExpr))))
+            --                "p"))
+            --      "x")
+            [embedALang|
+              let y = ohua.lang/id 0 in
+              let x = ohua.lang/seq y (let p = some/function 1 in p) in
+                x
+            |] `shouldLowerTo`
             DFExpr
                 [ LetExpr 1 "y" Refs.id [0] Nothing
                 , LetExpr 2 "y0" Refs.seq ["y"] Nothing
@@ -189,7 +221,8 @@ matchAndReport gr1 gr2
                     filter
                         (not . flip IntSet.member (IntMap.keysSet largest) . fst)
                         (labNodes gr2)
-             in expectationFailure $ toString $
+             in expectationFailure $
+                toString $
                 unlines
                     [ "Graphs weren't isomorphic."
                     , "The largest match was between"
