@@ -83,7 +83,7 @@ data Lexeme
     | KWDataflow
     | OPEq -- ^ operator @=@
     | OPComma -- ^ operator @,@
-    | Int_ Int
+    | Int_ Integer
     | EnvRef HostExpr
     | UnqualId Binding -- ^ an identifier
     | QualId QualifiedBinding -- ^ a qualified binding

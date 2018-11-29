@@ -9,7 +9,6 @@ import Ohua.Prelude
 
 import qualified Data.Text as T
 import Text.PrettyPrint.Boxes hiding ((<>))
-import Ohua.ALang.Lang (Lit(..))
 
 import Ohua.DFGraph
 

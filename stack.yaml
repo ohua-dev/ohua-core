@@ -6,7 +6,7 @@ packages:
 - ./tests
 - location:
     git: https://github.com/ohua-dev/alang-ml-parser
-    commit: 17ad1606549984ddd68bc6a0a2d0d074ae9b8be5
+    commit:  55afe8e5de0417f6be00ff87586a8436c94529c1
   extra-dep: true
 extra-deps: []
 resolver: lts-12.6

@@ -37,9 +37,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 
 module Ohua.ALang.Lang
-  ( Lit(..)
-  , FunRef(..)
-  , Expr(..)
+  ( Expr(..)
   , AExpr
   , Expression
   -- ** Convenience patterns
@@ -55,27 +53,16 @@ import Universum
 
 import Data.Functor.Foldable as RS
 import Data.Functor.Foldable.TH (makeBaseFunctor)
-import Data.Generics.Uniplate.Direct
+import Control.Lens.Plated
 import Language.Haskell.TH.Syntax (Lift)
 import Control.Category ((>>>))
 
 import Ohua.Types
-import Ohua.LensClasses
 
 #include "compat.h"
 
 -------------------- Basic ALang types --------------------
 
-data FunRef = FunRef QualifiedBinding (Maybe FnId)
-    deriving (Show, Eq, Generic, Lift)
-
--- | Literals of kinds we expect any host language to support
-data Lit
-    = NumericLit !Integer -- ^ an integer literal
-    | UnitLit -- ^ aka @()@
-    | EnvRefLit !HostExpr -- ^ A reference to some value from the environment
-    | FunRefLit FunRef -- ^ Reference to an external function
-    deriving (Show, Eq, Lift, Generic)
 
 -- IMPORTANT: we need this to be polymorphic over `bindingType` or at
 -- least I would very much recommend that, because then we can
@@ -133,7 +120,7 @@ data Expr
     | Let Binding Expr Expr
     | Apply Expr Expr
     | Lambda Binding Expr
-    deriving (Show, Eq, Lift)
+    deriving (Show, Eq, Lift, Generic)
 
 type AExpr = Expr
 -- | Backward compatibility alias
@@ -181,16 +168,7 @@ instance NFData AExpr where
             ApplyF a b -> a `deepseq` rnf b
             LambdaF assign b -> assign `deepseq` rnf b
 
--------------------- Uniplate support --------------------
-
-instance Uniplate AExpr where
-    uniplate (Let assign val body) = plate (Let assign) |* val |* body
-    uniplate (Apply f v) = plate Apply |* f |* v
-    uniplate (Lambda assign body) = plate (Lambda assign) |* body
-    uniplate o = plate o
-
-instance Biplate AExpr AExpr where
-    biplate = plateSelf
+instance Plated AExpr where plate = gplate
 
 -------------------- Additional Traversals --------------------
 

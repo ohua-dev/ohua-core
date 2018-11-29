@@ -27,8 +27,8 @@ import Data.Default.Class
 import qualified Data.HashSet as HS
 import qualified Data.Text as T
 import qualified Data.Vector as V
-import Lens.Micro.Mtl
-import Data.Generics.Uniplate.Direct
+import Control.Lens.Plated
+import Control.Lens.Operators ((%=), (.=))
 
 import Ohua.Types as Ty
 import Ohua.ALang.Lang
@@ -51,15 +51,14 @@ newtype OhuaM env a = OhuaM
                , MonadLoggerIO
                )
 
-class MonadGenBnd m where
+class Monad m => MonadGenBnd m where
     generateBinding :: m Binding
-    default generateBinding :: (MonadGenBnd n, MonadTrans t, Monad n, t n ~ m) =>
+    default generateBinding :: (MonadGenBnd n, MonadTrans t, t n ~ m) =>
         m Binding
     generateBinding = lift generateBinding
     generateBindingWith :: Binding -> m Binding
     default generateBindingWith :: ( MonadGenBnd n
                                    , MonadTrans t
-                                   , Monad n
                                    , t n ~ m
                                    ) =>
         Binding -> m Binding
@@ -330,3 +329,15 @@ initNameGen taken =
           | num <- Nothing : map Just [(0 :: Integer) ..]
           , char <- ['a' .. 'z']
           ])
+
+newtype GenBndT m a = GenBndT (StateT NameGenerator m a)
+    deriving (Monad, Functor, Applicative, MonadTrans)
+
+instance Monad m => MonadGenBnd (GenBndT m) where
+    generateBinding = GenBndT $ generateBindingIn id
+    generateBindingWith = GenBndT . generateBindingWithIn id
+
+runGenBndT :: MonadError Error m => HS.HashSet Binding -> GenBndT m a -> m a
+runGenBndT taken (GenBndT comp) = do
+    ng <- initNameGen taken
+    evaluatingStateT ng comp

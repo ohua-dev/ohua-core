@@ -14,22 +14,22 @@ author:
 - Justus Adam
 maintainer: dev@justus.science
 license: OtherLicense
-license-file: ../LICENSE.txt
+license-file: LICENSE
 homepage: https://ohua-dev.github.io/ohua
 github: ohua-dev/ohua-core
 extra-source-files:
-- ../README.md
 - cbits/compat.h
 dependencies:
 - base >=4.8 && <5
 - text
 - mtl
 - aeson # >= 1.0.0.0
-- microlens
-- microlens-mtl
+- lens
+#- microlens
+#- microlens-mtl
 - containers
 - bytestring
-- deepseq
+#- deepseq
 - data-default-class
 - universum >= 1.0
 default-extensions:
@@ -52,6 +52,7 @@ default-extensions:
 - DeriveFoldable
 - DeriveTraversable
 - DeriveGeneric
+- DeriveDataTypeable
 - PatternSynonyms
 - NamedFieldPuns
 - RecordWildCards
@@ -104,16 +105,15 @@ library:
   - transformers
   - unordered-containers
   - hashable
-  - monad-loops
+  #- monad-loops
   - vector
   - bifunctors
   - recursion-schemes
   - free
   - boxes
   - transformers-base
-  - monad-control
+  #- monad-control
   - comonad
-  - uniplate
   - fgl
   - monad-logger
   - fast-logger
@@ -121,7 +121,6 @@ library:
   - safe-exceptions
   - template-haskell
   - th-lift-instances
-  - microlens-th
   include-dirs:
     cbits
   when:
