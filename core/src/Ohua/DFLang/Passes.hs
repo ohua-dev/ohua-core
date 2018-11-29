@@ -97,7 +97,9 @@ handleDefinitionalExpr _ e _ =
 lowerDefault :: MonadOhua m => Pass m
 lowerDefault fn fnId assign args =
     mapM expectVar args <&> \args' ->
-        [LetExpr fnId [assign] (EmbedSf fn) args' Nothing]
+        [LetExpr fnId [assign] (lowerFnToDFLang fn) args' Nothing]
+  where
+    lowerFnToDFLang = fromMaybe (EmbedSf fn) . Refs.lowerBuiltinFunctions
 
 -- | Analyze an apply expression, extracting the inner stateful
 -- function and the nested arguments as a list.  Also generates a new

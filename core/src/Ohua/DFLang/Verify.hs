@@ -34,5 +34,4 @@ checkBuiltinArities e =
             _ -> pure ()
   where
     builtinOps :: HM.HashMap DFFnRef Int
-    builtinOps =
-        [(Refs.collect, 2), (Refs.smapFun, 1), (Refs.id, 1), (Refs.select, 3)]
+    builtinOps = [(Refs.collect, 2), (Refs.smapFun, 1), (Refs.select, 3)]
