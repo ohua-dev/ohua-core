@@ -70,7 +70,7 @@ tests:
     main: Spec.hs
     source-dirs: src
     other-modules:
-    # - DFLowering
+    - DFLowering
     - PassesSpec
     - TestALangUtils
     - TestAesonConvert

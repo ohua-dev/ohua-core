@@ -1,7 +1,8 @@
 import Ohua.Prelude
 
 -- import qualified ALangVerify
--- import qualified DFLowering
+import qualified DFLowering
+
 -- import qualified TailRecSpec
 -- FIXME
 -- import           PassesSpec
@@ -14,12 +15,13 @@ main =
     hspec $
        -- FIXME
        -- passesSpec
-        -- DFLowering.generalLowering
-        -- DFLowering.ifSpec
+     do
+        DFLowering.generalLowering
+        DFLowering.ifSpec
+          -- FIXME
         -- DFLowering.seqSpec
         -- DFLowering.smapSpec
     --ALangVerify.currying
-     do
         TestALangUtils.spec
         TestAesonConvert.spec
         -- TailRecSpec.passesSpec

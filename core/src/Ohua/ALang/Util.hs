@@ -120,8 +120,10 @@ findFreeVariables e =
         (HS.fromList $ definedBindings e)
 
 fromListToApply :: FunRef -> [Expr] -> Expr
-fromListToApply f (v:[]) = Apply (Lit $ FunRefLit f) v
-fromListToApply f (v:vs) = Apply (fromListToApply f vs) v
+fromListToApply f args = go $ reverse args
+  where
+    go (v:[]) = Apply (Lit $ FunRefLit f) v
+    go (v:vs) = Apply (go vs) v
 
 fromApplyToList :: Expr -> (FunRef, [Expr])
 fromApplyToList (Apply (Lit (FunRefLit f)) v) = (f, [v])

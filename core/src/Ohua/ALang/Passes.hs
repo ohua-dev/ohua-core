@@ -29,6 +29,7 @@ import qualified Data.HashMap.Strict as HM
 import qualified Data.HashSet as HS
 
 import Ohua.ALang.Lang
+import Ohua.ALang.PPrint
 import Ohua.ALang.Passes.If
 import Ohua.ALang.Passes.Seq
 import Ohua.ALang.Passes.Smap
@@ -38,10 +39,13 @@ import Ohua.Stage
 runCorePasses :: MonadOhua m => Expression -> m Expression
 runCorePasses expr = do
     smapE <- smapRewrite expr
+    -- traceM $ "smap: " <> (show $ prettyExpr smapE)
     stage "smap-transformation" smapE
     ifE <- ifRewrite smapE
+    -- traceM $ "if: " <> (show $ prettyExpr ifE)
     stage "conditionals-transformation" ifE
     seqE <- seqRewrite ifE
+    -- traceM $ "seq: " <> (show $ prettyExpr seqE)
     stage "seq-transformation" seqE
     return seqE
 

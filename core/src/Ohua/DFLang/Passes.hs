@@ -64,6 +64,7 @@ checkSSAExpr (DFExpr l _) = checkSSA l
 -- 'checkProgramValidity'.
 lowerALang :: MonadOhua m => Expression -> m DFExpr
 lowerALang expr = do
+    traceM $ "Lowering alang expr: " <> quickRender expr
     logDebugN $ "Lowering alang expr: " <> quickRender expr
     (var, exprs) <- runWriterT $ lowerToDF expr
     return $ DFExpr exprs var

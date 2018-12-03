@@ -11,39 +11,38 @@ import qualified Data.IntSet as IntSet
 import Test.Hspec
 
 import Ohua.ALang.Lang
+import Ohua.ALang.Passes
 import qualified Ohua.ALang.Refs as ALangRefs
 import Ohua.DFGraph
 import Ohua.DFLang.Lang
+import Ohua.DFLang.PPrint
 import Ohua.DFLang.Passes
 import qualified Ohua.DFLang.Refs as Refs
 import Ohua.Test (embedALang, embedDFLang)
 import Ohua.Test.DFGraph
 
--- sf :: a -> AExpr bndType (Symbol a)
--- sf = Var . flip Sf Nothing
---
--- instance IsString DFFnRef where
---     fromString = EmbedSf . fromString
---
--- instance Num ResolvedSymbol where
---     fromInteger = Env . fromInteger
---
--- instance Num Expression where
---     fromInteger = Var . fromInteger
 shouldSatisfyRet :: Show a => IO a -> (a -> Bool) -> Expectation
 shouldSatisfyRet action predicate = action >>= (`shouldSatisfy` predicate)
 
 runLowering :: Expression -> IO DFExpr
 runLowering =
     fmap (either error identity) .
-    runSilentLoggingT . runFromExpr def lowerALang
+    runSilentLoggingT .
+    runFromExpr
+        def
+        (lowerALang <=<
+         normalize <=< Ohua.ALang.Passes.runCorePasses <=< normalize)
 
 -- | IMPORTANT: Both source and target expression must be in SSA form
 shouldLowerTo :: Expression -> DFExpr -> Expectation
 shouldLowerTo input expected = do
-    gr1 <- fmap (toFGLGraph . toGraph) (runLowering input)
-    let gr2 = toFGLGraph $ toGraph expected
-    (matchAndReport `on` unGr) gr1 gr2
+    lowered <- runLowering input
+    traceM $ "expected:\n" <> (show $ prettyDFExpr expected)
+    traceM $ "got:\n" <> (show $ prettyDFExpr lowered)
+    lowered `shouldBe` expected
+    -- let gr1 = (toFGLGraph . toGraph) lowered
+    -- let gr2 = toFGLGraph $ toGraph expected
+    -- (matchAndReport `on` unGr) gr1 gr2
 
 lowerAndValidate :: Expression -> DFExpr -> String -> Spec
 lowerAndValidate sourceExpr targetExpr statementType = do
@@ -124,8 +123,8 @@ ifLowering =
                   let c = ohua.lang/id 2 in
                   let z = ohua.lang/if
                             c
-                           (\then0 -> let f = someNs/plus a b in f)
-                           (\else0 -> let f0 = someNs/minus a b in f0) in
+                           (\() -> let f = someNs/plus a b in f)
+                           (\() -> let f0 = someNs/minus a b in f0) in
                     z
                 |]
         let targetExpr
@@ -148,15 +147,23 @@ ifLowering =
                 --     "z"
              =
                 [embedDFLang|
-                  let (a) = ohua.lang/id<0> (0) in
-                  let (b) = ohua.lang/id<1> (1) in
-                  let (c) = ohua.lang/id<2> (2) in
-                  let (true, false) = ohua.lang/bool<3> (c) in
-                  let (a0, b0) = ohua.lang/scope<7> (a,b) [true] in
-                  let (a1, b1) = ohua.lang/scope<8> (a,b) [false] in
-                  let (d) = someNs/plus<4> (a0,b0) in
-                  let (e) = someNs/minus<5> (a1,b1) in
-                  let (z) = ohua.lang/select<6> (true,d,e) in
+                  let (a) = ohua.lang/id<1> (0)  in
+                  let (b) = ohua.lang/id<2> (1)  in
+                  let (c) = ohua.lang/id<3> (2)  in
+                  let (ctrls_0) = dataflow ohua.lang/ifFun<4> (c)  in
+                  let (ctrlTrue_1) = ohua.lang/nth<5> (0, ctrls_0)  in
+                  let (ctrlFalse_1) = ohua.lang/nth<6> (1, ctrls_0)  in
+                  let (ctrl_0) = dataflow ohua.lang/ctrl<7> (ctrlTrue_0, a, b, ())  in
+                  let (a_0) = ohua.lang/nth<8> (0, ctrl_0)  in
+                  let (b_0) = ohua.lang/nth<9> (1, ctrl_0)  in
+                  let (unitVar_0) = ohua.lang/nth<10> (2, ctrl_0)  in
+                  let (trueResult_0) = someNs/plus<11> (a_0, b_0)  in
+                  let (ctrl_1) = dataflow ohua.lang/ctrl<12> (ctrlFalse_0, a, b, ())  in
+                  let (a_1) = ohua.lang/nth<13> (0, ctrl_1)  in
+                  let (b_1) = ohua.lang/nth<14> (1, ctrl_1)  in
+                  let (unitVar_1) = ohua.lang/nth<15> (2, ctrl_1)  in
+                  let (falseResult_0) = someNs/minus<16> (a_1, b_1)  in
+                  let (z) = dataflow ohua.lang/select<17> (c, trueResult_0, falseResult_0)  in
                     z
                 |]
         lowerAndValidate sourceExpr targetExpr "if"
@@ -170,7 +177,9 @@ generalLowering = do
             --     (sf ALangRefs.id `Apply` 0)
             --     (Let "x" ("some/function" `Apply` "a") "x")
             [embedALang|
-              let a = ohua.lang/id 0 in let x = some/function a in x
+              let a = ohua.lang/id 0 in
+              let x = some/function a in
+                x
               |] `shouldLowerTo`
             -- DFExpr
             --     [ LetExpr 1 "a" Refs.id [0] Nothing
@@ -179,7 +188,7 @@ generalLowering = do
             --     "x"
             [embedDFLang|
               let (a) = ohua.lang/id<1> (0) in
-              let (x) = some/function<0> (a) in
+              let (x) = some/function<2> (a) in
                 x
             |]
         it "lowers a function with one env argument" $
@@ -189,7 +198,7 @@ generalLowering = do
             --     "x"
             [embedALang| let x = some/function 0 in x |] `shouldLowerTo`
             -- DFExpr [LetExpr 0 "x" "some/function" [0] Nothing] "x"
-            [embedDFLang| let (x) = some/function<0> (0) in x |]
+            [embedDFLang| let (x) = some/function<1> (0) in x |]
         -- left out for the moment one we merge the unit stuff into the core we can add it back
         -- it "lowers a function with no arguments" $
         --     Let "x" "some/function" "x"

@@ -175,9 +175,9 @@ import Ohua.Unit
 -- (if there are no independent function then this binding will never turn into an arc anyway.)
 liftIntoCtrlCtxt ::
        (Monad m, MonadGenBnd m) => Binding -> Expression -> m Expression
-liftIntoCtrlCtxt ctrlIn lam@(Lambda _ _) = do
-    (lam', actuals) <- lambdaLifting lam
-    let (originalFormals, _) = lambdaArgsAndBody lam
+liftIntoCtrlCtxt ctrlIn e = do
+    (lam', actuals) <- lambdaLifting e
+    let (originalFormals, _) = lambdaArgsAndBody e
     let (allFormals, e) = lambdaArgsAndBody lam'
     unitVar <- generateBindingWith "unitVar"
     ctrlOut <- generateBindingWith "ctrl"
@@ -185,7 +185,7 @@ liftIntoCtrlCtxt ctrlIn lam@(Lambda _ _) = do
     let formals' = formals ++ [unitVar]
     let actuals' = (map Var $ [ctrlIn] ++ actuals) ++ [unitExpr]
     let e' = replaceUnitWithVar unitVar e
-    let ie = mkDestructured formals ctrlOut e'
+    let ie = mkDestructured formals' ctrlOut e'
     return $
         mkLambda originalFormals $
         Let
@@ -199,5 +199,6 @@ liftIntoCtrlCtxt ctrlIn lam@(Lambda _ _) = do
         Let v (replaceUnitWithVar unitVar e) (replaceUnitWithVar unitVar ie)
     replaceUnitWithVar unitVar (Apply e1 e2) =
         Apply (replaceUnitWithVar unitVar e1) (replaceUnitWithVar unitVar e2)
-    replaceUnitWithVar unitVar someunitExpr = Var unitVar
+    replaceUnitWithVar unitVar (Lit UnitLit) = Var unitVar
+    replaceUnitWithVar unitVar l@(Lit _) = l
     replaceUnitWithVar unitVar v@(Var _) = v

@@ -107,13 +107,15 @@ import Ohua.Prelude
 import Ohua.ALang.Lang
 import Ohua.ALang.Passes.Control (liftIntoCtrlCtxt)
 import qualified Ohua.ALang.Refs as Refs (ifFun, ifThenElse, select)
-import Ohua.ALang.Util (fromListToApply, lambdaLifting, mkDestructured)
+import Ohua.ALang.Util
+    ( fromListToApply
+    , lambdaArgsAndBody
+    , lambdaLifting
+    , mkDestructured
+    )
 import Ohua.Unit
 
 import Control.Monad (foldM)
-
-ifSf :: Expression
-ifSf = Lit $ FunRefLit $ FunRef Refs.ifThenElse Nothing
 
 selectSf :: Expression
 selectSf = Lit $ FunRefLit $ FunRef Refs.select Nothing
@@ -124,11 +126,18 @@ ifFunSf = Lit $ FunRefLit $ FunRef "ohua.lang/ifFun" Nothing
 ifRewrite :: (Monad m, MonadGenBnd m) => Expression -> m Expression
 ifRewrite (Let v a b) = Let v <$> ifRewrite a <*> ifRewrite b
 ifRewrite (Lambda v e) = Lambda v <$> ifRewrite e
-ifRewrite (Apply (Apply (Apply ifSf cond) trueBranch) falseBranch) = do
+ifRewrite (Apply (Apply (Apply (Lit (FunRefLit (FunRef "ohua.lang/if" Nothing))) cond) trueBranch) falseBranch)
+    -- traceM $ "true branch: " <> (show trueBranch)
+    -- traceM $ "false branch: " <> (show falseBranch)
+ = do
     ctrlTrue <- generateBindingWith "ctrlTrue"
     ctrlFalse <- generateBindingWith "ctrlFalse"
     trueBranch' <- liftIntoCtrlCtxt ctrlTrue trueBranch
     falseBranch' <- liftIntoCtrlCtxt ctrlFalse falseBranch
+    -- now these can become normal expressions
+    -- TODO match against "()" - unit symbol for args
+    let ((_:[]), trueBranch'') = lambdaArgsAndBody trueBranch'
+    let ((_:[]), falseBranch'') = lambdaArgsAndBody falseBranch'
     -- return $
     --     [ohualang|
     --       let ($var:ctrlTrue, $var:ctrlFalse) = ohua.lang/ifFun $var:cond in
@@ -146,10 +155,11 @@ ifRewrite (Apply (Apply (Apply ifSf cond) trueBranch) falseBranch) = do
     return $
         Let ctrls (Apply ifFunSf cond) $
         mkDestructured [ctrlTrue, ctrlFalse] ctrls $
-        Let trueResult trueBranch' $
-        Let falseResult falseBranch' $
+        Let trueResult trueBranch'' $
+        Let falseResult falseBranch'' $
         Let
             result
             (Apply (Apply (Apply selectSf cond) $ Var trueResult) $
              Var falseResult) $
         Var result
+ifRewrite e = return e
