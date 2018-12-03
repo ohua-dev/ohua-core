@@ -51,7 +51,6 @@ expr5 =
         (Lambda "c" "com.ohua.lang/smap-io-fun")
         (Lambda "c" "com.ohua.lang/pcollect")
 
--- does not parse yet
 -- expr5 =
 --     [embedALang| (\c -> com.ohua.lang/smap-io-fun) (\c -> com.ohua.lang/pcollect) |]
 main :: IO ()

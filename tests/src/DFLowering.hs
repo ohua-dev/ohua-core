@@ -16,21 +16,20 @@ import Ohua.DFGraph
 import Ohua.DFLang.Lang
 import Ohua.DFLang.Passes
 import qualified Ohua.DFLang.Refs as Refs
-import Ohua.Test (embedALang)
+import Ohua.Test (embedALang, embedDFLang)
 import Ohua.Test.DFGraph
 
-sf :: a -> AExpr bndType (Symbol a)
-sf = Var . flip Sf Nothing
-
-instance IsString DFFnRef where
-    fromString = EmbedSf . fromString
-
-instance Num ResolvedSymbol where
-    fromInteger = Env . fromInteger
-
-instance Num Expression where
-    fromInteger = Var . fromInteger
-
+-- sf :: a -> AExpr bndType (Symbol a)
+-- sf = Var . flip Sf Nothing
+--
+-- instance IsString DFFnRef where
+--     fromString = EmbedSf . fromString
+--
+-- instance Num ResolvedSymbol where
+--     fromInteger = Env . fromInteger
+--
+-- instance Num Expression where
+--     fromInteger = Var . fromInteger
 shouldSatisfyRet :: Show a => IO a -> (a -> Bool) -> Expectation
 shouldSatisfyRet action predicate = action >>= (`shouldSatisfy` predicate)
 
@@ -70,17 +69,28 @@ smapLowering =
                                     coll in
                             x
                                |]
-        let targetExpr =
-                DFExpr
-                    [ LetExpr 0 "coll" Refs.id [0] Nothing
-                    , LetExpr 4 "a" Refs.size ["coll"] Nothing
-                    , LetExpr 5 "b" Refs.oneToN ["a", "coll"] Nothing
-                    , LetExpr 1 "y" Refs.smapFun ["b"] Nothing
-                    , LetExpr 2 "z" "some.module/inc" ["y"] Nothing
-                    , LetExpr 6 "c" Refs.oneToN ["a", "a"] Nothing
-                    , LetExpr 3 "x" Refs.collect ["c", "z"] Nothing
-                    ]
-                    "x"
+        let targetExpr
+                -- DFExpr
+                --     [ LetExpr 0 "coll" Refs.id [0] Nothing
+                --     , LetExpr 4 "a" Refs.size ["coll"] Nothing
+                --     , LetExpr 5 "b" Refs.oneToN ["a", "coll"] Nothing
+                --     , LetExpr 1 "y" Refs.smapFun ["b"] Nothing
+                --     , LetExpr 2 "z" "some.module/inc" ["y"] Nothing
+                --     , LetExpr 6 "c" Refs.oneToN ["a", "a"] Nothing
+                --     , LetExpr 3 "x" Refs.collect ["c", "z"] Nothing
+                --     ]
+                --     "x"
+             =
+                [embedDFLang|
+                  let (coll) = ohua.lang/id<0> (0) in
+                  let (a) = ohua.lang/size<4> (coll) in
+                  let (b) = ohua.lang/oneToN<5> (a,coll) in
+                  let (y) = dataflow ohua.lang/smapFun<1> (b) in
+                  let (z) = some.module/inc<2> (y) in
+                  let (c) = ohua.lang/oneToN<6> (a,a) in
+                  let (x) = dataflow ohua.lang/collect<3> (c,z) in
+                    x
+                |]
         lowerAndValidate sourceExpr targetExpr "smap"
 
 smapSpec :: Spec
@@ -114,28 +124,41 @@ ifLowering =
                   let c = ohua.lang/id 2 in
                   let z = ohua.lang/if
                             c
-                           (\then -> let f = some-ns/+ a b in f)
-                           (\else -> let f0 = some-ns/- a b in f0) in
+                           (\then0 -> let f = someNs/plus a b in f)
+                           (\else0 -> let f0 = someNs/minus a b in f0) in
                     z
                 |]
-        let targetExpr =
-                DFExpr
-                    [ LetExpr 0 "a" Refs.id [0] Nothing
-                    , LetExpr 1 "b" Refs.id [1] Nothing
-                    , LetExpr 2 "c" Refs.id [2] Nothing
-                    , LetExpr 3 ["true", "false"] Refs.bool ["c"] Nothing
-                    , LetExpr 7 ["a0", "b0"] Refs.scope ["a", "b"] (Just "true")
-                    , LetExpr
-                          8
-                          ["a1", "b1"]
-                          Refs.scope
-                          ["a", "b"]
-                          (Just "false")
-                    , LetExpr 4 "d" "some-ns/+" ["a0", "b0"] Nothing
-                    , LetExpr 5 "e" "some-ns/-" ["a1", "b1"] Nothing
-                    , LetExpr 6 "z" Refs.select ["true", "d", "e"] Nothing
-                    ]
-                    "z"
+        let targetExpr
+                -- DFExpr
+                --     [ LetExpr 0 "a" Refs.id [0] Nothing
+                --     , LetExpr 1 "b" Refs.id [1] Nothing
+                --     , LetExpr 2 "c" Refs.id [2] Nothing
+                --     , LetExpr 3 ["true", "false"] Refs.bool ["c"] Nothing
+                --     , LetExpr 7 ["a0", "b0"] Refs.scope ["a", "b"] (Just "true")
+                --     , LetExpr
+                --           8
+                --           ["a1", "b1"]
+                --           Refs.scope
+                --           ["a", "b"]
+                --           (Just "false")
+                --     , LetExpr 4 "d" "some-ns/+" ["a0", "b0"] Nothing
+                --     , LetExpr 5 "e" "some-ns/-" ["a1", "b1"] Nothing
+                --     , LetExpr 6 "z" Refs.select ["true", "d", "e"] Nothing
+                --     ]
+                --     "z"
+             =
+                [embedDFLang|
+                  let (a) = ohua.lang/id<0> (0) in
+                  let (b) = ohua.lang/id<1> (1) in
+                  let (c) = ohua.lang/id<2> (2) in
+                  let (true, false) = ohua.lang/bool<3> (c) in
+                  let (a0, b0) = ohua.lang/scope<7> (a,b) [true] in
+                  let (a1, b1) = ohua.lang/scope<8> (a,b) [false] in
+                  let (d) = someNs/plus<4> (a0,b0) in
+                  let (e) = someNs/minus<5> (a1,b1) in
+                  let (z) = ohua.lang/select<6> (true,d,e) in
+                    z
+                |]
         lowerAndValidate sourceExpr targetExpr "if"
 
 generalLowering :: Spec
@@ -149,18 +172,24 @@ generalLowering = do
             [embedALang|
               let a = ohua.lang/id 0 in let x = some/function a in x
               |] `shouldLowerTo`
-            DFExpr
-                [ LetExpr 1 "a" Refs.id [0] Nothing
-                , LetExpr 0 "x" "some/function" ["a"] Nothing
-                ]
-                "x"
+            -- DFExpr
+            --     [ LetExpr 1 "a" Refs.id [0] Nothing
+            --     , LetExpr 0 "x" "some/function" ["a"] Nothing
+            --     ]
+            --     "x"
+            [embedDFLang|
+              let (a) = ohua.lang/id<1> (0) in
+              let (x) = some/function<0> (a) in
+                x
+            |]
         it "lowers a function with one env argument" $
             -- Let
             --     "x"
             --     ("some/function" `Apply` 0)
             --     "x"
             [embedALang| let x = some/function 0 in x |] `shouldLowerTo`
-            DFExpr [LetExpr 0 "x" "some/function" [0] Nothing] "x"
+            -- DFExpr [LetExpr 0 "x" "some/function" [0] Nothing] "x"
+            [embedDFLang| let (x) = some/function<0> (0) in x |]
         -- left out for the moment one we merge the unit stuff into the core we can add it back
         -- it "lowers a function with no arguments" $
         --     Let "x" "some/function" "x"
@@ -192,12 +221,18 @@ seqSpec = do
               let x = ohua.lang/seq y (let p = some/function 1 in p) in
                 x
             |] `shouldLowerTo`
-            DFExpr
-                [ LetExpr 1 "y" Refs.id [0] Nothing
-                , LetExpr 2 "y0" Refs.seq ["y"] Nothing
-                , LetExpr 0 "x" (EmbedSf "some/function") [1] "y0"
-                ]
-                "x"
+            -- DFExpr
+            --     [ LetExpr 1 "y" Refs.id [0] Nothing
+            --     , LetExpr 2 "y0" Refs.seq ["y"] Nothing
+            --     , LetExpr 0 "x" (EmbedSf "some/function") [1] "y0"
+            --     ]
+            --     "x"
+            [embedDFLang|
+              let (y) = ohua.lang/id<1> (0) in
+              let (y0) = ohua.lang/seq<2> (y) in
+              let (x) = some/function<0> (1) [y0] in
+                x
+            |]
 
 matchAndReport :: (Eq a, Ord b, Show a, Show b) => Gr a b -> Gr a b -> IO ()
 matchAndReport gr1 gr2

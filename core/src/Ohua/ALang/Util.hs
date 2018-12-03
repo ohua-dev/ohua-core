@@ -68,14 +68,14 @@ destructure source bnds =
 lambdaLifting ::
        (Monad m, MonadGenBnd m) => Expression -> m (Expression, [Binding])
 lambdaLifting o@(Lambda _ _) =
-    let (formalVars, _) = lambdaArgsAndBody o
+    let (formalVars, b) = lambdaArgsAndBody o
         freeVars = findFreeVariables o
         actuals = sort $ toList freeVars -- makes the list of args deterministic
      in case actuals of
             [] -> return (o, [])
             _ -> do
                 newFormals <- mapM generateBindingWith actuals
-                let rewrittenExp = foldl renameVar o $ zip actuals newFormals
+                let rewrittenExp = foldl renameVar b $ zip actuals newFormals
                 return
                     (mkLambda (formalVars ++ newFormals) rewrittenExp, actuals)
 lambdaLifting e =
@@ -103,7 +103,7 @@ definedBindings e =
     [ v
     | e' <- universe e
     , v <-
-          case e of
+          case e' of
               Let v' _ _ -> [v']
               Lambda v' _ -> [v']
               _ -> []
@@ -146,5 +146,5 @@ mkDestructured formals compound e = do
 lambdaArgsAndBody :: Expression -> ([Binding], Expression)
 lambdaArgsAndBody (Lambda arg l@(Lambda _ _)) =
     let (args, body) = lambdaArgsAndBody l
-     in (args ++ [arg], body)
+     in ([arg] ++ args, body)
 lambdaArgsAndBody (Lambda arg body) = ([arg], body)
