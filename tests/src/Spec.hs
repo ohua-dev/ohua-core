@@ -19,9 +19,8 @@ main =
         DFLowering.generalLowering
         DFLowering.ifSpec
         DFLowering.seqSpec
-        -- FIXME
-        -- DFLowering.smapSpec
-    --ALangVerify.currying
+        DFLowering.smapSpec
+        --ALangVerify.currying
         TestALangUtils.spec
         TestAesonConvert.spec
         -- TailRecSpec.passesSpec

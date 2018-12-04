@@ -28,7 +28,7 @@ module Ohua.ALang.Passes.Smap where
 import Ohua.ALang.Lang
 import Ohua.ALang.Passes.Control
 import qualified Ohua.ALang.Refs as Refs
-import Ohua.ALang.Util (mkDestructured)
+import Ohua.ALang.Util (lambdaArgsAndBody, mkDestructured, renameVar)
 import Ohua.Prelude
 
 smapSfFun :: Expression
@@ -40,9 +40,12 @@ collectSf = Lit $ FunRefLit $ FunRef Refs.collect Nothing
 smapRewrite :: (Monad m, MonadGenBnd m) => Expression -> m Expression
 smapRewrite (Let v a b) = Let v <$> smapRewrite a <*> smapRewrite b
 smapRewrite (Lambda v e) = Lambda v <$> smapRewrite e
-smapRewrite e@(Apply (Apply (Lit (FunRefLit (FunRef "ohua.lang/smap" Nothing))) body) dataGen) = do
+smapRewrite e@(Apply (Apply (Lit (FunRefLit (FunRef "ohua.lang/smap" Nothing))) lamExpr) dataGen) = do
     ctrlVar <- generateBindingWith "ctrl"
-    body' <- liftIntoCtrlCtxt ctrlVar body
+    lamExpr' <- liftIntoCtrlCtxt ctrlVar lamExpr
+    let ((inBnd:[]), expr) = lambdaArgsAndBody lamExpr'
+    d <- generateBindingWith "d"
+    let expr' = renameVar expr (Var inBnd, d)
   --   [ohualang|
   --     let (d, $var:ctrlVar, size) = ohua.lang/smapFun $var:dataGen in
   --      let (a,b,c) = ctrl $var:ctrlVar a b c in
@@ -50,7 +53,6 @@ smapRewrite e@(Apply (Apply (Lit (FunRefLit (FunRef "ohua.lang/smap" Nothing))) 
   --        let resultList = collect size result in
   --          resultList
   -- |]
-    d <- generateBindingWith "d"
     size <- generateBindingWith "size"
     ctrls <- generateBindingWith "ctrls"
     result <- generateBindingWith "result"
@@ -58,7 +60,7 @@ smapRewrite e@(Apply (Apply (Lit (FunRefLit (FunRef "ohua.lang/smap" Nothing))) 
     return $
         Let ctrls (Apply smapSfFun dataGen) $
         mkDestructured [d, ctrlVar, size] ctrls $
-        Let result body' $
+        Let result expr' $
         Let resultList (Apply (Apply collectSf $ Var size) $ Var result) $
         Var resultList
 -- smapRewrite e@(Apply (Apply smapSf body) dataGen) = do
