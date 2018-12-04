@@ -21,10 +21,7 @@ embedALang =
         { quoteExp =
               \e -> do
                   let olang = ParseALang.parseExp $ LB.pack e
-                  let names =
-                          HS.fromList $
-                          [v | VarE v <- universe olang] <>
-                          [v | VarP v <- universeOn (cosmos . patterns) olang]
+                  let names = definedBindings olang
                   alang <-
                       fmap (either error id) $
                       runExceptT $ runGenBndT names $ toAlang olang

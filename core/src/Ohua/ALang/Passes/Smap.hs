@@ -52,7 +52,7 @@ smapRewrite e@(Apply (Apply (Lit (FunRefLit (FunRef "ohua.lang/smap" Nothing))) 
   --       let result = $expr:body' in -- lifted into control context
   --        let resultList = collect size result in
   --          resultList
-  -- |]
+  -- (this breaks haddock) |]
     size <- generateBindingWith "size"
     ctrls <- generateBindingWith "ctrls"
     result <- generateBindingWith "result"
@@ -63,6 +63,4 @@ smapRewrite e@(Apply (Apply (Lit (FunRefLit (FunRef "ohua.lang/smap" Nothing))) 
         Let result expr' $
         Let resultList (Apply (Apply collectSf $ Var size) $ Var result) $
         Var resultList
--- smapRewrite e@(Apply (Apply smapSf body) dataGen) = do
--- smapRewrite e@(Apply (Apply b@(smapSf) body) dataGen) = do
 smapRewrite e = return e

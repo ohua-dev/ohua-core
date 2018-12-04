@@ -90,6 +90,7 @@ toGraph (DFExpr lets r) = OutGraph ops grArcs (getSource r)
         case arg of
             DFVar v -> LocalSource $ getSource v
             DFEnvVar envExpr -> EnvSource envExpr
+            DFVarList _ -> error "not implemented"
         | (arg, idx) <-
               maybe identity ((:) . (, -1) . DFVar) (contextArg l)
                   -- prepend (ctxBinding, -1) if there is a context arc

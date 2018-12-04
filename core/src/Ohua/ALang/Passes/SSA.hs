@@ -16,8 +16,8 @@ import Ohua.Prelude
 
 import Data.Functor.Foldable
 import qualified Data.HashMap.Strict as HM
-import qualified Data.HashSet as HS
 import Control.Category ((>>>))
+import Control.Lens (non, at)
 
 import Ohua.ALang.Lang
 import Ohua.ALang.Util
@@ -25,7 +25,7 @@ import Ohua.ALang.Util
 type LocalScope = HM.HashMap Binding Binding
 
 ssaResolve :: MonadReader LocalScope m => Binding -> m Binding
-ssaResolve bnd = reader $ fromMaybe bnd <$> HM.lookup bnd
+ssaResolve bnd = view $ at bnd . non bnd
 
 -- | Generate a new name for the provided binding and run the inner
 -- computation with that name in scope to replace the provided binding
@@ -66,7 +66,7 @@ ssa =
 isSSA :: Expression -> [Binding]
 isSSA e = [b | (b, count) <- HM.toList counts, count > 1]
   where
-    counts = HM.fromListWith (+) [(b, 1) | b <- definedBindings e]
+    counts = HM.fromListWith (+) [(b, 1 :: Word) | b <- definedBindings e]
 
 
 

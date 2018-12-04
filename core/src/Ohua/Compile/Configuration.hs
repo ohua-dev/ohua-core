@@ -1,4 +1,4 @@
-module Ohua.Configuration where
+module Ohua.Compile.Configuration where
 
 import Ohua.Prelude
 

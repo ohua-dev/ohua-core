@@ -38,8 +38,27 @@ import Ohua.Util
 import Data.Default.Class
 import Ohua.LensClasses
 import Control.Exception.Safe (assert)
-import Control.Lens.Plated (rewrite, rewriteM, transform, transformM, universe)
-import Control.Lens (Lens', (.~), (^.), (&))
+import Control.Lens.Plated
+    ( children
+    , cosmos
+    , rewrite
+    , rewriteM
+    , transform
+    , transformM
+    , universe
+    )
+import Control.Lens
+    ( Lens
+    , Lens'
+    , Traversal
+    , Traversal'
+    , (%~)
+    , (&)
+    , (.~)
+    , (^.)
+    , (^?)
+    , view
+    )
 import Control.Lens.Tuple
 
 import Universum.Applicative

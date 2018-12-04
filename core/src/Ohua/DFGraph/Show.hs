@@ -37,7 +37,7 @@ asTable (OutGraph ops arcs' _) =
                 UnitLit -> "()"
                 NumericLit n -> text $ show n
                 EnvRefLit n -> text $ "$" <> show (unwrap n)
-                FunRefLit fr -> error "Not supported"
+                FunRefLit _fr -> error "Not supported"
             LocalSource t -> targetToBox t
     targetList =
         vcat left $ (text "target" :) $ (targetToBox . target) `map` arcs'

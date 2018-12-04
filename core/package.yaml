@@ -73,6 +73,7 @@ library:
   source-dirs: src
   exposed-modules:
   - Ohua.Compile
+  - Ohua.Compile.Configuration
   - Ohua.Types
   - Ohua.LensClasses
   - Ohua.Monad

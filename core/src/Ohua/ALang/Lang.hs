@@ -148,11 +148,6 @@ pattern SfF bnd id = LitF (FunRefLit (FunRef bnd id))
 
 -------------------- Additional type class instances --------------------
 
-instance NFData FunRef
-instance NFData Lit
-
-instance Hashable FunRef
-instance Hashable Lit
 
 instance IsString AExpr where
     fromString = fromString >>> \case
