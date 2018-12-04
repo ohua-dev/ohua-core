@@ -24,6 +24,7 @@ import Ohua.Prelude
 import Ohua.ALang.Lang
 import Ohua.ALang.Passes.Control
 import qualified Ohua.ALang.Refs as Refs (seq, seqFun)
+import Ohua.ALang.Util (lambdaArgsAndBody)
 
 seqFunSf :: Expression
 seqFunSf = Lit $ FunRefLit $ FunRef Refs.seqFun Nothing
@@ -34,6 +35,8 @@ seqRewrite (Lambda v e) = Lambda v <$> seqRewrite e
 seqRewrite (Apply (Apply (Lit (FunRefLit (FunRef "ohua.lang/seq" Nothing))) dep) expr) = do
     ctrl <- generateBindingWith "ctrl"
     expr' <- liftIntoCtrlCtxt ctrl expr
+    -- TODO verify that this arg is actually ()
+    let ((_:[]), expr'') = lambdaArgsAndBody expr'
     -- return $
     --     [ohualang|
     --       let $var:ctrl = ohua.lang/seqFun $var:dep in
@@ -41,5 +44,5 @@ seqRewrite (Apply (Apply (Lit (FunRefLit (FunRef "ohua.lang/seq" Nothing))) dep)
     --             result
     --                |]
     result <- generateBindingWith "result"
-    return $ Let ctrl (Apply seqFunSf dep) $ Let result expr' $ Var result
+    return $ Let ctrl (Apply seqFunSf dep) $ Let result expr'' $ Var result
 seqRewrite e = return e

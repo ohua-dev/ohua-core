@@ -13,6 +13,7 @@ import Ohua.Prelude
 
 import Ohua.ALang.Lang
 import qualified Ohua.ALang.Refs as Refs (nth)
+import Ohua.Types
 
 import Data.Functor.Foldable
 import qualified Data.HashSet as HS
@@ -63,26 +64,38 @@ destructure source bnds =
     mkNthExpr idx source =
         Sf Refs.nth Nothing `Apply` (Lit $ NumericLit idx) `Apply` source
 
--- FIXME lambda lifting for an expression that is not a lambda should also work!
---       it just creates the lambda!
 lambdaLifting ::
-       (Monad m, MonadGenBnd m) => Expression -> m (Expression, [Binding])
-lambdaLifting o@(Lambda _ _) =
-    let (formalVars, b) = lambdaArgsAndBody o
-        freeVars = findFreeVariables o
-        actuals = sort $ toList freeVars -- makes the list of args deterministic
-     in case actuals of
-            [] -> return (o, [])
-            _ -> do
-                newFormals <- mapM generateBindingWith actuals
-                let rewrittenExp = foldl renameVar b $ zip actuals newFormals
-                return
-                    (mkLambda (formalVars ++ newFormals) rewrittenExp, actuals)
-lambdaLifting e =
-    error $
-    T.pack $
-    "Invariant broken! Lambda lifting is only applicable to lambda expressions! Found: " ++
-    (show e)
+       (Monad m, MonadGenBnd m) => Expression -> m (Expression, [Expression])
+lambdaLifting e = do
+    (e', actuals) <- go findFreeVariables renameVar bindingFromVar e
+    (e'', actuals') <- go findLiterals replaceLit bindingFromLit e'
+    return (e'', actuals ++ actuals')
+  where
+    go :: (Monad m, MonadGenBnd m)
+       => (Expression -> [Expression])
+       -> (Expression -> (Expression, Binding) -> Expression)
+       -> (Expression -> m Binding)
+       -> Expression
+       -> m (Expression, [Expression])
+    go findFreeExprs renameExpr toBinding expr =
+        let (formalVars, b) =
+                case expr of
+                    (Lambda _ _) -> lambdaArgsAndBody expr
+                    _ -> ([], expr)
+            actuals = findFreeExprs expr
+         in case actuals of
+                [] -> return (expr, [])
+                _ -> do
+                    newFormals <- mapM toBinding actuals
+                    let rewrittenExp =
+                            foldl renameExpr b $ zip actuals newFormals
+                    return
+                        ( mkLambda (formalVars ++ newFormals) rewrittenExp
+                        , actuals)
+    bindingFromVar (Var v) = generateBindingWith v
+    bindingFromLit (Lit (NumericLit l)) =
+        generateBindingWith $ "lit_" <> (show l)
+    bindingFromLit (Lit UnitLit) = generateBindingWith "lit_unit"
 
 mkLambda :: [Binding] -> Expression -> Expression
 mkLambda args expr = go expr $ reverse args
@@ -90,8 +103,15 @@ mkLambda args expr = go expr $ reverse args
     go e (a:as) = flip go as $ Lambda a e
     go e [] = e
 
-renameVar :: Expression -> (Binding, Binding) -> Expression
-renameVar e (old, new) =
+replaceLit :: Expression -> (Expression, Binding) -> Expression
+replaceLit e (Lit old, new) =
+    flip transform e $ \case
+        Lit l
+            | l == old -> Var new
+        other -> other
+
+renameVar :: Expression -> (Expression, Binding) -> Expression
+renameVar e (Var old, new) =
     flip transform e $ \case
         Var v
             | v == old -> Var new
@@ -113,11 +133,26 @@ definedBindings e =
 -- expression but not defined in it. This is implemented as a simple set
 -- intersection, therefore it relies on the fact that the expression is in SSA
 -- form.
-findFreeVariables :: Expression -> HS.HashSet Binding
+findFreeVariables :: Expression -> [Expression]
 findFreeVariables e =
+    map Var $
+    sort $ -- makes the list of args deterministic
+    toList $
     HS.difference
         (HS.fromList [v | Var v <- universe e])
         (HS.fromList $ definedBindings e)
+
+findLiterals :: Expression -> [Expression]
+findLiterals e =
+    [ Lit lit
+    | Lit l <- universe e
+    , lit <-
+          case l of
+              UnitLit -> [l]
+              NumericLit _ -> [l]
+              EnvRefLit _ -> [l]
+              _ -> []
+    ]
 
 fromListToApply :: FunRef -> [Expr] -> Expr
 fromListToApply f args = go $ reverse args
@@ -150,3 +185,4 @@ lambdaArgsAndBody (Lambda arg l@(Lambda _ _)) =
     let (args, body) = lambdaArgsAndBody l
      in ([arg] ++ args, body)
 lambdaArgsAndBody (Lambda arg body) = ([arg], body)
+lambdaArgsAndBody e = ([], e)

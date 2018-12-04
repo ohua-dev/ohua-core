@@ -179,26 +179,13 @@ liftIntoCtrlCtxt ctrlIn e = do
     (lam', actuals) <- lambdaLifting e
     let (originalFormals, _) = lambdaArgsAndBody e
     let (allFormals, e) = lambdaArgsAndBody lam'
-    unitVar <- generateBindingWith "unitVar"
     ctrlOut <- generateBindingWith "ctrl"
     let formals = reverse $ take (length actuals) $ reverse allFormals
-    let formals' = formals ++ [unitVar]
-    let actuals' = (map Var $ [ctrlIn] ++ actuals) ++ [unitExpr]
-    let e' = replaceUnitWithVar unitVar e
-    let ie = mkDestructured formals' ctrlOut e'
+    let actuals' = [Var ctrlIn] ++ actuals
+    let ie = mkDestructured formals ctrlOut e
     return $
         mkLambda originalFormals $
         Let
             ctrlOut
             (fromListToApply (FunRef "ohua.lang/ctrl" Nothing) actuals')
             ie
-  where
-    replaceUnitWithVar unitVar (Lambda v e) =
-        Lambda v $ replaceUnitWithVar unitVar e
-    replaceUnitWithVar unitVar (Let v e ie) =
-        Let v (replaceUnitWithVar unitVar e) (replaceUnitWithVar unitVar ie)
-    replaceUnitWithVar unitVar (Apply e1 e2) =
-        Apply (replaceUnitWithVar unitVar e1) (replaceUnitWithVar unitVar e2)
-    replaceUnitWithVar unitVar (Lit UnitLit) = Var unitVar
-    replaceUnitWithVar unitVar l@(Lit _) = l
-    replaceUnitWithVar unitVar v@(Var _) = v

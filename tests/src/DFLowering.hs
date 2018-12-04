@@ -37,8 +37,8 @@ runLowering =
 shouldLowerTo :: Expression -> DFExpr -> Expectation
 shouldLowerTo input expected = do
     lowered <- runLowering input
-    traceM $ "expected:\n" <> (show $ prettyDFExpr expected)
-    traceM $ "got:\n" <> (show $ prettyDFExpr lowered)
+    -- traceM $ "expected:\n" <> (show $ prettyDFExpr expected)
+    -- traceM $ "got:\n" <> (show $ prettyDFExpr lowered)
     lowered `shouldBe` expected
     -- let gr1 = (toFGLGraph . toGraph) lowered
     -- let gr2 = toFGLGraph $ toGraph expected
@@ -172,32 +172,18 @@ generalLowering :: Spec
 generalLowering = do
     describe "lowering a stateful function" $ do
         it "lowers a function with one argument" $
-            -- Let
-            --     "a"
-            --     (sf ALangRefs.id `Apply` 0)
-            --     (Let "x" ("some/function" `Apply` "a") "x")
             [embedALang|
               let a = ohua.lang/id 0 in
               let x = some/function a in
                 x
               |] `shouldLowerTo`
-            -- DFExpr
-            --     [ LetExpr 1 "a" Refs.id [0] Nothing
-            --     , LetExpr 0 "x" "some/function" ["a"] Nothing
-            --     ]
-            --     "x"
             [embedDFLang|
               let (a) = ohua.lang/id<1> (0) in
               let (x) = some/function<2> (a) in
                 x
             |]
         it "lowers a function with one env argument" $
-            -- Let
-            --     "x"
-            --     ("some/function" `Apply` 0)
-            --     "x"
             [embedALang| let x = some/function 0 in x |] `shouldLowerTo`
-            -- DFExpr [LetExpr 0 "x" "some/function" [0] Nothing] "x"
             [embedDFLang| let (x) = some/function<1> (0) in x |]
         -- left out for the moment one we merge the unit stuff into the core we can add it back
         -- it "lowers a function with no arguments" $
@@ -214,33 +200,35 @@ instance IsString a => IsString (Maybe a) where
 seqSpec :: Spec
 seqSpec = do
     describe "seq lowering" $ do
-        it "lowers a simple seq" $
-            -- (Let "y" (sf ALangRefs.id `Apply` 0) $
-            --  Let
-            --      "x"
-            --      (sf ALangRefs.seq `Apply` "y" `Apply`
-            --       Lambda
-            --           "_"
-            --           (Let "p"
-            --                ("some/function" `Apply` (Var (Env (1 :: HostExpr))))
-            --                "p"))
-            --      "x")
+        it
+            "lowers a seq with a lambda and an independent function with a integer literal as input" $
             [embedALang|
               let y = ohua.lang/id 0 in
-              let x = ohua.lang/seq y (let p = some/function 1 in p) in
+              let x = ohua.lang/seq y (\() -> let p = some/function 1 in p) in
                 x
             |] `shouldLowerTo`
-            -- DFExpr
-            --     [ LetExpr 1 "y" Refs.id [0] Nothing
-            --     , LetExpr 2 "y0" Refs.seq ["y"] Nothing
-            --     , LetExpr 0 "x" (EmbedSf "some/function") [1] "y0"
-            --     ]
-            --     "x"
             [embedDFLang|
-              let (y) = ohua.lang/id<1> (0) in
-              let (y0) = ohua.lang/seq<2> (y) in
-              let (x) = some/function<0> (1) [y0] in
+              let (y) = ohua.lang/id<1> (0)  in
+              let (ctrl_0) = ohua.lang/seqFun<2> (y)  in
+              let (ctrl_1) = dataflow ohua.lang/ctrl<3> (ctrl_0, 1)  in
+              let (lit_1_0) = ohua.lang/nth<4> (0, ctrl_1)  in
+              let (x) = some/function<5> (lit_1_0)  in
                 x
+            |]
+        it
+            "lowers a seq with a lambda and an independent function with a unit as input" $
+            [embedALang|
+                let y = ohua.lang/id 0 in
+                let x = ohua.lang/seq y (\() -> let p = some/function () in p) in
+                  x
+              |] `shouldLowerTo`
+            [embedDFLang|
+              let (y) = ohua.lang/id<1> (0)  in
+              let (ctrl_0) = ohua.lang/seqFun<2> (y)  in
+              let (ctrl_1) = dataflow ohua.lang/ctrl<3> (ctrl_0, ())  in
+              let (lit_unit_0) = ohua.lang/nth<4> (0, ctrl_1)  in
+              let (x) = some/function<5> (lit_unit_0)  in
+              x
             |]
 
 matchAndReport :: (Eq a, Ord b, Show a, Show b) => Gr a b -> Gr a b -> IO ()

@@ -63,8 +63,9 @@ checkSSAExpr (DFExpr l _) = checkSSA l
 -- This can be achieved with the 'normalize' and 'performSSA' functions and tested with
 -- 'checkProgramValidity'.
 lowerALang :: MonadOhua m => Expression -> m DFExpr
-lowerALang expr = do
-    traceM $ "Lowering alang expr: " <> quickRender expr
+lowerALang expr
+    -- traceM $ "Lowering alang expr: " <> quickRender expr
+ = do
     logDebugN $ "Lowering alang expr: " <> quickRender expr
     (var, exprs) <- runWriterT $ lowerToDF expr
     return $ DFExpr exprs var

@@ -18,8 +18,8 @@ main =
      do
         DFLowering.generalLowering
         DFLowering.ifSpec
-          -- FIXME
-        -- DFLowering.seqSpec
+        DFLowering.seqSpec
+        -- FIXME
         -- DFLowering.smapSpec
     --ALangVerify.currying
         TestALangUtils.spec

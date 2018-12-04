@@ -39,13 +39,13 @@ import Ohua.Stage
 runCorePasses :: MonadOhua m => Expression -> m Expression
 runCorePasses expr = do
     smapE <- smapRewrite expr
-    -- traceM $ "smap: " <> (show $ prettyExpr smapE)
+    -- traceM $ "after 'smap' pass:\n" <> (show $ prettyExpr smapE)
     stage "smap-transformation" smapE
     ifE <- ifRewrite smapE
-    -- traceM $ "if: " <> (show $ prettyExpr ifE)
+    -- traceM $ "after 'if' pass:\n" <> (show $ prettyExpr ifE)
     stage "conditionals-transformation" ifE
     seqE <- seqRewrite ifE
-    -- traceM $ "seq: " <> (show $ prettyExpr seqE)
+    -- traceM $ "after 'seq' pass:\n" <> (show $ prettyExpr seqE)
     stage "seq-transformation" seqE
     return seqE
 
