@@ -37,8 +37,8 @@ runLowering =
 shouldLowerTo :: Expression -> DFExpr -> Expectation
 shouldLowerTo input expected = do
     lowered <- runLowering input
-    -- traceM $ "expected:\n" <> (show $ prettyDFExpr expected)
-    -- traceM $ "got:\n" <> (show $ prettyDFExpr lowered)
+    traceM $ "expected:\n" <> (show $ prettyDFExpr expected)
+    traceM $ "got:\n" <> (show $ prettyDFExpr lowered)
     lowered `shouldBe` expected
     -- let gr1 = (toFGLGraph . toGraph) lowered
     -- let gr2 = toFGLGraph $ toGraph expected
@@ -153,18 +153,16 @@ ifLowering =
                   let (ctrls_0) = dataflow ohua.lang/ifFun<4> (c)  in
                   let (ctrlTrue_1) = ohua.lang/nth<5> (0, ctrls_0)  in
                   let (ctrlFalse_1) = ohua.lang/nth<6> (1, ctrls_0)  in
-                  let (ctrl_0) = dataflow ohua.lang/ctrl<7> (ctrlTrue_0, a, b, ())  in
+                  let (ctrl_0) = dataflow ohua.lang/ctrl<7> (ctrlTrue_0, a, b)  in
                   let (a_0) = ohua.lang/nth<8> (0, ctrl_0)  in
                   let (b_0) = ohua.lang/nth<9> (1, ctrl_0)  in
-                  let (unitVar_0) = ohua.lang/nth<10> (2, ctrl_0)  in
-                  let (trueResult_0) = someNs/plus<11> (a_0, b_0)  in
-                  let (ctrl_1) = dataflow ohua.lang/ctrl<12> (ctrlFalse_0, a, b, ())  in
-                  let (a_1) = ohua.lang/nth<13> (0, ctrl_1)  in
-                  let (b_1) = ohua.lang/nth<14> (1, ctrl_1)  in
-                  let (unitVar_1) = ohua.lang/nth<15> (2, ctrl_1)  in
-                  let (falseResult_0) = someNs/minus<16> (a_1, b_1)  in
-                  let (z) = dataflow ohua.lang/select<17> (c, trueResult_0, falseResult_0)  in
-                    z
+                  let (trueResult_0) = someNs/plus<10> (a_0, b_0)  in
+                  let (ctrl_1) = dataflow ohua.lang/ctrl<11> (ctrlFalse_0, a, b)  in
+                  let (a_1) = ohua.lang/nth<12> (0, ctrl_1)  in
+                  let (b_1) = ohua.lang/nth<13> (1, ctrl_1)  in
+                  let (falseResult_0) = someNs/minus<14> (a_1, b_1)  in
+                  let (z) = dataflow ohua.lang/select<15> (c, trueResult_0, falseResult_0)  in
+                  z
                 |]
         lowerAndValidate sourceExpr targetExpr "if"
 
