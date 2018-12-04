@@ -11,6 +11,7 @@ import qualified Data.Vector as V
 import GHC.Exts (IsList(..))
 import Instances.TH.Lift ()
 import Language.Haskell.TH.Syntax (Lift)
+import Ohua.LensClasses
 
 import Ohua.Util
 
