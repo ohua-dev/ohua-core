@@ -16,7 +16,6 @@ import Ohua.Prelude
 
 import Data.Functor.Foldable
 import qualified Data.HashMap.Strict as HM
-import qualified Data.HashSet as HS
 import Control.Category ((>>>))
 
 import Ohua.ALang.Lang
@@ -66,7 +65,7 @@ ssa =
 isSSA :: Expression -> [Binding]
 isSSA e = [b | (b, count) <- HM.toList counts, count > 1]
   where
-    counts = HM.fromListWith (+) [(b, 1) | b <- definedBindings e]
+    counts = HM.fromListWith (+) [(b, 1 :: Word) | b <- definedBindings e]
 
 
 

@@ -13,8 +13,9 @@ import Ohua.Prelude
 
 import Ohua.ALang.Lang
 import qualified Ohua.ALang.Refs as Refs (nth)
+import Data.Functor.Foldable (embed, para)
+import Control.Comonad
 
-import Data.Functor.Foldable
 import qualified Data.HashSet as HS
 import qualified Data.Text as T
 
@@ -28,27 +29,6 @@ substitute !var val =
         Var v
             | v == var -> val
         other -> other
-substitute !var val = cata f
-  where
-    f (VarF v)
-        | var == v = val
-    f e = embed e
-
--- substitute var val e =
---     case e of
---         Var (Local v)
---             | var == v -> val
---             | otherwise -> e
---         Var _ -> e
---         Apply expr1 expr2 -> Apply (recurse expr1) (recurse expr2)
---         Let bnd expr1 expr2
---             | var `elem` flattenAssign bnd -> e
---             | otherwise -> Let bnd (recurse expr1) (recurse expr2)
---         Lambda assignment body
---             | var `elem` flattenAssign assignment -> body
---             | otherwise -> Lambda assignment (recurse body)
---   where
---     recurse = substitute var val
 -- | Note that this only performs the initial lifting of the lambda expression.
 -- It does not find calls to the lambda and rewrites them accordingly.
 -- This is due to the fact that we often want to package the freeVars via a call to
@@ -60,13 +40,12 @@ destructure source bnds =
     foldl (.) id $
     map (\(idx, bnd0) -> Let bnd0 $ mkNthExpr idx source) (zip [0 ..] bnds)
   where
-    mkNthExpr idx source =
-        Sf Refs.nth Nothing `Apply` (Lit $ NumericLit idx) `Apply` source
+    mkNthExpr idx source0 =
+        Sf Refs.nth Nothing `Apply` (Lit $ NumericLit idx) `Apply` source0
 
 -- FIXME lambda lifting for an expression that is not a lambda should also work!
 --       it just creates the lambda!
-lambdaLifting ::
-       (Monad m, MonadGenBnd m) => Expression -> m (Expression, [Binding])
+lambdaLifting :: MonadGenBnd m => Expression -> m (Expression, [Binding])
 lambdaLifting o@(Lambda _ _) =
     let (formalVars, _) = lambdaArgsAndBody o
         freeVars = findFreeVariables o
@@ -103,7 +82,7 @@ definedBindings e =
     [ v
     | e' <- universe e
     , v <-
-          case e of
+          case e' of
               Let v' _ _ -> [v']
               Lambda v' _ -> [v']
               _ -> []
@@ -120,31 +99,23 @@ findFreeVariables e =
         (HS.fromList $ definedBindings e)
 
 fromListToApply :: FunRef -> [Expr] -> Expr
-fromListToApply f (v:[]) = Apply (Lit $ FunRefLit f) v
-fromListToApply f (v:vs) = Apply (fromListToApply f vs) v
+fromListToApply f = foldl Apply (Lit $ FunRefLit f)
 
 fromApplyToList :: Expr -> (FunRef, [Expr])
-fromApplyToList (Apply (Lit (FunRefLit f)) v) = (f, [v])
-fromApplyToList (Apply a b) =
-    let (f, args) = fromApplyToList a
-     in (f, args ++ [b])
+fromApplyToList =
+    para $ \case
+        ApplyF (extract -> (f, args)) (arg, _) -> (f, args ++ [arg])
+        LitF (FunRefLit f) -> (f, [])
+        other ->
+            error $
+            "Expected apply or function reference, got: " <>
+            show (embed $ fmap fst other)
 
 mkDestructured :: [Binding] -> Binding -> Expression -> Expression
-mkDestructured formals compound e = do
-    let lastIdx = (length formals) - 1
-    foldl go e $ reverse $ zip formals [0 .. lastIdx]
-  where
-    go :: Expression -> (Binding, Int) -> Expression
-    go expr (f, i) =
-        Let
-            f
-            (Apply
-                 (Apply (Sf Refs.nth Nothing) $ Lit $ NumericLit $ toInteger i) $
-             Var compound)
-            expr
+mkDestructured formals compound = destructure (Var compound) formals
 
 lambdaArgsAndBody :: Expression -> ([Binding], Expression)
-lambdaArgsAndBody (Lambda arg l@(Lambda _ _)) =
-    let (args, body) = lambdaArgsAndBody l
-     in (args ++ [arg], body)
-lambdaArgsAndBody (Lambda arg body) = ([arg], body)
+lambdaArgsAndBody =
+    para $ \case
+        LambdaF arg (extract -> (args, e0)) -> (arg : args, e0)
+        other -> ([], embed $ fmap fst other)

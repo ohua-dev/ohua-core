@@ -7,6 +7,7 @@ module Ohua.Frontend.Lang
     , ExprF(..)
     , toAlang
     , patterns
+    , definedBindings
     ) where
 
 import Ohua.Prelude
@@ -14,12 +15,12 @@ import Ohua.Prelude
 import Control.Category ((>>>))
 import Data.Functor.Foldable (cata)
 import Data.Functor.Foldable.TH (makeBaseFunctor)
-import Control.Lens.Plated (Plated, plate, gplate)
+import Control.Lens.Plated (Plated, plate, gplate, universeOn, cosmos)
 import Control.Lens (Traversal')
+import qualified Data.HashSet as HS
 
 import Ohua.ALang.Lang hiding (Expr, ExprF)
 import qualified Ohua.ALang.Lang as AL
-import qualified Ohua.ALang.Refs as Refs
 import Ohua.ParseTools.Refs (ifBuiltin, mkTuple, smapBuiltin)
 
 data Pat
@@ -76,8 +77,8 @@ instance NFData Expr
 -- a lambda
 --
 -- I am leaving it here in case we need it later.
-ensureLambdaInSmap :: (Monad m, MonadGenBnd m) => Expr -> m Expr
-ensureLambdaInSmap =
+_ensureLambdaInSmap :: (Monad m, MonadGenBnd m) => Expr -> m Expr
+_ensureLambdaInSmap =
     rewriteM $ \case
         MapE (LamE _ _) _ -> pure Nothing
         MapE other coll -> do
@@ -92,7 +93,7 @@ mkLamSingleArgument =
         LamE (x1:x2:xs) b -> Just $ LamE [x1] $ LamE (x2 : xs) b
         _ -> Nothing
 
-removeDestructuring :: (MonadGenBnd m, Monad m) => Expr -> m Expr
+removeDestructuring :: MonadGenBnd m => Expr -> m Expr
 removeDestructuring =
     rewriteM $ \case
         LetE (TupP pats) e1 e2 -> do
@@ -131,7 +132,7 @@ trans =
         LamEF p e ->
             case p of
                 [] -> e
-                [p] -> Lambda (patToBnd p) e
+                [p0] -> Lambda (patToBnd p0) e
                 _ ->
                     error $
                     "Invariant broken: Found multi apply or destucture lambda: " <>
@@ -140,9 +141,9 @@ trans =
             ifBuiltin `Apply` cont `Apply` Lambda "_" then_ `Apply`
             Lambda "_" else_
         MapEF function coll -> smapBuiltin `Apply` function `Apply` coll
-        BindEF e1 e2 -> error "State binding not yet implemented in ALang"
+        BindEF _e1 _e2 -> error "State binding not yet implemented in ALang"
         StmtEF e1 cont -> Let "_" e1 cont
-        SeqEF source target -> error "Seq not yet implemented"
+        SeqEF _source _target -> error "Seq not yet implemented"
         TupEF parts -> foldl Apply (Sf mkTuple Nothing) parts
   where
     patToBnd =
@@ -156,3 +157,9 @@ toAlang :: (Monad m, MonadGenBnd m) => Expr -> m AL.Expr
 toAlang =
     giveEmptyLambdaUnitArgument >>>
     mkLamSingleArgument >>> removeDestructuring >=> pure . trans
+
+definedBindings :: Expr -> HS.HashSet Binding
+definedBindings olang =
+    HS.fromList $
+    [v | VarE v <- universe olang] <>
+    [v | VarP v <- universeOn (cosmos . patterns) olang]

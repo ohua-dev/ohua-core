@@ -1,6 +1,5 @@
 module Ohua.ALang.Refs where
 
-import Ohua.ParseTools.Refs
 import Ohua.Types
 
 id :: QualifiedBinding

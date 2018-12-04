@@ -49,7 +49,7 @@ smapRewrite (Apply (Apply smapSf body) dataGen) = do
   --       let result = $expr:body' in -- lifted into control context
   --        let resultList = collect size result in
   --          resultList
-  -- |]
+  -- this breaks haddock |]
     d <- generateBindingWith "d"
     size <- generateBindingWith "size"
     ctrls <- generateBindingWith "ctrls"

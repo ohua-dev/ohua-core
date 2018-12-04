@@ -27,7 +27,7 @@ import Language.Haskell.TH.Syntax (Lift)
 data DFExpr = DFExpr
     { letExprs :: Seq LetExpr
     , returnVar :: !Binding
-    } deriving (Eq, Show, Lift)
+    } deriving (Eq, Show, Lift, Generic)
 
 data LetExpr = LetExpr
     { callSiteId :: !FnId
@@ -35,12 +35,12 @@ data LetExpr = LetExpr
     , functionRef :: !DFFnRef
     , callArguments :: ![DFVar]
     , contextArg :: !(Maybe Binding)
-    } deriving (Eq, Show, Lift)
+    } deriving (Eq, Show, Lift, Generic)
 
 data DFFnRef
     = DFFunction !QualifiedBinding -- a built-in function of DFLang
     | EmbedSf !QualifiedBinding -- an generic dataflow function that wraps a stateful function call
-    deriving (Eq, Show, Lift)
+    deriving (Eq, Show, Lift, Generic)
 
 instance Hashable DFFnRef where
     hashWithSalt s =
@@ -52,29 +52,20 @@ data DFVar
     = DFEnvVar !Lit
     | DFVar !Binding
     | DFVarList ![Binding]
-    deriving (Eq, Show, Lift)
+    deriving (Eq, Show, Lift, Generic)
 
-instance Hashable DFVar where
-    hashWithSalt s (DFVar v) = hashWithSalt s (0 :: Int, v)
-    hashWithSalt s (DFEnvVar e) = hashWithSalt s (1 :: Int, e)
+instance Hashable DFVar
 
 instance IsString DFVar where
     fromString = DFVar . fromString
 
-instance NFData DFExpr where
-    rnf (DFExpr a b) = a `deepseq` rnf b
+instance NFData DFExpr
 
-instance NFData LetExpr where
-    rnf (LetExpr a b c d e) =
-        a `deepseq` b `deepseq` c `deepseq` d `deepseq` rnf e
+instance NFData LetExpr
 
-instance NFData DFFnRef where
-    rnf (DFFunction bnd) = rnf bnd
-    rnf (EmbedSf bnd) = rnf bnd
+instance NFData DFFnRef
 
-instance NFData DFVar where
-    rnf (DFEnvVar e) = rnf e
-    rnf (DFVar v) = rnf v
+instance NFData DFVar
 
 dfEnvExpr :: HostExpr -> DFVar
 dfEnvExpr = DFEnvVar . EnvRefLit
