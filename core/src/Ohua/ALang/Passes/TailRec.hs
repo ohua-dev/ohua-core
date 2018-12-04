@@ -250,7 +250,7 @@ import Ohua.ALang.Util
     , lambdaArgsAndBody
     , mkDestructured
     )
-import Ohua.Configuration
+import Ohua.Compile.Configuration
 import Ohua.Unit
 
 --  ==== Implementation starts here
@@ -433,7 +433,7 @@ rewriteCallExpr e = do
   --            ...
   --             let r = recurFun c result y1 ... yn in
   --               r
-  -- |]
+  -- this breaks haddock |]
     ctrls <- generateBindingWith "ctrls"
     return $
         Let ctrls (fromListToApply (FunRef recurFun Nothing) callArgs) $
