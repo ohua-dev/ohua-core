@@ -51,9 +51,14 @@ configuration file `.hindent.yaml` can be found at the project root.
 
 I use a `Prelude` replacement called `Universum` in this project. This has a few
 minor consequences for how code is written. Most importantly I activate the
-`NoImplicitPrelude` extension by default, thus in every new module written you
-should first do an `import Universum` (or `import Prelude` if you *really* like
-`Prelude`).
+`NoImplicitPrelude` extension by default. This means you have to import a
+prelude explicitly.
+
+1. You can use `Ohua.Prelude` which pulls in `Universum` as well as basic ohua
+   core modules (`Ohua.Types`, `Ohua.Util`) and code traversal helpers such as
+   `transform` and `rewrite`.
+2. Alternatively you can import `Universum`
+3. or `Prelude ` if you *really* like `Prelude`).
 
 The following are some notes on using `Universum`, assembled for your convenience:
 
@@ -84,5 +89,5 @@ The following are some notes on using `Universum`, assembled for your convenienc
   scope by default. No need to import `Control.Monad.Reader` etc
 
 
-For more information on protolude check out [the GitHUb
+For more information on universum check out [the GitHUb
 repository](https://github.com/serokell/universum).
