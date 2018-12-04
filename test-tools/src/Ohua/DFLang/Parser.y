@@ -52,6 +52,7 @@ import Prelude ((!!))
     ','             { OPComma }
 
 %%
+unit : '('')' {}
 
 many1 (p)
     : p many1(p) { $1 : $2 }
@@ -102,6 +103,7 @@ DFVar
 Lit :: { Lit }
     : int { NumericLit $1 }
     | env_ref { EnvRefLit $1 }
+    | unit { UnitLit }
 
 FnRef :: { DFFnRef }
 FnRef : opt(dataflow) qualid { maybe EmbedSf (const DFFunction) $1 $2 }
