@@ -62,7 +62,10 @@ patterns f = \case
 
 makeBaseFunctor ''Pat
 
-instance Plated Pat where plate = gplate
+instance Plated Pat where
+    plate f = \case
+        TupP ps -> TupP <$> traverse f ps
+        other -> gplate f other
 
 instance Hashable Pat
 
@@ -70,7 +73,11 @@ instance NFData Pat
 
 makeBaseFunctor ''Expr
 
-instance Plated Expr where plate = gplate
+instance Plated Expr where
+    plate f = \case
+        TupE es -> TupE <$> traverse f es
+        AppE e es -> AppE <$> f e <*> traverse f es
+        other -> gplate f other
 instance Hashable Expr
 instance NFData Expr
 
