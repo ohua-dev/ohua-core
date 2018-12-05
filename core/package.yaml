@@ -1,5 +1,5 @@
 name: ohua-core
-version: '0.2.0'
+version: '0.3.0'
 synopsis: Fundamental, platform independent functionality of the ohua compiler.
 description: |
   Components for compiling a portable dataflow graph from an expression-based language.
