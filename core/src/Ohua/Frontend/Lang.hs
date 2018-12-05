@@ -18,6 +18,7 @@ import Data.Functor.Foldable.TH (makeBaseFunctor)
 import Control.Lens.Plated (Plated, plate, gplate, universeOn, cosmos)
 import Control.Lens (Traversal')
 import qualified Data.HashSet as HS
+import GHC.Exts
 
 import Ohua.ALang.Lang hiding (Expr, ExprF)
 import qualified Ohua.ALang.Lang as AL
@@ -72,6 +73,17 @@ makeBaseFunctor ''Expr
 instance Plated Expr where plate = gplate
 instance Hashable Expr
 instance NFData Expr
+
+instance IsString Expr where
+    fromString = VarE . fromString
+instance IsList Expr where
+    type Item Expr = Expr
+    fromList = TupE
+instance IsString Pat where
+    fromString = VarP . fromString
+instance IsList Pat where
+    type Item Pat = Pat
+    fromList = TupP
 
 -- | Not sure this traversal is necessary, but it makes every smap argument into
 -- a lambda
