@@ -25,6 +25,8 @@ import qualified Data.Text as T
 import Test.Hspec
 import Test.QuickCheck
 import Test.QuickCheck.Property as P
+import Control.Comonad
+import Data.Functor.Foldable (para)
 
 import Ohua.ALang.Lang
 import Ohua.ALang.Passes
@@ -41,11 +43,11 @@ smapName = "ohua.lang/smap"
 --     arbitrary = ApplyOnlyExpr <$> sized tree
 --       where
 --         tree (_, values) 0 = Var $ Local
-instance Num ResolvedSymbol where
-    fromInteger = Env . fromInteger
+instance Num Lit where
+    fromInteger = EnvRefLit . fromInteger
 
 instance Num Expression where
-    fromInteger = Var . fromInteger
+    fromInteger = Lit . fromInteger
 
 runPasses :: Expression -> IO (Either Error Expression)
 runPasses expr =
@@ -57,7 +59,7 @@ type ALangCheck = Either Text
 
 everyLetBindsCall :: Expression -> ALangCheck ()
 everyLetBindsCall (Let _ (Apply _ _) body) = everyLetBindsCall body
-everyLetBindsCall (Let _ _ _) = throwErrorS "Let without call"
+everyLetBindsCall Let{} = throwErrorS "Let without call"
 everyLetBindsCall _ = return ()
 
 noNestedLets :: Expression -> ALangCheck ()
@@ -65,7 +67,7 @@ noNestedLets (Let _ expr1 body) = noLets expr1 >> noNestedLets body
 noNestedLets _ = return ()
 
 noLets :: Expression -> ALangCheck ()
-noLets e@(Let _ _ _) = throwErrorS $ "Found a let " <> show e
+noLets e@Let{} = throwErrorS $ "Found a let " <> show e
 noLets (Apply expr1 expr2) = noLets expr1 >> noLets expr2
 noLets (Lambda _ expr) = noNestedLets expr
 noLets _ = return ()
@@ -74,7 +76,10 @@ checkInvariants :: Expression -> ALangCheck ()
 checkInvariants expr = do
     noNestedLets expr
     everyLetBindsCall expr
-    maybe (return ()) (throwErrorS . show) $ isSSA expr
+    case isSSA expr of
+        [] -> return ()
+        xs ->
+            throwErrorS $ show xs
 
 prop_passes :: Expression -> Property
 prop_passes input =
@@ -109,7 +114,7 @@ doesn't_reject :: Expression -> Expectation
 doesn't_reject e = runPasses e `shouldSatisfyRet` isRight
 
 lambda_as_argument :: Expression
-lambda_as_argument = Apply (Var (Sf smapName Nothing)) (Lambda "a" "a")
+lambda_as_argument = Apply (Sf smapName Nothing) (Lambda "a" "a")
 
 bound_lambda_as_argument :: Expression
 bound_lambda_as_argument = Let "f" (Lambda "a" "a") (Apply "some/function" "f")
@@ -122,7 +127,7 @@ calculated_lambda_as_argument =
 
 lambda_with_app_as_arg :: Expression
 lambda_with_app_as_arg =
-    Apply "some/func" $ Apply (Lambda "a" (Lambda "b" "a")) $ Var $ Env 10
+    Apply "some/func" $ Apply (Lambda "a" (Lambda "b" "a")) $ 10
 
 passesSpec :: Spec
 passesSpec = do
@@ -136,11 +141,12 @@ passesSpec = do
             doesn't_reject bound_lambda_as_argument
         it "doesn't reject a program where calculated lambda is input" $
             doesn't_reject calculated_lambda_as_argument
-        let lambdaStaysInput (Apply _ (Lambda _ (Lambda _ _))) = False
-            lambdaStaysInput (Apply (Var (Sf _ _)) (Lambda _ _)) = True
-            lambdaStaysInput (Let _ expr _) = lambdaStaysInput expr
-            lambdaStaysInput (Apply _ body) = lambdaStaysInput body
-            lambdaStaysInput _ = False
+        let lambdaStaysInput = para $ \case
+                ApplyF _ (Lambda _ (Lambda _ _),_) -> False
+                ApplyF (Sf _ _, _) (Lambda _ _,  _) -> True
+                LetF _ (extract -> expr) (extract -> body) -> expr || body
+                ApplyF _ (extract -> body) -> body
+                _ -> False
         it
             "Reduces lambdas as far as possible but does not remove them when argument" $
             runPasses lambda_with_app_as_arg `shouldSatisfyRet`
@@ -207,28 +213,22 @@ passesSpec = do
                       "c")
                      "x")
     describe "removing destructuring" $ do
-        let mkNth0 objBnd =
-                \i ->
-                    Var (Sf ALangRefs.nth Nothing) `Apply` i `Apply`
-                    Var (Local objBnd)
-            runRemDestr =
-                runSilentLoggingT .
-                runFromExpr def (Ohua.ALang.Passes.removeDestructuring (show))
+        let mkNth0 objBnd i =
+                Sf ALangRefs.nth Nothing `Apply` Lit (NumericLit i) `Apply` Var objBnd
+            runRemDestr = pure
         it "removes destructuring from lets" $
             let objBnd = "d"
                 mkNth = mkNth0 objBnd
              in runRemDestr [embedALang| let (a, b, c) = x in y |] `shouldReturn`
-                Right
-                    (Let (Direct objBnd)
-                         "x"
-                         (Let "a" (mkNth 0) $
-                          Let "b" (mkNth 1) $ Let "c" (mkNth 2) "y"))
+                Let objBnd
+                     "x"
+                     (Let "a" (mkNth 0) $
+                      Let "b" (mkNth 1) $ Let "c" (mkNth 2) "y")
         it "removes destructuring from lambdas" $
             let objBnd = "d"
                 mkNth = mkNth0 objBnd
              in runRemDestr [embedALang| \(a, b, c) -> y |] `shouldReturn`
-                Right
-                    (Lambda
-                         (Direct objBnd)
-                         (Let "a" (mkNth 0) $
-                          Let "b" (mkNth 1) $ Let "c" (mkNth 2) "y"))
+                Lambda
+                     objBnd
+                     (Let "a" (mkNth 0) $
+                      Let "b" (mkNth 1) $ Let "c" (mkNth 2) "y")

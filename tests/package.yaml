@@ -21,6 +21,8 @@ dependencies:
 - data-default-class
 - ohua-core
 - ohua-test-tools
+- comonad
+- recursion-schemes
 default-extensions:
 - OverloadedStrings
 - OverloadedLists
@@ -50,11 +52,6 @@ default-extensions:
 - RankNTypes
 - ViewPatterns
 executables:
-  ohua-test-exec:
-    main: Main.hs
-    dependencies:
-    - ohua-core
-    other-modules: []
   test-graph-gen:
     main: GenJSONGraph.hs
     other-modules: []

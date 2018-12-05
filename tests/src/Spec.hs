@@ -1,7 +1,6 @@
 
 import Ohua.Prelude
 
--- import qualified ALangVerify
 import qualified DFLowering
 import           PassesSpec
 import           Test.Hspec
