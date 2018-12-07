@@ -5,7 +5,6 @@ import Ohua.Prelude hiding (lift)
 import Language.Haskell.TH.Quote
 import Language.Haskell.TH.Syntax (lift, Exp, Q)
 import qualified Data.ByteString.Lazy.Char8 as LB
-import Control.Lens.Plated (universeOn, cosmos)
 import qualified Data.HashSet as HS
 
 import Ohua.ALang.Lang
