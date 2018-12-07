@@ -3,6 +3,7 @@
 -- as though it should be obvious, since the argument to `vsep` and
 -- `vcat` and the likes aren't polymorphic.
 {-# LANGUAGE NoOverloadedLists #-}
+
 module Ohua.DFGraph.Show where
 
 import Ohua.Prelude
@@ -12,9 +13,10 @@ import Text.PrettyPrint.Boxes hiding ((<>))
 
 import Ohua.DFGraph
 
+-- TODO show compound arcs 
 -- | TODO show return arc
 asTable :: OutGraph -> T.Text
-asTable (OutGraph ops arcs' _) =
+asTable (OutGraph ops (Arcs arcs' _) _) =
     T.pack $
     render $
     vsep
@@ -33,11 +35,12 @@ asTable (OutGraph ops arcs' _) =
         vcat left $
         (text "source" :) $
         (`map` map source arcs') $ \case
-            EnvSource i -> case i of
-                UnitLit -> "()"
-                NumericLit n -> text $ show n
-                EnvRefLit n -> text $ "$" <> show (unwrap n)
-                FunRefLit _fr -> error "Not supported"
+            EnvSource i ->
+                case i of
+                    UnitLit -> "()"
+                    NumericLit n -> text $ show n
+                    EnvRefLit n -> text $ "$" <> show (unwrap n)
+                    FunRefLit _fr -> error "Not supported"
             LocalSource t -> targetToBox t
     targetList =
         vcat left $ (text "target" :) $ (targetToBox . target) `map` arcs'

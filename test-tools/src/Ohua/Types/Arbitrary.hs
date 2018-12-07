@@ -1,18 +1,19 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE CPP #-}
+
 module Ohua.Types.Arbitrary where
 
 import Ohua.Prelude
 
-import qualified Data.Text as T
-import Test.QuickCheck
 import qualified Data.HashMap.Strict as HM
 import qualified Data.HashSet as HS
+import qualified Data.Text as T
+import Test.QuickCheck
 
 import Ohua.ALang.Lang
 import Ohua.DFGraph
-import Ohua.Frontend.NS
 import Ohua.DFLang.Lang
+import Ohua.Frontend.NS
 
 genFromMake :: (HasCallStack, Make t, Arbitrary (SourceType t)) => Gen t
 genFromMake =
@@ -36,14 +37,28 @@ reservedWords =
 
 instance Arbitrary T.Text where
     arbitrary = T.pack <$> arbitrary
+
 instance Arbitrary Operator where
     arbitrary = Operator <$> arbitrary <*> arbitrary
+
 instance Arbitrary Target where
     arbitrary = liftM2 Target arbitrary arbitrary
+
+instance Arbitrary a => Arbitrary (DirectArc a) where
+    arbitrary = liftM2 DirectArc arbitrary arbitrary
+
+instance Arbitrary CompoundArc where
+    arbitrary = liftM2 CompoundArc arbitrary arbitrary
+
+instance Arbitrary a => Arbitrary (Arcs a) where
+    arbitrary = liftM2 Arcs arbitrary arbitrary
+
 instance Arbitrary a => Arbitrary (Arc a) where
-    arbitrary = liftM2 Arc arbitrary arbitrary
+    arbitrary = oneof [Direct <$> arbitrary, Compound <$> arbitrary]
+
 instance Arbitrary a => Arbitrary (Source a) where
     arbitrary = oneof [LocalSource <$> arbitrary, EnvSource <$> arbitrary]
+
 instance Arbitrary a => Arbitrary (AbstractOutGraph a) where
     arbitrary = liftM3 OutGraph arbitrary arbitrary arbitrary
 
@@ -65,38 +80,50 @@ instance Arbitrary Binding where
 
 instance Arbitrary QualifiedBinding where
     arbitrary = QualifiedBinding <$> arbitrary <*> arbitrary
+
 instance Arbitrary SomeBinding where
     arbitrary = oneof [Qual <$> arbitrary, Unqual <$> arbitrary]
+
 instance Arbitrary NSRef where
     arbitrary = genFromMake `suchThat` (not . null . unwrap)
-instance Arbitrary FnId where arbitrary = genFromMake
-instance Arbitrary HostExpr where arbitrary = genFromMake
-instance Arbitrary FunRef where arbitrary = liftM2 FunRef arbitrary arbitrary
+
+instance Arbitrary FnId where
+    arbitrary = genFromMake
+
+instance Arbitrary HostExpr where
+    arbitrary = genFromMake
+
+instance Arbitrary FunRef where
+    arbitrary = liftM2 FunRef arbitrary arbitrary
+
 instance Arbitrary Lit where
-    arbitrary = oneof
-        [ NumericLit <$> arbitrary
-        , FunRefLit <$> arbitrary
-        , EnvRefLit <$> arbitrary
-        , pure UnitLit
-        ]
+    arbitrary =
+        oneof
+            [ NumericLit <$> arbitrary
+            , FunRefLit <$> arbitrary
+            , EnvRefLit <$> arbitrary
+            , pure UnitLit
+            ]
+
 instance Arbitrary Expr where
     arbitrary = sized expr
       where
         expr :: Int -> Gen Expr
         expr 0 = Var <$> arbitrary
-        expr n = oneof
-            [ liftM3 Let arbitrary nestExpr nestExpr
-            , liftM2 Apply nestExpr nestExpr
-            , liftM2 Lambda arbitrary nestExpr
-            , Lit <$> arbitrary
-            , Var <$> arbitrary
-            ]
+        expr n =
+            oneof
+                [ liftM3 Let arbitrary nestExpr nestExpr
+                , liftM2 Apply nestExpr nestExpr
+                , liftM2 Lambda arbitrary nestExpr
+                , Lit <$> arbitrary
+                , Var <$> arbitrary
+                ]
           where
             nestExpr = expr $ n `div` 2
-    shrink (Let a b c)  = b:c: [Let a b' c' | (b', c') <- shrink (b, c)]
-    shrink (Apply a b)  = a:b: [Apply a' b' | (a', b') <- shrink (a, b)]
-    shrink (Lambda a b) = b: map (Lambda a) (shrink b)
-    shrink _            = []
+    shrink (Let a b c) = b : c : [Let a b' c' | (b', c') <- shrink (b, c)]
+    shrink (Apply a b) = a : b : [Apply a' b' | (a', b') <- shrink (a, b)]
+    shrink (Lambda a b) = b : map (Lambda a) (shrink b)
+    shrink _ = []
 
 instance Arbitrary a => Arbitrary (Namespace a) where
     arbitrary = do
@@ -109,9 +136,10 @@ instance Arbitrary a => Arbitrary (Namespace a) where
             sfImports .~ sfImports0 &
             decls .~ HM.fromList decls0
     shrink ns = do
-        (ai, si, de) <- shrink (ns ^. algoImports, ns ^. sfImports, HM.toList $ ns ^. decls)
-        pure $ ns & algoImports .~ ai & sfImports .~ si & decls .~ HM.fromList de
-
+        (ai, si, de) <-
+            shrink (ns ^. algoImports, ns ^. sfImports, HM.toList $ ns ^. decls)
+        pure $
+            ns & algoImports .~ ai & sfImports .~ si & decls .~ HM.fromList de
 
 instance Arbitrary DFExpr where
     arbitrary = DFExpr <$> arbitrary <*> arbitrary
