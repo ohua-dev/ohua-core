@@ -146,13 +146,9 @@ instance Arbitrary DFExpr where
     shrink (DFExpr lets ret) = map (`DFExpr` ret) $ shrink lets
 
 instance Arbitrary LetExpr where
-    arbitrary =
-        LetExpr <$> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary <*>
-        arbitrary
-    shrink (LetExpr id r fr ca ctx) =
-        [ LetExpr id' r' fr' ca' ctx'
-        | (id', r', fr', ca', ctx') <- shrink (id, r, fr, ca, ctx)
-        ]
+    arbitrary = LetExpr <$> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary
+    shrink (LetExpr id r fr ca) =
+        [LetExpr id' r' fr' ca' | (id', r', fr', ca') <- shrink (id, r, fr, ca)]
 
 instance Arbitrary DFVar where
     arbitrary = oneof [DFEnvVar <$> arbitrary, DFVar <$> arbitrary]

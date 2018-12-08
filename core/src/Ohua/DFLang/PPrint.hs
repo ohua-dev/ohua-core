@@ -1,12 +1,13 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
+
 module Ohua.DFLang.PPrint where
 
 import Ohua.Prelude
 
 import Data.Text.Prettyprint.Doc
 
-import Ohua.DFLang.Lang
 import Ohua.ALang.PPrint ()
+import Ohua.DFLang.Lang
 
 prettyDFExpr :: DFExpr -> Doc a
 prettyDFExpr DFExpr {..} =
@@ -23,7 +24,6 @@ prettyLetExpr LetExpr {..} =
         , "="
         , pretty functionRef <> angles (pretty callSiteId)
         , align $ tupled $ map pretty callArguments
-        , maybe mempty (brackets . pretty) contextArg
         , "in"
         ]
 

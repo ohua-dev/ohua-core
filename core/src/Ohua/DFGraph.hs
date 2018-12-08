@@ -119,11 +119,7 @@ toGraph (DFExpr lets r) = OutGraph ops grArcs (getSource r)
         HM.lookup v sources
     toArc createArc l =
         [ createArc t arg
-        | (arg, idx) <-
-              maybe identity ((:) . (, -1) . DFVar) (contextArg l)
-                  -- prepend (ctxBinding, -1) if there is a context arc
-               $
-              zip (callArguments l) [0 ..]
+        | (arg, idx) <- zip (callArguments l) [0 ..]
         , let t = Target (callSiteId l) idx
         ]
     -- toDirectArc :: LetExpr -> [DirectArc envExpr]

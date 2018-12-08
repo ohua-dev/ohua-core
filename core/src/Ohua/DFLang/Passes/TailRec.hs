@@ -35,7 +35,6 @@ recurLowering (DFExpr letExprs returnVar)
                         , cond
                         , DFVarList (join $ map extractBindings recurArgs)
                         ]
-                        Nothing
      in flip DFExpr returnVar $
         finalRecurFuns >< removeAllExprs recurFuns letExprs
   where

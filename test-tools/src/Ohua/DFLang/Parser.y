@@ -93,7 +93,7 @@ FnId :: { FnId }
 FnId : int { makeThrow $ fromInteger $1 }
 
 LetExpr :: { LetExpr }
-LetExpr : let Pat '=' FnRef '<' FnId '>' tuple(DFVar) opt(CtxRef) in { LetExpr $6 $2 $4 $8 $9 }
+LetExpr : let Pat '=' FnRef '<' FnId '>' tuple(DFVar) in { LetExpr $6 $2 $4 $8 }
 
 DFVar :: { DFVar }
 DFVar

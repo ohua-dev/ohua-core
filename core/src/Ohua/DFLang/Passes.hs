@@ -99,7 +99,7 @@ handleDefinitionalExpr _ e _ =
 lowerDefault :: MonadOhua m => Pass m
 lowerDefault fn fnId assign args =
     mapM expectVar args <&> \args' ->
-        [LetExpr fnId [assign] (lowerFnToDFLang fn) args' Nothing]
+        [LetExpr fnId [assign] (lowerFnToDFLang fn) args']
   where
     lowerFnToDFLang = fromMaybe (EmbedSf fn) . Refs.lowerBuiltinFunctions
 
@@ -138,36 +138,6 @@ handleApplyExpr l@(Apply _ _) = go [] l
 handleApplyExpr (Sf fn fnId) = (fn, , []) <$> maybe generateId return fnId
                                                                                  -- what is this?
 handleApplyExpr g = failWith $ "Expected apply but got: " <> show g
-
-tieContext0 ::
-       ( Monad m
-       , Functor f
-       , SemigroupConstraint (f LetExpr)
-       , f LetExpr ~ c
-       , Container c
-       , Element c ~ LetExpr
-       )
-    => m (Maybe (c, Binding))
-    -> c
-    -> m c
-tieContext0 initExpr lets
-    | all hasLocalArcs lets = pure lets
-    | otherwise =
-        initExpr <&>
-        maybe
-            lets
-            (\(initExprs, scopeBnd) -> initExprs <> fmap (go scopeBnd) lets)
-  where
-    hasLocalArcs e
-        | any isLocalArc (callArguments e) = True
-        | Just ctxArg <- contextArg e
-        , isLocalArc (DFVar ctxArg) = True
-    hasLocalArcs _ = False
-    go _ e
-        | hasLocalArcs e = e
-    go ctxSource e = e {contextArg = Just ctxSource}
-    isLocalArc (DFVar _) = True
-    isLocalArc _ = False
 
 -- | Inspect an expression expecting something which can be captured
 -- in a DFVar otherwise throws appropriate errors.

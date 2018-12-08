@@ -34,7 +34,6 @@ data LetExpr = LetExpr
     , output :: ![Binding]
     , functionRef :: !DFFnRef
     , callArguments :: ![DFVar]
-    , contextArg :: !(Maybe Binding)
     } deriving (Eq, Show, Lift, Generic)
 
 data DFFnRef
