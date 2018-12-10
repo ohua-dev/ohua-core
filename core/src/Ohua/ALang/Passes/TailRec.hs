@@ -238,22 +238,22 @@ loadTailRecPasses True passes@(CustomPasses { passBeforeNormalize = bn
 recur = ALangRefs.recur -- allows me to use it in binding position
 
 recur_sf :: Expression
-recur_sf = Sf ALangRefs.recur Nothing
+recur_sf = PureFunction ALangRefs.recur Nothing
 
 -- The Y combinator from Haskell Curry
 y :: QualifiedBinding
 y = "ohua.lang/Y"
 
 y_sf :: Expression
-y_sf = Sf y Nothing
+y_sf = PureFunction y Nothing
 
 recurFun :: QualifiedBinding
 recurFun = "ohua.lang/recurFun"
 
-recurFunSf :: Expression
-recurFunSf = Sf recurFun Nothing
+recurFunPureFunction :: Expression
+recurFunPureFunction = PureFunction recurFun Nothing
 
-idSf = Lit $ FunRefLit $ FunRef "ohua.lang/id" Nothing
+idPureFunction = Lit $ FunRefLit $ FunRef "ohua.lang/id" Nothing
 
 -- Phase 1:
 findTailRecs :: (Monad m, MonadGenBnd m) => Bool -> Expression -> m Expression
@@ -322,7 +322,7 @@ verifyTailRecursion e
     -- failOnRecur (Let _ e ie) | isCall recur e || isCall recur ie = error "Recursion is not tail recursive!"
     failOnRecur (Let _ e ie) = failOnRecur e >> failOnRecur ie
     failOnRecur (Lambda v e) = failOnRecur e -- TODO maybe throw a better error message when this happens
-    failOnRecur (Apply (Sf recur _) _) =
+    failOnRecur (Apply (PureFunction recur _) _) =
         error "Recursion is not tail recursive!"
     failOnRecur (Apply a b) = return ()
     failOnRecur e =
@@ -377,7 +377,7 @@ rewriteAll v@(Var _) = return v
 -- With `plated` this would be
 -- rewriteAll = transformM $ \e -> if isCall y e then rewriteCallExpr r else pure e
 
-isCall f (Apply (Sf f' _) _)
+isCall f (Apply (PureFunction f' _) _)
     | f == f' = True
 isCall f (Apply e@(Apply _ _) _) = isCall f e
 isCall _ _ = False
@@ -411,7 +411,7 @@ rewriteCallExpr e = do
     rewriteLastCond (Let v e o@(Var _)) = (\e' -> Let v e' o) $ rewriteCond e
     rewriteLastCond (Let v e ie) = Let v e $ rewriteLastCond ie
     rewriteCond :: Expression -> Expression
-    rewriteCond (Apply (Apply (Apply idSf cond) (Lambda a trueB)) (Lambda b falseB)) =
+    rewriteCond (Apply (Apply (Apply idPureFunction cond) (Lambda a trueB)) (Lambda b falseB)) =
         let trueB' = rewriteBranch trueB
             falseB' = rewriteBranch falseB
             fixRef =
@@ -435,7 +435,7 @@ rewriteCallExpr e = do
             "invariant broken: recursive function does not have the proper structure."
     rewriteBranch :: Expression -> Either Expression [Expression]
     -- normally this is "fix" instead of `id`
-    rewriteBranch (Let v (Apply (Sf "ohua.lang/id" _) result) _) = Left result
+    rewriteBranch (Let v (Apply (PureFunction "ohua.lang/id" _) result) _) = Left result
     rewriteBranch (Let v e _)
         | isCall recur e = (Right . snd . fromApplyToList) e
     rewriteBranch _ = error "invariant broken"

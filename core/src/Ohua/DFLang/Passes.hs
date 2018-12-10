@@ -118,7 +118,7 @@ handleApplyExpr l@(Apply _ _) = go [] l
                         failWith
                             "Calling local functions is not supported in this adapter"
                     Just fn -> (fn, , ve : args) <$> generateId
-            Sf fn fnId -> (fn, , args) <$> maybe generateId return fnId
+            PureFunction fn fnId -> (fn, , args) <$> maybe generateId return fnId
             ve@(Lit v) ->
                 case v of
                     EnvRefLit _ ->
@@ -135,7 +135,7 @@ handleApplyExpr l@(Apply _ _) = go [] l
             x ->
                 failWith $
                 "Expected Apply or Var but got: " <> show (x :: Expression)
-handleApplyExpr (Sf fn fnId) = (fn, , []) <$> maybe generateId return fnId
+handleApplyExpr (PureFunction fn fnId) = (fn, , []) <$> maybe generateId return fnId
                                                                                  -- what is this?
 handleApplyExpr g = failWith $ "Expected apply but got: " <> show g
 
@@ -143,7 +143,7 @@ handleApplyExpr g = failWith $ "Expected apply but got: " <> show g
 -- in a DFVar otherwise throws appropriate errors.
 expectVar :: MonadError Error m => Expression -> m DFVar
 expectVar (Var bnd) = pure $ DFVar bnd
-expectVar r@Sf {} =
+expectVar r@PureFunction {} =
     throwError $
     "Stateful function references are not yet supported as arguments: " <>
     show (pretty r)

@@ -8,7 +8,7 @@ ohuaLangNS :: NSRef
 ohuaLangNS = makeThrow ["ohua", "lang"]
 
 mkQualVar :: NSRef -> Binding -> Expr
-mkQualVar ns name0 = Sf (QualifiedBinding ns name0) Nothing
+mkQualVar ns name0 = PureFunction (QualifiedBinding ns name0) Nothing
 
 mkOhuaLangRef :: Binding -> Expr
 mkOhuaLangRef = mkQualVar ohuaLangNS

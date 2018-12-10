@@ -91,7 +91,7 @@ checkHigherOrderFunctionSupport (Let _ e rest) = do
             "Lambdas may only be input to higher order functions, not " <>
             show f
         pure True
-    checkNestedExpr (Sf n _) = pure $ HS.member n hofNames
+    checkNestedExpr (PureFunction n _) = pure $ HS.member n hofNames
     checkNestedExpr (Var _) = pure False
     checkNestedExpr a = failWith $ "Expected var or apply expr, got " <> show a
     isLambda (Lambda _ _) = True

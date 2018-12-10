@@ -161,7 +161,7 @@ ensureFinalLetInLambdas =
 ensureAtLeastOneCall :: (Monad m, MonadGenBnd m) => Expression -> m Expression
 ensureAtLeastOneCall e@(Var _) = do
     newBnd <- generateBinding
-    pure $ Let newBnd (Sf Refs.id Nothing `Apply` e) $ Var newBnd
+    pure $ Let newBnd (PureFunction Refs.id Nothing `Apply` e) $ Var newBnd
 ensureAtLeastOneCall e = cata f e
   where
     f (LambdaF bnd body) =
@@ -170,7 +170,7 @@ ensureAtLeastOneCall e = cata f e
                 newBnd <- generateBinding
                 pure $
                     Lambda bnd $
-                    Let newBnd (Sf Refs.id Nothing `Apply` v) $ Var newBnd
+                    Let newBnd (PureFunction Refs.id Nothing `Apply` v) $ Var newBnd
             eInner -> pure $ Lambda bnd eInner
     f eInner = embed <$> sequence eInner
 
@@ -242,7 +242,7 @@ hasFinalLet =
 noDuplicateIds :: MonadError Error m => Expression -> m ()
 noDuplicateIds = flip evalStateT mempty . cata go
   where
-    go (SfF _ (Just funid)) = do
+    go (PureFunctionF _ (Just funid)) = do
         isMember <- gets (HS.member funid)
         when isMember $ failWith $ "Duplicate id " <> show funid
         modify (HS.insert funid)
@@ -251,8 +251,8 @@ noDuplicateIds = flip evalStateT mempty . cata go
 -- | Checks that no apply to a local variable is performed.  This is a
 -- simple check and it will pass on complex expressions even if they
 -- would reduce to an apply to a local variable.
-applyToSf :: MonadOhua m => Expression -> m ()
-applyToSf =
+applyToPureFunction :: MonadOhua m => Expression -> m ()
+applyToPureFunction =
     para $ \case
         ApplyF (Var bnd, _) _ ->
             failWith $ "Illegal Apply to local var " <> show bnd
@@ -276,7 +276,7 @@ checkProgramValidity :: MonadOhua m => Expression -> m ()
 checkProgramValidity e = do
     hasFinalLet e
     noDuplicateIds e
-    applyToSf e
+    applyToPureFunction e
     noUndefinedBindings e
 
 -- | Lifts something like @if (f x) a b@ to @let x0 = f x in if x0 a b@

@@ -160,10 +160,10 @@ trans =
             ifBuiltin `Apply` cont `Apply` Lambda "_" then_ `Apply`
             Lambda "_" else_
         MapEF function coll -> smapBuiltin `Apply` function `Apply` coll
-        BindEF _e1 _e2 -> error "State binding not yet implemented in ALang"
+        BindEF ref e -> BindState ref e
         StmtEF e1 cont -> Let "_" e1 cont
         SeqEF _source _target -> error "Seq not yet implemented"
-        TupEF parts -> foldl Apply (Sf mkTuple Nothing) parts
+        TupEF parts -> foldl Apply (PureFunction mkTuple Nothing) parts
   where
     patToBnd =
         \case

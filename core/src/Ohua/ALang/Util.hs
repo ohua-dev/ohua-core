@@ -43,7 +43,7 @@ destructure source bnds =
     map (\(idx, bnd0) -> Let bnd0 $ mkNthExpr idx source) (zip [0 ..] bnds)
   where
     mkNthExpr idx source0 =
-        Sf Refs.nth Nothing `Apply` (Lit $ NumericLit idx) `Apply` source0
+        PureFunction Refs.nth Nothing `Apply` (Lit $ NumericLit idx) `Apply` source0
 
 lambdaLifting ::
        (Monad m, MonadGenBnd m) => Expression -> m (Expression, [Expression])

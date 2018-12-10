@@ -27,22 +27,37 @@ afterLetIndent = 0
 argumentIndent :: Int
 argumentIndent = 2
 
+data Prescedence
+    = VarPrec
+    | AppPrec
+    | BindPrec
+    | LamPrec
+    | LetPrec
+    deriving (Eq, Ord)
+
+type WPrec a = (Doc a, Prescedence)
+
+parenthesize :: Prescedence -> WPrec a -> Doc a
+parenthesize prec1 (e, prec0)
+    | prec0 > prec1 = parens e
+    | otherwise = e
+noParens :: Doc a -> WPrec a
+noParens = (, VarPrec)
+needParens :: Prescedence -> Doc a -> WPrec a
+needParens prec = (, prec)
+discardParens :: WPrec a -> Doc a
+discardParens = fst
+
 prettyExpr :: Expr -> Doc a
 prettyExpr = fst . histo worker
   where
-    parenthesize prec1 (e, prec0)
-        | prec0 > prec1 = parens e
-        | otherwise = e
-    noParens = (, 0 :: Word)
-    needParens prec = (, prec)
-    discardParens = fst
     worker =
         \case
             VarF bnd -> noParens $ pretty bnd
             LitF l -> noParens $ pretty l
             LetF assign expr (extract -> cont) ->
                 let (assigns, e) = collectLambdas expr
-                 in needParens 3 $
+                 in needParens LetPrec $
                     sep
                         [ "let" <+>
                           align
@@ -56,17 +71,20 @@ prettyExpr = fst . histo worker
                         , align (discardParens cont)
                         ]
             ApplyF (extract -> fun) (extract -> arg) ->
-                needParens 1 $
+                needParens AppPrec $
                 hang argumentIndent $
-                sep [parenthesize 1 fun, parenthesize 0 arg]
+                sep [parenthesize AppPrec fun, parenthesize VarPrec arg]
             LambdaF assign body ->
                 let (assigns, e) = collectLambdas body
-                 in needParens 2 $
+                 in needParens LamPrec $
                     "λ" <+>
                     align
                         (sep [ sep (map pretty (assign : assigns) <> ["->"])
                              , discardParens e
                              ])
+            BindStateF (extract -> fun) (extract -> state) ->
+                needParens BindPrec $
+                hsep [discardParens fun, "with", discardParens state]
     collectLambdas =
         para $ \case
             (tailF -> LambdaF assign (_, (assigns, e))) -> (assign : assigns, e)
