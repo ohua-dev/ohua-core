@@ -28,6 +28,7 @@ recurLowering (DFExpr letExprs returnVar)
                         (callSiteId recurFunStart)
                         ((output recurFunStart) ++ (output recurFunEnd))
                         (functionRef recurFunStart)
+                        Nothing
                         [ DFVarList
                               (join $
                                map extractBindings $ callArguments recurFunStart)

@@ -33,6 +33,7 @@ data LetExpr = LetExpr
     { callSiteId :: !FnId
     , output :: ![Binding]
     , functionRef :: !DFFnRef
+    , stateArgument :: !(Maybe DFVar)
     , callArguments :: ![DFVar]
     } deriving (Eq, Show, Lift, Generic)
 

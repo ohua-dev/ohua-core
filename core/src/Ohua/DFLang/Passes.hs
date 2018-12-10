@@ -88,18 +88,19 @@ handleDefinitionalExpr ::
     -> m Binding
     -> m Binding
 handleDefinitionalExpr assign l@(Apply _ _) cont = do
-    (fn, fnId, args) <- handleApplyExpr l
-    tell =<< lowerDefault fn fnId assign args
+    (fn, fnId, s, args) <- handleApplyExpr l
+    e <- lowerDefault fn fnId assign args
+    tell $ pure e {stateArgument = s}
     cont
 handleDefinitionalExpr _ e _ =
     failWith $
     "Definitional expressions in a let can only be 'apply' but got: " <> show e
 
 -- | Lower any not specially treated function type.
-lowerDefault :: MonadOhua m => Pass m
+lowerDefault :: MonadOhua m => QualifiedBinding -> FnId -> Binding -> [Expression] -> m LetExpr
 lowerDefault fn fnId assign args =
     mapM expectVar args <&> \args' ->
-        [LetExpr fnId [assign] (lowerFnToDFLang fn) args']
+        LetExpr fnId [assign] (lowerFnToDFLang fn) Nothing args'
   where
     lowerFnToDFLang = fromMaybe (EmbedSf fn) . Refs.lowerBuiltinFunctions
 
@@ -107,7 +108,9 @@ lowerDefault fn fnId assign args =
 -- function and the nested arguments as a list.  Also generates a new
 -- function id for the inner function should it not have one yet.
 handleApplyExpr ::
-       (MonadOhua m) => Expression -> m (QualifiedBinding, FnId, [Expression])
+       (MonadOhua m)
+    => Expression
+    -> m (QualifiedBinding, FnId, Maybe DFVar, [Expression])
 handleApplyExpr l@(Apply _ _) = go [] l
   where
     go args =
@@ -117,8 +120,12 @@ handleApplyExpr l@(Apply _ _) = go [] l
                     Nothing ->
                         failWith
                             "Calling local functions is not supported in this adapter"
-                    Just fn -> (fn, , ve : args) <$> generateId
-            PureFunction fn fnId -> (fn, , args) <$> maybe generateId return fnId
+                    Just fn -> (fn, , Nothing, ve : args) <$> generateId
+            PureFunction fn fnId ->
+                (fn, , Nothing, args) <$> maybe generateId return fnId
+            StatefulFunction fn fnId state -> do
+                state' <- expectVar state
+                (fn, , Just $ state', args) <$> maybe generateId return fnId
             ve@(Lit v) ->
                 case v of
                     EnvRefLit _ ->
@@ -126,7 +133,7 @@ handleApplyExpr l@(Apply _ _) = go [] l
                             Nothing ->
                                 failWith
                                     "Calling environment functions is not supported in this adapter"
-                            Just fn -> (fn, , ve : args) <$> generateId
+                            Just fn -> (fn, , Nothing, ve : args) <$> generateId
                     other ->
                         throwError $
                         "This literal cannot be used as a function :" <>
@@ -135,7 +142,8 @@ handleApplyExpr l@(Apply _ _) = go [] l
             x ->
                 failWith $
                 "Expected Apply or Var but got: " <> show (x :: Expression)
-handleApplyExpr (PureFunction fn fnId) = (fn, , []) <$> maybe generateId return fnId
+handleApplyExpr (PureFunction fn fnId) =
+    (fn, , Nothing, []) <$> maybe generateId return fnId
                                                                                  -- what is this?
 handleApplyExpr g = failWith $ "Expected apply but got: " <> show g
 
