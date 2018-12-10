@@ -51,79 +51,37 @@ runCorePasses expr = do
 
 -- | Inline all references to lambdas.
 -- Aka `let f = (\a -> E) in f N` -> `(\a -> E) N`
-inlineLambdaRefs :: MonadOhua m => Expression -> m Expression
-inlineLambdaRefs = flip runReaderT mempty . para go
-  where
-    go (LetF b (Lambda _ _, l) (_, body)) =
-        l >>= \l' -> local (HM.insert b l') body
-    go (VarF bnd) = asks (fromMaybe (Var bnd) . HM.lookup bnd)
-    go e = embed <$> traverse snd e
+inlineLambdaRefs ::
+       (MonadState (HM.HashMap Binding Expr) m)
+    => Expression
+    -> m (Maybe Expression)
+inlineLambdaRefs = \case
+    Let b l@Lambda{} body -> do
+        modify (HM.insert b l)
+        pure $ Just body
+    Var bnd -> gets (HM.lookup bnd)
+    _ -> pure Nothing
+
+floatOutLet :: Expression -> Maybe Expression
+floatOutLet =
+    \case
+        Apply fun arg
+            | Let b e fun' <- fun -> Just $ Let b e (Apply fun' arg)
+            | Let b e arg' <- arg -> Just $ Let b e (Apply fun arg')
+        Let b (Let b2 e2 e3) e -> Just $ Let b2 e2 $ Let b e3 e
+        BindState fun arg
+            | Let b e fun' <- fun -> Just $ Let b e (BindState fun' arg)
+            | Let b e arg' <- arg -> Just $ Let b e (BindState fun arg')
+        _ -> Nothing
 
 -- | Reduce lambdas by simulating application
 -- Aka `(\a -> E) N` -> `let a = N in E`
 -- Assumes lambda refs have been inlined
-inlineLambda :: Expression -> Expression
-inlineLambda =
-    cata $ \case
-        e@(ApplyF func argument) ->
-            case func of
-                Lambda assignment body -> Let assignment argument body
-                Apply _ _ -> reduceLetCWith f func
-                    where f (Lambda assignment body) =
-                              Let assignment argument body
-                          f v0 = Apply v0 argument
-                _ -> embed e
-        e -> embed e
+inlineLambda :: Expression -> Maybe Expression
+inlineLambda = \case
+    Apply (Lambda b e) arg -> Just $ Let b arg e
+    _ -> Nothing
 
--- recursively performs the substitution
---
--- let x = (let y = M in A) in E[x] -> let y = M in let x = A in E[x]
-reduceLetA :: Expression -> Expression
-reduceLetA =
-    \case
-        Let assign (Let assign2 val expr3) expr ->
-            Let assign2 val $ reduceLetA $ Let assign expr3 expr
-        e -> e
-
-reduceLetCWith :: (Expression -> Expression) -> Expression -> Expression
-reduceLetCWith f =
-    \case
-        Apply (Let assign val expr) argument ->
-            Let assign val $ reduceLetCWith f $ Apply expr argument
-        e -> f e
-
-reduceLetC :: Expression -> Expression
-reduceLetC = reduceLetCWith identity
-
-reduceAppArgument :: Expression -> Expression
-reduceAppArgument =
-    \case
-        Apply function (Let assign val expr) ->
-            Let assign val $ reduceApplication $ Apply function expr
-        e -> e
-
--- recursively performs the substitution
---
--- (let x = M in A) N -> let x = M in A N
---
--- and then
---
--- A (let x = M in N) -> let x = M in A N
-reduceApplication :: Expression -> Expression
-reduceApplication = reduceLetCWith reduceAppArgument
-
--- | Lift all nested lets to the top level
--- Aka `let x = let y = E in N in M` -> `let y = E in let x = N in M`
--- and `(let x = E in F) a` -> `let x = E in F a`
-letLift :: Expression -> Expression
-letLift =
-    cata $ \e ->
-        let f =
-                case e of
-                    LetF _ _ _ -> reduceLetA
-                    ApplyF _ _ -> reduceApplication
-                    _ -> identity
-         in f $ embed e
 
 -- | Inline all direct reassignments.
 -- Aka `let x = E in let y = x in y` -> `let x = E in x`
@@ -288,12 +246,26 @@ liftApplyToApply =
             return $ Let bnd arg $ Apply fn (Var bnd)
         a -> return a
 
+normalizeBind :: (MonadError Error m, MonadGenBnd m) => Expression -> m Expression
+normalizeBind =
+    rewriteM $ \case
+        BindState e1@(PureFunction _ _) e2 ->
+            case e2 of
+                Var _ -> pure Nothing
+                Lit _ -> pure Nothing
+                _ ->
+                    generateBinding >>= \b ->
+                        pure $ Just $ Let b e2 (BindState e1 (Var b))
+        BindState _ _ -> throwError "State bind target must be a pure function reference"
+        _ -> pure Nothing
+
 -- The canonical composition of the above transformations to create a
 -- program with the invariants we expect.
-normalize :: MonadOhua m => Expression -> m Expression
+normalize :: (MonadPlus m, MonadOhua m) => Expression -> m Expression
 normalize e =
-    reduceLambdas (letLift e) >>= removeCurrying >>= liftApplyToApply >>=
+    reduceLambdas e >>= removeCurrying >>= liftApplyToApply >>=
     ensureFinalLet . inlineReassignments . letLift >>=
+    normalizeBind >>=
     ensureAtLeastOneCall
     -- we repeat this step until a fix point is reached.
     -- this is necessary as lambdas may be input to lambdas,
@@ -302,19 +274,10 @@ normalize e =
     -- I doubt this will ever do more than two or three iterations,
     -- but to make sure it accepts every valid program this is necessary.
   where
-    reduceLambdas expr = do
-        res <- letLift . inlineLambda <$> inlineLambdaRefs expr
-        if res == expr
-            then return res
-            else reduceLambdas res
--- letLift (Let assign1 (Let assign2 expr2 expr3) expr4) = letLift $ Let assign2 expr2 $ Let assign1 expr3 expr4
--- letLift (Let assign v@(Var _) expr) = Let assign v $ letLift expr
--- letLift (Let assign val expr) =
---     case letLift val of
---         v'@(Let _ _ _) -> letLift $ Let assign v' expr
---         _ -> Let assign v' $ letLift expr
--- letLift e@(Var _) = e
--- letLift (Apply v@(Var _) argument) = Apply v (letLift argument)
--- letLift (Apply (Let assign expr function) argument) = letLift $ Let assign expr $ Apply function argument
--- letLift (Apply function argument) =
---     case letLift argument of
+    letLift = rewrite floatOutLet
+    reduceLambdas =
+        evaluatingStateT mempty .
+        rewriteM
+            (\e ->
+                 pure (floatOutLet e) <|> pure (inlineLambda e) <|>
+                 inlineLambdaRefs e)

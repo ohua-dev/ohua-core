@@ -49,6 +49,8 @@ newtype OhuaM env a = OhuaM
                , MonadError Error
                , MonadLogger
                , MonadLoggerIO
+               , MonadPlus
+               , Alternative
                )
 
 class Monad m => MonadGenBnd m where
