@@ -11,12 +11,12 @@ module Ohua.DFGraph where
 import Ohua.Prelude
 
 import qualified Data.HashMap.Strict as HM
-import Data.List (partition)
 import Ohua.DFLang.Lang
 
 data Operator = Operator
     { operatorId :: !FnId
     , operatorType :: !QualifiedBinding
+    , operatorNType :: !NodeType
     } deriving (Eq, Generic, Show)
 
 data Target = Target
@@ -26,23 +26,18 @@ data Target = Target
 
 data Arcs envExpr = Arcs
     { direct :: ![DirectArc envExpr]
-    , compound :: ![Arc envExpr]
+    , compound :: ![CompoundArc]
+    , state :: ![StateArc envExpr]
     } deriving (Eq, Generic, Show)
 
-data Arc envExpr
-    = Direct (DirectArc envExpr)
-    | Compound CompoundArc
-    deriving (Eq, Generic, Show)
+data Arc target source = Arc
+    { target :: !target
+    , source :: !source
+    } deriving (Eq, Show, Generic)
 
-data CompoundArc = CompoundArc
-    { compoundTarget :: !Target
-    , compoundSource :: ![Target]
-    } deriving (Eq, Generic, Show)
-
-data DirectArc envExpr = DirectArc
-    { target :: !Target
-    , source :: !(Source envExpr)
-    } deriving (Eq, Generic, Show)
+type CompoundArc = Arc Target [Target]
+type DirectArc envExpr = Arc Target (Source envExpr)
+type StateArc envExpr = Arc FnId (Source envExpr)
 
 data Source envExpr
     = LocalSource !Target
@@ -72,13 +67,9 @@ instance NFData Operator
 
 instance NFData Target
 
-instance NFData a => NFData (DirectArc a)
+instance (NFData a, NFData b) => NFData (Arc a b)
 
-instance NFData (CompoundArc)
-
-instance NFData a => NFData (Arc a)
-
-instance NFData a => NFData (Arcs a)
+instance (NFData a) => NFData (Arcs a)
 
 instance NFData a => NFData (Source a)
 
@@ -88,12 +79,12 @@ toGraph :: DFExpr -> OutGraph
 toGraph (DFExpr lets r) = OutGraph ops grArcs (getSource r)
   where
     ops = map toOp $ toList lets
-    toOp e = Operator (callSiteId e) (deRef e)
-    deRef =
-        (\case
-             DFFunction n -> n
-             EmbedSf n -> n) .
-        functionRef
+    states =
+        mapMaybe
+            (\LetExpr {..} -> fmap (Arc callSiteId . varToSource) stateArgument) $
+        toList lets
+    toOp LetExpr {..} =
+        Operator callSiteId (nodeRef functionRef) (nodeType functionRef)
     sources =
         HM.fromList $
         toList lets >>= \l ->
@@ -101,41 +92,27 @@ toGraph (DFExpr lets r) = OutGraph ops grArcs (getSource r)
             | (var, idx) <- zip (output l) [0 ..]
             ]
     grArcs =
-        let allArcs = toList lets
-            (toDirectArcs, toCompoundArcs) =
-                flip partition allArcs $ \LetExpr {callArguments = callArgs} ->
-                    null $
-                    flip filter callArgs $ \case
-                        DFVarList _ -> False
-                        _ -> True
-         in Arcs
-                (concatMap toDirectArc toDirectArcs)
-                (concatMap toCompAndDirectArc toCompoundArcs)
+        let (compounds, directs) =
+                partitionEithers
+                    [ case v of
+                        DFVarList l -> Left $ arc $ map getSource l
+                        _ -> Right $ arc $ varToSource v
+                    | LetExpr {..} <- toList lets
+                    , (idx, v) <- zip [0 ..] callArguments
+                    , let arc :: source -> Arc Target source
+                          arc = Arc $ Target callSiteId idx
+                    ]
+         in Arcs directs compounds states
     getSource v =
         fromMaybe
             (error $
              "Undefined Binding: DFVar " <> show v <> " defined vars: " <>
              show sources) $
         HM.lookup v sources
-    toArc createArc l =
-        [ createArc t arg
-        | (arg, idx) <- zip (callArguments l) [0 ..]
-        , let t = Target (callSiteId l) idx
-        ]
-    -- toDirectArc :: LetExpr -> [DirectArc envExpr]
-    toDirectArc =
-        toArc $ \t arg ->
-            case arg of
-                DFVar v -> DirectArc t $ LocalSource $ getSource v
-                DFEnvVar envExpr -> DirectArc t $ EnvSource envExpr
-                DFVarList _ -> error "Invariant Broken!"
-    -- toCompAndDirectArc :: LetExpr -> [Arc envExpr]
-    toCompAndDirectArc =
-        toArc $ \t arg ->
-            case arg of
-                DFVar v -> Direct $ DirectArc t $ LocalSource $ getSource v
-                DFEnvVar envExpr -> Direct $ DirectArc t $ EnvSource envExpr
-                DFVarList bindings ->
-                    Compound $ CompoundArc t $ map getSource bindings
+    varToSource =
+        \case
+            DFVar v -> LocalSource $ getSource v
+            DFEnvVar envExpr -> EnvSource envExpr
+            DFVarList _ -> error "Invariant Broken!"
 -- spliceEnv :: (Int -> a) -> OutGraph -> AbstractOutGraph a
 -- spliceEnv lookupExpr = fmap f where f i = lookupExpr $ unwrap i

@@ -4,7 +4,7 @@ import qualified DFLowering
 
 -- import qualified TailRecSpec
 -- FIXME
--- import           PassesSpec
+import           PassesSpec
 import Test.Hspec
 import qualified TestALangUtils
 import qualified TestAesonConvert
@@ -15,6 +15,7 @@ main =
        -- FIXME
        -- passesSpec
      do
+        passesSpec
         DFLowering.generalLowering
         DFLowering.ifSpec
         DFLowering.seqSpec

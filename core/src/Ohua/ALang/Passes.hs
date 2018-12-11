@@ -49,18 +49,18 @@ runCorePasses expr = do
     stage "seq-transformation" seqE
     return seqE
 
--- | Inline all references to lambdas.
--- Aka `let f = (\a -> E) in f N` -> `(\a -> E) N`
-inlineLambdaRefs ::
-       (MonadState (HM.HashMap Binding Expr) m)
-    => Expression
-    -> m (Maybe Expression)
-inlineLambdaRefs = \case
-    Let b l@Lambda{} body -> do
-        modify (HM.insert b l)
-        pure $ Just body
-    Var bnd -> gets (HM.lookup bnd)
-    _ -> pure Nothing
+-- -- | Inline all references to lambdas.
+-- -- Aka `let f = (\a -> E) in f N` -> `(\a -> E) N`
+-- inlineLambdaRefs ::
+--        (MonadState (HM.HashMap Binding Expr) m)
+--     => Expression
+--     -> m (Maybe Expression)
+-- inlineLambdaRefs = \case
+--     Let b l@Lambda{} body -> do
+--         modify (HM.insert b l)
+--         pure $ Just body
+--     Var bnd -> gets (HM.lookup bnd)
+--     _ -> pure Nothing
 
 floatOutLet :: Expression -> Maybe Expression
 floatOutLet =
@@ -74,26 +74,26 @@ floatOutLet =
             | Let b e arg' <- arg -> Just $ Let b e (BindState fun arg')
         _ -> Nothing
 
--- | Reduce lambdas by simulating application
--- Aka `(\a -> E) N` -> `let a = N in E`
--- Assumes lambda refs have been inlined
-inlineLambda :: Expression -> Maybe Expression
-inlineLambda = \case
-    Apply (Lambda b e) arg -> Just $ Let b arg e
-    _ -> Nothing
+-- -- | Reduce lambdas by simulating application
+-- -- Aka `(\a -> E) N` -> `let a = N in E`
+-- -- Assumes lambda refs have been inlined
+-- inlineLambda :: Expression -> Maybe Expression
+-- inlineLambda = \case
+--     Apply (Lambda b e) arg -> Just $ Let b arg e
+--     _ -> Nothing
 
 
--- | Inline all direct reassignments.
--- Aka `let x = E in let y = x in y` -> `let x = E in x`
-inlineReassignments :: Expression -> Expression
-inlineReassignments = flip runReader HM.empty . cata go
-  where
-    go (LetF bnd val body) =
-        val >>= \case
-            v@(Var _) -> local (HM.insert bnd v) body
-            v -> Let bnd v <$> body
-    go (VarF val) = asks (fromMaybe (Var val) . HM.lookup val)
-    go e = embed <$> sequence e
+-- -- | Inline all direct reassignments.
+-- -- Aka `let x = E in let y = x in y` -> `let x = E in x`
+-- inlineReassignments :: Expression -> Expression
+-- inlineReassignments = flip runReader HM.empty . cata go
+--   where
+--     go (LetF bnd val body) =
+--         val >>= \case
+--             v@(Var _) -> local (HM.insert bnd v) body
+--             v -> Let bnd v <$> body
+--     go (VarF val) = asks (fromMaybe (Var val) . HM.lookup val)
+--     go e = embed <$> sequence e
 
 -- | Transforms the final expression into a let expression with the result variable as body.
 -- Aka `let x = E in some/sf a` -> `let x = E in let y = some/sf a in y`
@@ -237,47 +237,100 @@ checkProgramValidity e = do
     applyToPureFunction e
     noUndefinedBindings e
 
--- | Lifts something like @if (f x) a b@ to @let x0 = f x in if x0 a b@
-liftApplyToApply :: MonadOhua m => Expression -> m Expression
-liftApplyToApply =
-    lrPrewalkExprM $ \case
-        Apply fn arg@(Apply _ _) -> do
-            bnd <- generateBinding
-            return $ Let bnd arg $ Apply fn (Var bnd)
-        a -> return a
+-- -- | Lifts something like @if (f x) a b@ to @let x0 = f x in if x0 a b@
+-- liftApplyToApply :: MonadOhua m => Expression -> m Expression
+-- liftApplyToApply =
+--     lrPrewalkExprM $ \case
+--         Apply fn arg@(Apply _ _) -> do
+--             bnd <- generateBinding
+--             return $ Let bnd arg $ Apply fn (Var bnd)
+--         a -> return a
 
-normalizeBind :: (MonadError Error m, MonadGenBnd m) => Expression -> m Expression
-normalizeBind =
-    rewriteM $ \case
-        BindState e1@(PureFunction _ _) e2 ->
-            case e2 of
-                Var _ -> pure Nothing
-                Lit _ -> pure Nothing
-                _ ->
-                    generateBinding >>= \b ->
-                        pure $ Just $ Let b e2 (BindState e1 (Var b))
-        BindState _ _ -> throwError "State bind target must be a pure function reference"
-        _ -> pure Nothing
+-- normalizeBind :: (MonadError Error m, MonadGenBnd m) => Expression -> m Expression
+-- normalizeBind =
+--     rewriteM $ \case
+--         BindState e1@(PureFunction _ _) e2 ->
+--             case e2 of
+--                 Var _ -> pure Nothing
+--                 Lit _ -> pure Nothing
+--                 _ ->
+--                     generateBinding >>= \b ->
+--                         pure $ Just $ Let b e2 (BindState e1 (Var b))
+--         BindState _ _ -> throwError "State bind target must be a pure function reference"
+--         _ -> pure Nothing
 
--- The canonical composition of the above transformations to create a
--- program with the invariants we expect.
-normalize :: (MonadPlus m, MonadOhua m) => Expression -> m Expression
-normalize e =
-    reduceLambdas e >>= removeCurrying >>= liftApplyToApply >>=
-    ensureFinalLet . inlineReassignments . letLift >>=
-    normalizeBind >>=
-    ensureAtLeastOneCall
-    -- we repeat this step until a fix point is reached.
-    -- this is necessary as lambdas may be input to lambdas,
-    -- which means after inlining them we may be able again to
-    -- inline a ref and then inline the lambda.
-    -- I doubt this will ever do more than two or three iterations,
-    -- but to make sure it accepts every valid program this is necessary.
+-- -- The canonical composition of the above transformations to create a
+-- -- program with the invariants we expect.
+-- normalize :: (MonadPlus m, MonadOhua m) => Expression -> m Expression
+-- normalize e =
+--     reduceLambdas e >>= removeCurrying >>= liftApplyToApply >>=
+--     ensureFinalLet . inlineReassignments . letLift >>=
+--     normalizeBind >>=
+--     ensureAtLeastOneCall
+--     -- we repeat this step until a fix point is reached.
+--     -- this is necessary as lambdas may be input to lambdas,
+--     -- which means after inlining them we may be able again to
+--     -- inline a ref and then inline the lambda.
+--     -- I doubt this will ever do more than two or three iterations,
+--     -- but to make sure it accepts every valid program this is necessary.
+--   where
+--     letLift = rewrite floatOutLet
+--     reduceLambdas =
+--         evaluatingStateT mempty .
+--         rewriteM
+--             (\e ->
+--                  pure (floatOutLet e) <|> pure (inlineLambda e) <|>
+--                  inlineLambdaRefs e)
+
+-- | A new version of 'normalize' which makes individual transformations simpler
+-- by specifying them as small "single term rewrites" which are combined and
+-- applied using 'rewriteM'
+normalize :: forall m . (MonadOhua m) => Expression -> m Expression
+normalize =
+    ensureAtLeastOneCall <=<
+    ensureFinalLet <=<
+    removeCurrying <=<
+    rewriteM
+        (fmap asum .
+         sequenceA .
+         (sequenceA
+              [ pure . floatOutLet
+              , liftArguments
+              , pure . inlinings
+              , pure . inlineLambda
+              ] :: Expr -> [m (Maybe Expr)]))
   where
-    letLift = rewrite floatOutLet
-    reduceLambdas =
-        evaluatingStateT mempty .
-        rewriteM
-            (\e ->
-                 pure (floatOutLet e) <|> pure (inlineLambda e) <|>
-                 inlineLambdaRefs e)
+    liftArguments =
+        \case
+            Apply fn arg@Apply {} -> do
+                b <- generateBinding
+                pure $ Just $ Let b arg (Apply fn (Var b))
+            BindState fn arg
+                | Lit {} <- arg -> pure Nothing
+                | Var {} <- arg -> pure Nothing
+                | otherwise -> do
+                    b <- generateBinding
+                    pure $ Just $ Let b arg $ Apply fn $ Var b
+            _ -> pure Nothing
+inlineLambda =
+    \case
+        Apply (Lambda v b) arg -> Just $ Let v arg b
+        _ -> Nothing
+-- | Inline stuff
+inlinings =
+    \case
+        Let v e body
+            | Lambda {} <- e -> issueReplace -- inline lambda refs
+            | Var {} <- e -> issueReplace -- inline variable reassignments
+            | BindState {} <- e -> issueReplace -- inline the state bindings they
+                                              -- propagate inside applications
+            | Lit {} <- e -> issueReplace -- I assume we can safely duplicate literals
+            where issueReplace =
+                      Just $
+                      rewrite
+                          (\case
+                               Var v'
+                                   | v == v' -> Just e
+                               _ -> Nothing)
+                          body
+        _ -> Nothing

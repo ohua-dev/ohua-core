@@ -28,6 +28,7 @@ import Data.Aeson.Types
 import Data.List
 
 import Ohua.DFGraph
+import Ohua.DFLang.Lang (NodeType(..))
 
 baseOptions :: Options
 baseOptions =
@@ -89,11 +90,18 @@ instance ToJSON Target where
 instance FromJSON Target where
     parseJSON = genericParseJSON baseOptions
 
-instance ToJSON a => ToJSON (Arc a) where
+instance (ToJSON a, ToJSON b) => ToJSON (Arc a b) where
     toEncoding = genericToEncoding baseOptions
     toJSON = genericToJSON baseOptions
 
-instance FromJSON a => FromJSON (Arc a) where
+instance (FromJSON a, FromJSON b) => FromJSON (Arc a b) where
+    parseJSON = genericParseJSON baseOptions
+
+instance ToJSON NodeType where
+    toEncoding = genericToEncoding baseOptions
+    toJSON = genericToJSON baseOptions
+
+instance FromJSON NodeType where
     parseJSON = genericParseJSON baseOptions
 
 instance ToJSON a => ToJSON (Source a) where
@@ -158,20 +166,6 @@ instance ToJSON NSRef where
 
 instance FromJSON NSRef where
     parseJSON = makeParseJSON
-
-instance ToJSON a => ToJSON (DirectArc a) where
-    toEncoding = genericToEncoding baseOptions
-    toJSON = genericToJSON baseOptions
-
-instance FromJSON a => FromJSON (DirectArc a) where
-    parseJSON = genericParseJSON baseOptions
-
-instance FromJSON CompoundArc where
-    parseJSON = genericParseJSON baseOptions
-
-instance ToJSON CompoundArc where
-    toEncoding = genericToEncoding baseOptions
-    toJSON = genericToJSON baseOptions
 
 instance FromJSON a => FromJSON (Arcs a) where
     parseJSON = genericParseJSON baseOptions

@@ -93,7 +93,7 @@ FnId :: { FnId }
 FnId : int { makeThrow $ fromInteger $1 }
 
 LetExpr :: { LetExpr }
-LetExpr : let Pat '=' FnRef '<' FnId '>' tuple(DFVar) in { LetExpr $6 $2 $4 $8 }
+LetExpr : let Pat '=' FnRef '<' FnId '>' opt(StateArg) tuple(DFVar) in { LetExpr $6 $2 $4 $8 $9 }
 
 DFVar :: { DFVar }
 DFVar
@@ -108,8 +108,8 @@ Lit :: { Lit }
 FnRef :: { DFFnRef }
 FnRef : opt(dataflow) qualid { maybe EmbedSf (const DFFunction) $1 $2 }
 
-CtxRef :: { Binding }
-CtxRef : '[' id ']' { $2 }
+StateArg :: { DFVar }
+StateArg : '[' DFVar ']' { $2 }
 
 Pat :: { Pat }
 Pat : tuple(id) { $1 }

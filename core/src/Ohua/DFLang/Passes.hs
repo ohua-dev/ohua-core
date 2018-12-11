@@ -153,7 +153,7 @@ expectVar :: MonadError Error m => Expression -> m DFVar
 expectVar (Var bnd) = pure $ DFVar bnd
 expectVar r@PureFunction {} =
     throwError $
-    "Stateful function references are not yet supported as arguments: " <>
+    "Function references are not yet supported as arguments: " <>
     show (pretty r)
 expectVar (Lit l) = pure $ DFEnvVar l
 expectVar a =

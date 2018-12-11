@@ -13,10 +13,10 @@ import Text.PrettyPrint.Boxes hiding ((<>))
 
 import Ohua.DFGraph
 
--- TODO show compound arcs 
+-- TODO show compound arcs
 -- | TODO show return arc
 asTable :: OutGraph -> T.Text
-asTable (OutGraph ops (Arcs arcs' _) _) =
+asTable (OutGraph ops (Arcs direct compound state) _) =
     T.pack $
     render $
     vsep
@@ -24,17 +24,33 @@ asTable (OutGraph ops (Arcs arcs' _) _) =
         left
         [ text "Operators"
         , hsep 4 top [idList, typeList]
-        , text "Arcs"
-        , hsep 4 top [sourceList, targetList]
+        , text "Direct Arcs"
+        , hsep
+              4
+              top
+              [sourceList direct sourceToBox, targetList direct targetToBox]
+        , text "Compound Arcs"
+        , hsep
+              4
+              top
+              [ sourceList compound $ hsep 1 left . map targetToBox
+              , targetList compound targetToBox
+              ]
+        , text "State Arcs"
+        , hsep
+              4
+              top
+              [ sourceList state sourceToBox
+              , targetList state $ text . show . unwrap
+              ]
         ]
   where
     idList =
         vcat right $ text "ids" : map (text . show . unwrap . operatorId) ops
     typeList = vcat left $ text "types" : map (text . show . operatorType) ops
-    sourceList =
-        vcat left $
-        (text "source" :) $
-        (`map` map source arcs') $ \case
+    sourceList arcs' f = vcat left $ (text "source" :) $ f . source <$> arcs'
+    sourceToBox =
+        \case
             EnvSource i ->
                 case i of
                     UnitLit -> "()"
@@ -42,6 +58,6 @@ asTable (OutGraph ops (Arcs arcs' _) _) =
                     EnvRefLit n -> text $ "$" <> show (unwrap n)
                     FunRefLit _fr -> error "Not supported"
             LocalSource t -> targetToBox t
-    targetList =
-        vcat left $ (text "target" :) $ (targetToBox . target) `map` arcs'
+    targetList arcs' f =
+        vcat left $ (text "target" :) $ (f . target) `map` arcs'
     targetToBox (Target op idx) = text $ show (unwrap op) ++ " @ " ++ show idx

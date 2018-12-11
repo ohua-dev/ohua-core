@@ -16,8 +16,7 @@
 {-# OPTIONS_GHC -fno-warn-unused-top-binds #-}
 #endif
 module PassesSpec
-    -- passesSpec
-    (
+    ( passesSpec
     ) where
 
 import Ohua.Prelude
@@ -114,7 +113,7 @@ doesn't_reject :: Expression -> Expectation
 doesn't_reject e = runPasses e `shouldSatisfyRet` isRight
 
 lambda_as_argument :: Expression
-lambda_as_argument = Apply (Sf smapName Nothing) (Lambda "a" "a")
+lambda_as_argument = Apply (PureFunction smapName Nothing) (Lambda "a" "a")
 
 bound_lambda_as_argument :: Expression
 bound_lambda_as_argument = Let "f" (Lambda "a" "a") (Apply "some/function" "f")
@@ -128,6 +127,8 @@ calculated_lambda_as_argument =
 lambda_with_app_as_arg :: Expression
 lambda_with_app_as_arg =
     Apply "some/func" $ Apply (Lambda "a" (Lambda "b" "a")) $ 10
+
+inlineReassignments = rewrite inlinings
 
 passesSpec :: Spec
 passesSpec = do
@@ -144,7 +145,7 @@ passesSpec = do
         let lambdaStaysInput =
                 para $ \case
                     ApplyF _ (Lambda _ (Lambda _ _), _) -> False
-                    ApplyF (Sf _ _, _) (Lambda _ _, _) -> True
+                    ApplyF (PureFunction _ _, _) (Lambda _ _, _) -> True
                     LetF _ (extract -> expr) (extract -> body) -> expr || body
                     ApplyF _ (extract -> body) -> body
                     _ -> False
@@ -215,7 +216,7 @@ passesSpec = do
                      "x")
     describe "removing destructuring" $ do
         let mkNth0 objBnd i =
-                Sf ALangRefs.nth Nothing `Apply` Lit (NumericLit i) `Apply`
+                PureFunction ALangRefs.nth Nothing `Apply` Lit (NumericLit i) `Apply`
                 Var objBnd
             runRemDestr = pure
         it "removes destructuring from lets" $

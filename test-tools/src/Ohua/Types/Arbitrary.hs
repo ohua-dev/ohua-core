@@ -38,23 +38,20 @@ reservedWords =
 instance Arbitrary T.Text where
     arbitrary = T.pack <$> arbitrary
 
+instance Arbitrary NodeType where
+    arbitrary = oneof [pure OperatorNode, pure FunctionNode]
+
 instance Arbitrary Operator where
-    arbitrary = Operator <$> arbitrary <*> arbitrary
+    arbitrary = Operator <$> arbitrary <*> arbitrary <*> arbitrary
 
 instance Arbitrary Target where
     arbitrary = liftM2 Target arbitrary arbitrary
 
-instance Arbitrary a => Arbitrary (DirectArc a) where
-    arbitrary = liftM2 DirectArc arbitrary arbitrary
-
-instance Arbitrary CompoundArc where
-    arbitrary = liftM2 CompoundArc arbitrary arbitrary
-
 instance Arbitrary a => Arbitrary (Arcs a) where
-    arbitrary = liftM2 Arcs arbitrary arbitrary
+    arbitrary = liftM3 Arcs arbitrary arbitrary arbitrary
 
-instance Arbitrary a => Arbitrary (Arc a) where
-    arbitrary = oneof [Direct <$> arbitrary, Compound <$> arbitrary]
+instance ( Arbitrary a, Arbitrary b ) => Arbitrary (Arc a b) where
+    arbitrary = Arc <$> arbitrary <*> arbitrary
 
 instance Arbitrary a => Arbitrary (Source a) where
     arbitrary = oneof [LocalSource <$> arbitrary, EnvSource <$> arbitrary]
@@ -146,9 +143,9 @@ instance Arbitrary DFExpr where
     shrink (DFExpr lets ret) = map (`DFExpr` ret) $ shrink lets
 
 instance Arbitrary LetExpr where
-    arbitrary = LetExpr <$> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary
-    shrink (LetExpr id r fr ca) =
-        [LetExpr id' r' fr' ca' | (id', r', fr', ca') <- shrink (id, r, fr, ca)]
+    arbitrary = LetExpr <$> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary
+    shrink (LetExpr id r fr sa ca) =
+        [LetExpr id' r' fr' sa' ca' | (id', r', fr', ca', sa') <- shrink (id, r, fr, ca, sa)]
 
 instance Arbitrary DFVar where
     arbitrary = oneof [DFEnvVar <$> arbitrary, DFVar <$> arbitrary]

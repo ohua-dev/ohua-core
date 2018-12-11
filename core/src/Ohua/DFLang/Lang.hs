@@ -15,9 +15,16 @@
 -- IR. One important aspect of DFLang: it does not define any abstractions,
 -- i.e., there are no function definitions.
 --
-{-# LANGUAGE CPP, DeriveLift #-}
+{-# LANGUAGE DeriveLift, CPP #-}
 #include "compat.h"
-module Ohua.DFLang.Lang where
+module Ohua.DFLang.Lang
+    ( DFExpr(..)
+    , LetExpr(..)
+    , DFFnRef(.., DFFunction, EmbedSf)
+    , NodeType(..)
+    , DFVar(..)
+    , dfEnvExpr
+    ) where
 
 import Ohua.Prelude
 
@@ -37,16 +44,29 @@ data LetExpr = LetExpr
     , callArguments :: ![DFVar]
     } deriving (Eq, Show, Lift, Generic)
 
-data DFFnRef
-    = DFFunction !QualifiedBinding -- a built-in function of DFLang
-    | EmbedSf !QualifiedBinding -- an generic dataflow function that wraps a stateful function call
+data DFFnRef = DFFnRef
+    { nodeType :: NodeType
+    , nodeRef :: QualifiedBinding
+    } deriving (Eq, Show, Lift, Generic)
+
+instance Hashable DFFnRef
+
+pattern DFFunction :: QualifiedBinding -> DFFnRef
+pattern DFFunction b = DFFnRef FunctionNode b -- a built-in function of DFLang
+
+pattern EmbedSf :: QualifiedBinding -> DFFnRef
+pattern EmbedSf b = DFFnRef OperatorNode b -- an generic dataflow function that wraps a stateful function call
+#if COMPLETE_PRAGMA_WORKS
+{-# COMPLETE DFFunction, EmbedSf #-}
+#endif
+
+data NodeType
+    = OperatorNode
+    | FunctionNode
     deriving (Eq, Show, Lift, Generic)
 
-instance Hashable DFFnRef where
-    hashWithSalt s =
-        hashWithSalt s . \case
-            DFFunction f -> (0 :: Int, f)
-            EmbedSf f -> (1, f)
+instance Hashable NodeType
+instance NFData NodeType
 
 data DFVar
     = DFEnvVar !Lit
