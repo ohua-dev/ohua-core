@@ -4,17 +4,14 @@ import qualified DFLowering
 
 -- import qualified TailRecSpec
 -- FIXME
-import           PassesSpec
+import PassesSpec
 import Test.Hspec
 import qualified TestALangUtils
 import qualified TestAesonConvert
 
 main :: IO ()
 main =
-    hspec $
-       -- FIXME
-       -- passesSpec
-     do
+    hspec $ do
         passesSpec
         DFLowering.generalLowering
         DFLowering.ifSpec
