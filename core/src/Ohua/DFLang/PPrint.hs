@@ -24,7 +24,7 @@ prettyLetExpr LetExpr {..} =
     , "="
     , pretty functionRef <> angles (pretty callSiteId)
     ] <>
-    maybe [] (pure . braces . pretty) stateArgument <>
+    maybe [] (pure . brackets . pretty) stateArgument <>
     [align $ tupled $ map pretty callArguments, "in"]
 
 instance Pretty LetExpr where
