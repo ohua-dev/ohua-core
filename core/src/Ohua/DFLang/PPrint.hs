@@ -32,7 +32,7 @@ instance Pretty LetExpr where
 
 prettyDFVar :: DFVar -> Doc a
 prettyDFVar = \case
-    DFEnvVar he -> "$" <> pretty he
+    DFEnvVar he -> pretty he
     DFVar b -> pretty b
     DFVarList bnds -> PP.list $ map pretty bnds
 
