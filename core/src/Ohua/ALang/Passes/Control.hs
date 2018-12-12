@@ -160,9 +160,9 @@ import Ohua.Prelude
 
 import Ohua.ALang.Lang
 import Ohua.ALang.Util
-    ( lambdaArgsAndBody
+    ( fromListToApply
+    , lambdaArgsAndBody
     , lambdaLifting
-    , mkApply
     , mkDestructured
     , mkLambda
     )
@@ -179,7 +179,6 @@ liftIntoCtrlCtxt ctrlIn e = do
     (lam', actuals) <- lambdaLifting e
     let (originalFormals, _) = lambdaArgsAndBody e
     let (allFormals, e) = lambdaArgsAndBody lam'
-    ctrlState <- generateBindingWith "ctrlState"
     ctrlOut <- generateBindingWith "ctrl"
     let formals = reverse $ take (length actuals) $ reverse allFormals
     let actuals' = [Var ctrlIn] ++ actuals
@@ -187,14 +186,6 @@ liftIntoCtrlCtxt ctrlIn e = do
     return $
         mkLambda originalFormals $
         Let
-            ctrlState
-            (Apply
-                 (Lit $ FunRefLit $ FunRef "ohua.lang/mkCtrlState" Nothing)
-                 unitExpr) $
-        Let
             ctrlOut
-            (mkApply
-                 (BindState (Lit $ FunRefLit $ FunRef "ohua.lang/ctrl" Nothing) $
-                  Var ctrlState)
-                 actuals')
+            (fromListToApply (FunRef "ohua.lang/ctrl" Nothing) actuals')
             ie
