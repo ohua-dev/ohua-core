@@ -17,6 +17,9 @@ optimizeCtrl (DFExpr letExprs returnVar)
    -- FIXME we can only perform this optimization when the vars are all just used once.
    --       feels like we need something more efficient in the backend for saying that
    --       we want to send the same value to a set of channels instead of just one.
+   -- FIXME this should not be the business of the ctrl! if a var is used multiple times
+   --       then it should be input to the ctrl more than once! the copying then happens
+   --       before the ctrl operator.
  =
     let ctrls = toList $ findAllExprs Refs.ctrl letExprs
         (newCtrls, orphanedNths) = unzip $ toList $ map updateCtrl ctrls
