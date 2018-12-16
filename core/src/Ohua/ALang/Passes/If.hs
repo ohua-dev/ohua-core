@@ -147,8 +147,6 @@ ifRewrite (Apply (Apply (Apply (Lit (FunRefLit (FunRef "ohua.lang/if" Nothing)))
     --             result
     --                |]
     ctrls <- generateBindingWith "ctrls"
-    ctrlTrue <- generateBindingWith "ctrlTrue"
-    ctrlFalse <- generateBindingWith "ctrlFalse"
     trueResult <- generateBindingWith "trueResult"
     falseResult <- generateBindingWith "falseResult"
     result <- generateBindingWith "result"
