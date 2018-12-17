@@ -1,6 +1,7 @@
 import Ohua.Prelude
 
 import qualified DFLowering
+import qualified DFOptimizations
 
 -- import qualified TailRecSpec
 -- FIXME
@@ -17,6 +18,7 @@ main =
         DFLowering.ifSpec
         DFLowering.seqSpec
         DFLowering.smapSpec
+        DFOptimizations.optimizations
         --ALangVerify.currying
         TestALangUtils.spec
         TestAesonConvert.spec

@@ -27,6 +27,8 @@ optimizeCtrl (DFExpr letExprs returnVar)
         letExprs' =
             removeAllExprs (DS.fromList $ ctrls ++ orphanedNths') letExprs
      in flip DFExpr returnVar $ letExprs' >< DS.fromList newCtrls
+    -- FIXME if we cut off the `nth` operators then we need to still take the outputs
+    --       of the `nth` ops and preserve them!
   where
     updateCtrl ctrl@(LetExpr {output = outs}) =
         let (newOuts, nths) =
