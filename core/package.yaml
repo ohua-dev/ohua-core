@@ -88,6 +88,7 @@ library:
   - Ohua.ALang.Passes.If
   - Ohua.ALang.Passes.Smap
   - Ohua.ALang.Passes.Control
+  - Ohua.ALang.Passes.Verify
   - Ohua.ALang.Util
   - Ohua.DFLang.Lang
   - Ohua.DFLang.Refs

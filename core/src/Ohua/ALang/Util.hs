@@ -44,6 +44,7 @@ destructure source bnds =
   where
     mkNthExpr idx source0 =
         PureFunction Refs.nth Nothing `Apply` (Lit $ NumericLit idx) `Apply`
+        (Lit $ NumericLit $ toInteger $ length bnds) `Apply`
         source0
 
 lambdaLifting ::

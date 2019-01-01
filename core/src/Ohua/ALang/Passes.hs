@@ -61,7 +61,6 @@ runCorePasses expr = do
 --         pure $ Just body
 --     Var bnd -> gets (HM.lookup bnd)
 --     _ -> pure Nothing
-
 floatOutLet :: Expression -> Maybe Expression
 floatOutLet =
     \case
@@ -81,8 +80,6 @@ floatOutLet =
 -- inlineLambda = \case
 --     Apply (Lambda b e) arg -> Just $ Let b arg e
 --     _ -> Nothing
-
-
 -- -- | Inline all direct reassignments.
 -- -- Aka `let x = E in let y = x in y` -> `let x = E in x`
 -- inlineReassignments :: Expression -> Expression
@@ -94,7 +91,6 @@ floatOutLet =
 --             v -> Let bnd v <$> body
 --     go (VarF val) = asks (fromMaybe (Var val) . HM.lookup val)
 --     go e = embed <$> sequence e
-
 -- | Transforms the final expression into a let expression with the result variable as body.
 -- Aka `let x = E in some/sf a` -> `let x = E in let y = some/sf a in y`
 --
@@ -128,7 +124,8 @@ ensureAtLeastOneCall e = cata f e
                 newBnd <- generateBinding
                 pure $
                     Lambda bnd $
-                    Let newBnd (PureFunction Refs.id Nothing `Apply` v) $ Var newBnd
+                    Let newBnd (PureFunction Refs.id Nothing `Apply` v) $
+                    Var newBnd
             eInner -> pure $ Lambda bnd eInner
     f eInner = embed <$> sequence eInner
 
@@ -245,7 +242,6 @@ checkProgramValidity e = do
 --             bnd <- generateBinding
 --             return $ Let bnd arg $ Apply fn (Var bnd)
 --         a -> return a
-
 -- normalizeBind :: (MonadError Error m, MonadGenBnd m) => Expression -> m Expression
 -- normalizeBind =
 --     rewriteM $ \case
@@ -258,7 +254,6 @@ checkProgramValidity e = do
 --                         pure $ Just $ Let b e2 (BindState e1 (Var b))
 --         BindState _ _ -> throwError "State bind target must be a pure function reference"
 --         _ -> pure Nothing
-
 -- -- The canonical composition of the above transformations to create a
 -- -- program with the invariants we expect.
 -- normalize :: (MonadPlus m, MonadOhua m) => Expression -> m Expression
@@ -281,11 +276,13 @@ checkProgramValidity e = do
 --             (\e ->
 --                  pure (floatOutLet e) <|> pure (inlineLambda e) <|>
 --                  inlineLambdaRefs e)
-
 -- | A new version of 'normalize' which makes individual transformations simpler
 -- by specifying them as small "single term rewrites" which are combined and
 -- applied using 'rewriteM'
-normalize :: forall m . (MonadOhua m) => Expression -> m Expression
+normalize ::
+       forall m. (MonadOhua m)
+    => Expression
+    -> m Expression
 normalize =
     ensureAtLeastOneCall <=<
     ensureFinalLet <=<
@@ -312,10 +309,12 @@ normalize =
                     b <- generateBinding
                     pure $ Just $ Let b arg $ Apply fn $ Var b
             _ -> pure Nothing
+
 inlineLambda =
     \case
         Apply (Lambda v b) arg -> Just $ Let v arg b
         _ -> Nothing
+
 -- | Inline stuff
 inlinings =
     \case
