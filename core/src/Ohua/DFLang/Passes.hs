@@ -25,6 +25,7 @@ import Ohua.ALang.PPrint
 
 import Ohua.DFLang.Lang (DFExpr(..), DFFnRef(..), DFVar(..), LetExpr(..))
 import Ohua.DFLang.Passes.Control
+import Ohua.DFLang.Passes.If
 import qualified Ohua.DFLang.Refs as Refs
 import Ohua.DFLang.Util
 import Ohua.Stage
@@ -33,10 +34,12 @@ type Pass m
      = QualifiedBinding -> FnId -> Binding -> [Expression] -> m (Seq LetExpr)
 
 runCorePasses :: (MonadOhua m, Pretty DFExpr) => DFExpr -> m DFExpr
-runCorePasses expr =
+runCorePasses expr = do
     let ctrlOptimized = optimizeCtrl expr
-     in do stage "ctrl-optimization" ctrlOptimized
-           return ctrlOptimized
+    stage "ctrl-optimization" ctrlOptimized
+    let ifOptimized = optimizeIf ctrlOptimized
+    stage "if-optimization" ifOptimized
+    return ifOptimized
 
 -- | Check that a sequence of let expressions does not redefine bindings.
 checkSSA :: (Container c, Element c ~ LetExpr, MonadOhua m) => c -> m ()
@@ -97,7 +100,13 @@ handleDefinitionalExpr _ e _ =
     "Definitional expressions in a let can only be 'apply' but got: " <> show e
 
 -- | Lower any not specially treated function type.
-lowerDefault :: MonadOhua m => QualifiedBinding -> FnId -> Binding -> [Expression] -> m LetExpr
+lowerDefault ::
+       MonadOhua m
+    => QualifiedBinding
+    -> FnId
+    -> Binding
+    -> [Expression]
+    -> m LetExpr
 lowerDefault fn fnId assign args =
     mapM expectVar args <&> \args' ->
         LetExpr fnId [assign] (lowerFnToDFLang fn) Nothing args'

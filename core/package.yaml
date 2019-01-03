@@ -95,6 +95,7 @@ library:
   - Ohua.DFLang.Util
   - Ohua.DFLang.Passes
   - Ohua.DFLang.Passes.Control
+  - Ohua.DFLang.Passes.If
   - Ohua.DFLang.PPrint
   - Ohua.DFGraph
   - Ohua.DFGraph.Show

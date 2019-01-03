@@ -29,7 +29,7 @@ smapFun :: DFFnRef
 smapFun = DFFunction Refs.smapFun
 
 ifFun :: DFFnRef
-ifFun = DFFunction Refs.ifFun
+ifFun = EmbedSf Refs.ifFun
 
 select :: DFFnRef
 select = DFFunction Refs.select
