@@ -14,19 +14,17 @@ optimizeIf :: DFExpr -> DFExpr
 optimizeIf (DFExpr letExprs returnVar) =
     let ifFuns = toList $ findAllExprs Refs.ifFun letExprs
         (newIfFuns, orphanedNths) = unzip $ toList $ map updateIfFuns ifFuns
-        orphanedNths' = join $ catMaybes $ join orphanedNths
+        orphanedNths' = join orphanedNths
         letExprs' =
             removeAllExprs (DS.fromList $ ifFuns ++ orphanedNths') letExprs
      in flip DFExpr returnVar $ letExprs' >< DS.fromList newIfFuns
   where
-    updateIfFuns ifFun@(LetExpr {output = outs, functionRef = DFFnRef _ qb}) =
+    updateIfFuns ifFun@(LetExpr {output = (out:[]), functionRef = DFFnRef _ qb}) =
         let (newOuts, nths) =
-                Ohua.Prelude.unzip $
-                flip map outs $ \out ->
-                    let (nth1:nth2:[]) = findUsages out letExprs
-                        nthOuts = output nth1 ++ output nth2
-                     in if (length nthOuts) == 1
-                            then (head $ NE.fromList nthOuts, Just [nth1, nth2])
-                            else error "Invariant broken"
+                let (nth1:nth2:[]) = findUsages out letExprs
+                    nthOuts = output nth1 ++ output nth2
+                 in if (length nthOuts) == 2
+                        then (nthOuts, [nth1, nth2])
+                        else error "Invariant broken"
          in ( ifFun {output = newOuts, functionRef = DFFnRef OperatorNode qb}
             , nths)
