@@ -160,10 +160,11 @@ handleApplyExpr g = failWith $ "Expected apply but got: " <> show g
 -- in a DFVar otherwise throws appropriate errors.
 expectVar :: MonadError Error m => Expression -> m DFVar
 expectVar (Var bnd) = pure $ DFVar bnd
-expectVar r@PureFunction {} =
-    throwError $
-    "Function references are not yet supported as arguments: " <>
-    show (pretty r)
+-- TODO currently only allowed for the unitFn function
+-- expectVar r@PureFunction {} =
+--     throwError $
+--     "Function references are not yet supported as arguments: " <>
+--     show (pretty r)
 expectVar (Lit l) = pure $ DFEnvVar l
 expectVar a =
     failWith $ "Argument must be local binding or literal, was " <> show a

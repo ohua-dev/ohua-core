@@ -33,12 +33,15 @@ import Ohua.ALang.PPrint
 import Ohua.ALang.Passes.If
 import Ohua.ALang.Passes.Seq
 import Ohua.ALang.Passes.Smap
+import Ohua.ALang.Passes.Unit
 import qualified Ohua.ALang.Refs as Refs
 import Ohua.Stage
 
 runCorePasses :: MonadOhua m => Expression -> m Expression
 runCorePasses expr = do
-    smapE <- smapRewrite expr
+    let exprE = mkUnitFunctionsExplicit expr
+    stage "unit-transformation" exprE
+    smapE <- smapRewrite exprE
     -- traceM $ "after 'smap' pass:\n" <> (show $ prettyExpr smapE)
     stage "smap-transformation" smapE
     ifE <- ifRewrite smapE

@@ -14,8 +14,8 @@ import Ohua.Test.DFGraph
 shouldOptimizeTo :: DFExpr -> DFExpr -> Expectation
 shouldOptimizeTo input expected = do
     let optimized = optimizeCtrl input
-    traceM $ "expected:\n" <> (show $ prettyDFExpr expected)
-    traceM $ "got:\n" <> (show $ prettyDFExpr optimized)
+    -- traceM $ "expected:\n" <> (show $ prettyDFExpr expected)
+    -- traceM $ "got:\n" <> (show $ prettyDFExpr optimized)
     optimized `shouldBe` expected
 
 optimizeAndValidate :: DFExpr -> DFExpr -> String -> Spec
