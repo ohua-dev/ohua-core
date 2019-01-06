@@ -13,7 +13,6 @@ import Text.PrettyPrint.Boxes hiding ((<>))
 
 import Ohua.DFGraph
 
--- TODO show compound arcs
 -- | TODO show return arc
 asTable :: OutGraph -> T.Text
 asTable (OutGraph ops (Arcs direct compound state) _) =

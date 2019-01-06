@@ -36,7 +36,9 @@ data Arc target source = Arc
     } deriving (Eq, Show, Generic)
 
 type CompoundArc = Arc Target [Target]
+
 type DirectArc envExpr = Arc Target (Source envExpr)
+
 type StateArc envExpr = Arc FnId (Source envExpr)
 
 data Source envExpr
