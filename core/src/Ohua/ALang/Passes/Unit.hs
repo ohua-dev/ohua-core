@@ -13,7 +13,7 @@ mkUnitFunctionsExplicit e =
                 -- FIXME the -1 is a hack because serialization otherwise prints null.
                 --       it feels to me that the id should be part of the outermost Lit
                 --       instead of the FunRef
-                ((Lit $ FunRefLit $ FunRef "lang/unitFn" Nothing) `Apply`
+                ((Lit $ FunRefLit $ FunRef "ohua.lang/unitFn" Nothing) `Apply`
                  (Lit $ FunRefLit $ FunRef f $ Just (-1)) `Apply`
                  u)
                 ie
