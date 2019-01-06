@@ -134,8 +134,7 @@ instance FromJSON FunRef where
 
 instance ToJSON Lit where
     toEncoding = genericToEncoding baseOptions
-    toJSON (FunRefLit (FunRef f _)) = toJSON f
-    toJSON l = genericToJSON baseOptions l
+    toJSON = genericToJSON baseOptions
 
 instance FromJSON Lit where
     parseJSON = genericParseJSON baseOptions
