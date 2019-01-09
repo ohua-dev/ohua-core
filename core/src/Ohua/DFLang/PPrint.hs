@@ -4,7 +4,7 @@ module Ohua.DFLang.PPrint where
 
 import Ohua.Prelude
 
-import Data.Text.Prettyprint.Doc
+import Data.Text.Prettyprint.Doc as PP
 
 import Ohua.ALang.PPrint ()
 import Ohua.DFLang.Lang
@@ -18,21 +18,23 @@ instance Pretty DFExpr where
 
 prettyLetExpr :: LetExpr -> Doc a
 prettyLetExpr LetExpr {..} =
-    hsep
-        [ "let"
-        , align $ tupled $ map pretty output
-        , "="
-        , pretty functionRef <> angles (pretty callSiteId)
-        , align $ tupled $ map pretty callArguments
-        , "in"
-        ]
+    hsep $
+    [ "let"
+    , align $ tupled $ map pretty output
+    , "="
+    , pretty functionRef <> angles (pretty callSiteId)
+    ] <>
+    maybe [] (pure . brackets . pretty) stateArgument <>
+    [align $ tupled $ map pretty callArguments, "in"]
 
 instance Pretty LetExpr where
     pretty = prettyLetExpr
 
 prettyDFVar :: DFVar -> Doc a
-prettyDFVar (DFEnvVar he) = "$" <> pretty he
-prettyDFVar (DFVar b) = pretty b
+prettyDFVar = \case
+    DFEnvVar he -> pretty he
+    DFVar b -> pretty b
+    DFVarList bnds -> PP.list $ map pretty bnds
 
 instance Pretty DFVar where
     pretty = prettyDFVar
