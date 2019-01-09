@@ -14,8 +14,6 @@
 -- @Data.Aeson@.
 -- This source code is licensed under the terms described in the associated LICENSE.TXT file
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-{-# LANGUAGE CPP #-}
-#include "compat.h"
 module Ohua.Serialize.JSON
     ( encode
     , eitherDecode
@@ -42,10 +40,6 @@ sourceOptions =
               \case
                   "LocalSource" -> "local"
                   "EnvSource" -> "env"
-                  _ ->
-                      error
-                          "This is only intended for use with something of type `Source`"
-        , sumEncoding = TaggedObject "type" "val"
         }
 
 operatorOptions :: Options
@@ -54,14 +48,6 @@ operatorOptions =
         { fieldLabelModifier =
               fieldLabelModifier baseOptions .
               fromMaybe (error "no prefix") . stripPrefix "operator"
-        }
-
-qualBindOptions :: Options
-qualBindOptions =
-    baseOptions
-        { fieldLabelModifier =
-              fieldLabelModifier baseOptions .
-              fromMaybe (error "no prefix") . stripPrefix "qb"
         }
 
 makeInJSON :: Make t => SourceType t -> Parser t
@@ -140,11 +126,11 @@ instance FromJSON Lit where
     parseJSON = genericParseJSON baseOptions
 
 instance ToJSON QualifiedBinding where
-    toEncoding = genericToEncoding qualBindOptions
-    toJSON = genericToJSON qualBindOptions
+    toEncoding = genericToEncoding baseOptions
+    toJSON = genericToJSON baseOptions
 
 instance FromJSON QualifiedBinding where
-    parseJSON = genericParseJSON qualBindOptions
+    parseJSON = genericParseJSON baseOptions
 
 instance ToJSON Binding where
     toEncoding = unwrapToEncoding
