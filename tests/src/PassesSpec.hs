@@ -128,8 +128,6 @@ lambda_with_app_as_arg :: Expression
 lambda_with_app_as_arg =
     Apply "some/func" $ Apply (Lambda "a" (Lambda "b" "a")) $ 10
 
-inlineReassignments = rewrite inlinings
-
 passesSpec :: Spec
 passesSpec = do
     describe "normalization" $

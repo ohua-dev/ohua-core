@@ -127,15 +127,15 @@ letLift =
 
 -- -- | Inline all direct reassignments.
 -- -- Aka `let x = E in let y = x in y` -> `let x = E in x`
--- inlineReassignments :: Expression -> Expression
--- inlineReassignments = flip runReader HM.empty . cata go
---   where
---     go (LetF bnd val body) =
---         val >>= \case
---             v@(Var _) -> local (HM.insert bnd v) body
---             v -> Let bnd v <$> body
---     go (VarF val) = asks (fromMaybe (Var val) . HM.lookup val)
---     go e = embed <$> sequence e
+inlineReassignments :: Expression -> Expression
+inlineReassignments = flip runReader HM.empty . cata go
+  where
+    go (LetF bnd val body) =
+        val >>= \case
+            v@(Var _) -> local (HM.insert bnd v) body
+            v -> Let bnd v <$> body
+    go (VarF val) = asks (fromMaybe (Var val) . HM.lookup val)
+    go e = embed <$> sequence e
 
 -- | Transforms the final expression into a let expression with the result variable as body.
 -- Aka `let x = E in some/sf a` -> `let x = E in let y = some/sf a in y`
@@ -279,14 +279,14 @@ checkProgramValidity e = do
     applyToPureFunction e
     noUndefinedBindings e
 
--- -- | Lifts something like @if (f x) a b@ to @let x0 = f x in if x0 a b@
--- liftApplyToApply :: MonadOhua m => Expression -> m Expression
--- liftApplyToApply =
---     lrPrewalkExprM $ \case
---         Apply fn arg@(Apply _ _) -> do
---             bnd <- generateBinding
---             return $ Let bnd arg $ Apply fn (Var bnd)
---         a -> return a
+-- | Lifts something like @if (f x) a b@ to @let x0 = f x in if x0 a b@
+liftApplyToApply :: MonadOhua m => Expression -> m Expression
+liftApplyToApply =
+    lrPrewalkExprM $ \case
+        Apply fn arg@(Apply _ _) -> do
+            bnd <- generateBinding
+            return $ Let bnd arg $ Apply fn (Var bnd)
+        a -> return a
 
 -- normalizeBind :: (MonadError Error m, MonadGenBnd m) => Expression -> m Expression
 -- normalizeBind =
