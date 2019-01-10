@@ -52,10 +52,10 @@ data DFFnRef = DFFnRef
 instance Hashable DFFnRef
 
 pattern DFFunction :: QualifiedBinding -> DFFnRef
-pattern DFFunction b = DFFnRef FunctionNode b -- a built-in function of DFLang
+pattern DFFunction b = DFFnRef OperatorNode b 
 
 pattern EmbedSf :: QualifiedBinding -> DFFnRef
-pattern EmbedSf b = DFFnRef OperatorNode b -- an generic dataflow function that wraps a stateful function call
+pattern EmbedSf b = DFFnRef FunctionNode b
 #if COMPLETE_PRAGMA_WORKS
 {-# COMPLETE DFFunction, EmbedSf #-}
 #endif

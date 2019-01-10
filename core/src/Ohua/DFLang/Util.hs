@@ -25,10 +25,10 @@ findAllExprs fnRef = DS.filter ((== fnRef) . functionRef)
 
 removeAllExprs :: Seq LetExpr -> Seq LetExpr -> Seq LetExpr
 removeAllExprs toRemove allExprs =
-    let t = HS.fromList $ toList $ map functionRef toRemove
+    let t = HS.fromList $ toList $ map callSiteId toRemove
      in foldl
             (\s e ->
-                 if HS.member (functionRef e) t
+                 if HS.member (callSiteId e) t
                      then s
                      else s |> e)
             DS.empty

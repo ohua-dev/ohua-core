@@ -16,12 +16,13 @@ import Ohua.Prelude
 
 import qualified Data.HashSet as HS
 
+import Control.Lens (view)
 import Ohua.ALang.Lang
 import Ohua.ALang.Passes
 import Ohua.ALang.Passes.SSA
 import Ohua.ALang.Passes.TailRec (loadTailRecPasses)
+import Ohua.ALang.Passes.Verify
 import Ohua.ALang.Refs as Refs
-import Control.Lens (view)
 import Ohua.Compile.Configuration
 import Ohua.DFGraph
 import Ohua.DFLang.PPrint ()
@@ -48,7 +49,9 @@ pipeline CustomPasses {..} e = do
     stage customAlangPasses customAfterNorm
     coreE <- Ohua.ALang.Passes.runCorePasses =<< normalize customAfterNorm
     stage coreAlang coreE
-    whenDebug $ Ohua.ALang.Passes.SSA.checkSSA coreE
+    whenDebug $ do
+        Ohua.ALang.Passes.SSA.checkSSA coreE
+        Ohua.ALang.Passes.Verify.checkInvariants coreE
     dfE <- lowerALang =<< normalize coreE
     stage initialDflang dfE
     Ohua.DFLang.Verify.verify dfE

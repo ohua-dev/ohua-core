@@ -64,9 +64,9 @@ smapLowering =
                 [embedDFLang|
                   let (coll) = ohua.lang/id<1> (0)  in
                   let (ctrls_0) = dataflow ohua.lang/smapFun<2> (coll)  in
-                  let (d_0) = ohua.lang/nth<3> (0, ctrls_0)  in
-                  let (ctrl_0) = ohua.lang/nth<4> (1, ctrls_0)  in
-                  let (size_0) = ohua.lang/nth<5> (2, ctrls_0)  in
+                  let (d_0) = ohua.lang/nth<3> (0, 3, ctrls_0)  in
+                  let (ctrl_0) = ohua.lang/nth<4> (1, 3, ctrls_0)  in
+                  let (size_0) = ohua.lang/nth<5> (2, 3, ctrls_0)  in
                   let (ctrl_1) = dataflow ohua.lang/ctrl<6> (ctrl_0)  in
                   let (result_0) = some.module/inc<7> (d_0)  in
                   let (x) = dataflow ohua.lang/collect<8> (size_0, result_0)  in
@@ -97,15 +97,15 @@ ifLowering =
                   let (b) = ohua.lang/id<2> (1)  in
                   let (c) = ohua.lang/id<3> (2)  in
                   let (ctrls_0) = dataflow ohua.lang/ifFun<4> (c)  in
-                  let (ctrlTrue_1) = ohua.lang/nth<5> (0, ctrls_0)  in
-                  let (ctrlFalse_1) = ohua.lang/nth<6> (1, ctrls_0)  in
+                  let (ctrlTrue_0) = ohua.lang/nth<5> (0, 2, ctrls_0)  in
+                  let (ctrlFalse_0) = ohua.lang/nth<6> (1, 2, ctrls_0)  in
                   let (ctrl_0) = dataflow ohua.lang/ctrl<7> (ctrlTrue_0, a, b)  in
-                  let (a_0) = ohua.lang/nth<8> (0, ctrl_0)  in
-                  let (b_0) = ohua.lang/nth<9> (1, ctrl_0)  in
+                  let (a_0) = ohua.lang/nth<8> (0, 2, ctrl_0)  in
+                  let (b_0) = ohua.lang/nth<9> (1, 2, ctrl_0)  in
                   let (trueResult_0) = someNs/plus<10> (a_0, b_0)  in
                   let (ctrl_1) = dataflow ohua.lang/ctrl<11> (ctrlFalse_0, a, b)  in
-                  let (a_1) = ohua.lang/nth<12> (0, ctrl_1)  in
-                  let (b_1) = ohua.lang/nth<13> (1, ctrl_1)  in
+                  let (a_1) = ohua.lang/nth<12> (0, 2, ctrl_1)  in
+                  let (b_1) = ohua.lang/nth<13> (1, 2, ctrl_1)  in
                   let (falseResult_0) = someNs/minus<14> (a_1, b_1)  in
                   let (z) = dataflow ohua.lang/select<15> (c, trueResult_0, falseResult_0)  in
                   z
@@ -155,7 +155,7 @@ seqSpec = do
               let (y) = ohua.lang/id<1> (0)  in
               let (ctrl_0) = ohua.lang/seqFun<2> (y)  in
               let (ctrl_1) = dataflow ohua.lang/ctrl<3> (ctrl_0, 1)  in
-              let (lit_1_0) = ohua.lang/nth<4> (0, ctrl_1)  in
+              let (lit_1_0) = ohua.lang/nth<4> (0, 1, ctrl_1)  in
               let (x) = some/function<5> (lit_1_0)  in
                 x
             |]
@@ -170,7 +170,7 @@ seqSpec = do
               let (y) = ohua.lang/id<1> (0)  in
               let (ctrl_0) = ohua.lang/seqFun<2> (y)  in
               let (ctrl_1) = dataflow ohua.lang/ctrl<3> (ctrl_0, ())  in
-              let (lit_unit_0) = ohua.lang/nth<4> (0, ctrl_1)  in
+              let (lit_unit_0) = ohua.lang/nth<4> (0, 1, ctrl_1)  in
               let (x) = some/function<5> (lit_unit_0)  in
               x
             |]

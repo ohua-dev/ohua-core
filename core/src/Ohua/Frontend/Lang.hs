@@ -13,15 +13,16 @@ module Ohua.Frontend.Lang
 import Ohua.Prelude
 
 import Control.Category ((>>>))
+import Control.Lens (Traversal')
+import Control.Lens.Plated (Plated, cosmos, gplate, plate, universeOn)
 import Data.Functor.Foldable (cata)
 import Data.Functor.Foldable.TH (makeBaseFunctor)
-import Control.Lens.Plated (Plated, plate, gplate, universeOn, cosmos)
-import Control.Lens (Traversal')
 import qualified Data.HashSet as HS
 import GHC.Exts
 
 import Ohua.ALang.Lang hiding (Expr, ExprF)
 import qualified Ohua.ALang.Lang as AL
+import qualified Ohua.ALang.Refs as ARefs
 import Ohua.ParseTools.Refs (ifBuiltin, mkTuple, smapBuiltin)
 
 data Pat
@@ -55,17 +56,19 @@ data Expr
     deriving (Show, Eq, Generic)
 
 patterns :: Traversal' Expr Pat
-patterns f = \case
-    LamE ps e -> flip LamE e <$> traverse f ps
-    LetE p e1 e2 -> (\p' -> LetE p' e1 e2) <$> f p
-    o -> pure o
+patterns f =
+    \case
+        LamE ps e -> flip LamE e <$> traverse f ps
+        LetE p e1 e2 -> (\p' -> LetE p' e1 e2) <$> f p
+        o -> pure o
 
 makeBaseFunctor ''Pat
 
 instance Plated Pat where
-    plate f = \case
-        TupP ps -> TupP <$> traverse f ps
-        other -> gplate f other
+    plate f =
+        \case
+            TupP ps -> TupP <$> traverse f ps
+            other -> gplate f other
 
 instance Hashable Pat
 
@@ -74,20 +77,26 @@ instance NFData Pat
 makeBaseFunctor ''Expr
 
 instance Plated Expr where
-    plate f = \case
-        TupE es -> TupE <$> traverse f es
-        AppE e es -> AppE <$> f e <*> traverse f es
-        other -> gplate f other
+    plate f =
+        \case
+            TupE es -> TupE <$> traverse f es
+            AppE e es -> AppE <$> f e <*> traverse f es
+            other -> gplate f other
+
 instance Hashable Expr
+
 instance NFData Expr
 
 instance IsString Expr where
     fromString = VarE . fromString
+
 instance IsList Expr where
     type Item Expr = Expr
     fromList = TupE
+
 instance IsString Pat where
     fromString = VarP . fromString
+
 instance IsList Pat where
     type Item Pat = Pat
     fromList = TupP
@@ -130,14 +139,23 @@ giveEmptyLambdaUnitArgument =
         _ -> Nothing
 
 nthFun :: Expr
-nthFun = LitE $ FunRefLit $ FunRef "ohua.lang/nth" Nothing
+nthFun = LitE $ FunRefLit $ FunRef ARefs.nth Nothing
 
 unstructure :: Binding -> [Pat] -> Expr -> Expr
-unstructure valBnd =
-    foldl (.) id .
-    map (\(idx, pat) ->
-             LetE pat $ AppE nthFun [LitE (NumericLit idx), VarE valBnd]) .
-    zip [0 ..]
+unstructure valBnd pats = go (toInteger $ length pats) pats
+  where
+    go numPats =
+        foldl (.) id .
+        map
+            (\(idx, pat) ->
+                 LetE pat $
+                 AppE
+                     nthFun
+                     [ LitE (NumericLit idx)
+                     , LitE (NumericLit numPats)
+                     , VarE valBnd
+                     ]) .
+        zip [0 ..]
 
 trans :: Expr -> AL.Expr
 trans =
@@ -169,7 +187,6 @@ trans =
         \case
             VarP v -> v
             UnitP -> "_"
-
             p -> error $ "Invariant broken, invalid pattern: " <> show p
 
 toAlang :: (Monad m, MonadGenBnd m) => Expr -> m AL.Expr

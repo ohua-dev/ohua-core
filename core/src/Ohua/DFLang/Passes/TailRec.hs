@@ -29,6 +29,10 @@ recurLowering (DFExpr letExprs returnVar)
                         ((output recurFunStart) ++ (output recurFunEnd))
                         (functionRef recurFunStart)
                         Nothing
+                        -- FIXME we don't need the var lists when we use the assertion
+                        -- that these two lists have the same size! and this is always
+                        -- true because these are the arguments to a call to the same
+                        -- function, i.e, the recursion!
                         [ DFVarList
                               (join $
                                map extractBindings $ callArguments recurFunStart)

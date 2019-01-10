@@ -43,7 +43,9 @@ destructure source bnds =
     map (\(idx, bnd0) -> Let bnd0 $ mkNthExpr idx source) (zip [0 ..] bnds)
   where
     mkNthExpr idx source0 =
-        PureFunction Refs.nth Nothing `Apply` (Lit $ NumericLit idx) `Apply` source0
+        PureFunction Refs.nth Nothing `Apply` (Lit $ NumericLit idx) `Apply`
+        (Lit $ NumericLit $ toInteger $ length bnds) `Apply`
+        source0
 
 lambdaLifting ::
        (Monad m, MonadGenBnd m) => Expression -> m (Expression, [Expression])
@@ -135,11 +137,15 @@ findLiterals e =
               _ -> []
     ]
 
-fromListToApply :: FunRef -> [Expr] -> Expr
-fromListToApply f args = go $ reverse args
+mkApply :: Expr -> [Expr] -> Expr
+mkApply f args = go $ reverse args
   where
-    go (v:[]) = Apply (Lit $ FunRefLit f) v
+    go (v:[]) = Apply f v
     go (v:vs) = Apply (go vs) v
+    go [] = f
+
+fromListToApply :: FunRef -> [Expr] -> Expr
+fromListToApply f = mkApply $ Lit $ FunRefLit f
 
 fromApplyToList :: Expr -> (FunRef, [Expr])
 fromApplyToList =
