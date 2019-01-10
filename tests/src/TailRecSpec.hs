@@ -9,7 +9,15 @@ import Ohua.Prelude
 import Ohua.ALang.Lang
 import Ohua.ALang.PPrint (quickRender)
 import Ohua.ALang.Passes (normalize)
-import Ohua.ALang.Passes.TailRec (findTailRecs, recur, verifyTailRecursion)
+import Ohua.ALang.Passes.TailRec
+    ( findTailRecs
+    , hoferize
+    , recur
+    , recur_hof
+    , rewriteAll
+    , verifyTailRecursion
+    )
+import Ohua.ALang.Util
 import qualified Ohua.ALang.Refs as ALangRefs
 import qualified Ohua.ParseTools.Refs as ALangRefs
 import Ohua.DFLang.Lang
@@ -22,7 +30,7 @@ import Test.Hspec
 
 array = "ohua.lang/array"
 
-sf s = Lit (FunRefLit $ FunRef s Nothing)
+sf s = PureFunction s Nothing
 
 -- -- FIXME copied from PassesSpec. put this in a test module.
 -- instance Num ResolvedSymbol where
@@ -160,194 +168,299 @@ recWithCallOnlyOnRecurBranch
 
 expectedRecWithExprOnTerminalBranch :: Expression
 expectedRecWithExprOnTerminalBranch =
-    (Let "a"
-         (Lambda
-              "i"
-              (Let "p"
-                   (("math/minus" `Apply` "i") `Apply` 10)
-                   (Let "x"
-                        (("math/lt" `Apply` "p") `Apply` 0)
-                        (Let "c"
-                             (Apply
-                                  (Apply
-                                       (Apply (sf ALangRefs.ifThenElse) "x")
-                                       (Lambda
-                                            "then"
-                                            (Let "t"
-                                                 (Apply (sf ALangRefs.id) "p")
-                                                 "t")))
-                                  (Lambda
-                                       "else"
-                                       (Let "r" ((sf recur) `Apply` "p") "r")))
-                             "c"))))
-         (Let "y" ("a" `Apply` 95) "y"))
+    [embedALang|
+        let a = \i ->
+            let p = math/minus i 10 in
+            let x = math/lt p 0 in
+            let c = ohua.lang/ifThenElse x
+                        (\_1 -> let t = ohua.lang/id p in t)
+                        (\_2 -> let r = ohua.lang/recur p in r) in
+            c in
+        let y = a 95 in
+        y
+               |]
+    -- (Let "a"
+    --      (Lambda
+    --           "i"
+    --           (Let "p"
+    --                (("math/minus" `Apply` "i") `Apply` 10)
+    --                (Let "x"
+    --                     (("math/lt" `Apply` "p") `Apply` 0)
+    --                     (Let "c"
+    --                          (Apply
+    --                               (Apply
+    --                                    (Apply (sf ALangRefs.ifThenElse) "x")
+    --                                    (Lambda
+    --                                         "then"
+    --                                         (Let "t"
+    --                                              (Apply (sf ALangRefs.id) "p")
+    --                                              "t")))
+    --                               (Lambda
+    --                                    "else"
+    --                                    (Let "r" ((sf recur) `Apply` "p") "r")))
+    --                          "c"))))
+    --      (Let "y" ("a" `Apply` 95) "y"))
 
 expectedRecWithVarOnlyOnTerminalBranch :: Expression
 expectedRecWithVarOnlyOnTerminalBranch =
-    (Let "a"
-         (Lambda
-              "i"
-              (Let "p"
-                   (("math/minus" `Apply` "i") `Apply` 10)
-                   (Let "x"
-                        (("math/lt" `Apply` "p") `Apply` 0)
-                        (Let "c"
-                             (Apply
-                                  (Apply
-                                       (Apply (sf ALangRefs.ifThenElse) "x")
-                                       (Lambda "then" "p"))
-                                  (Lambda
-                                       "else"
-                                       (Let "r" ((sf recur) `Apply` "p") "r")))
-                             "c"))))
-         (Let "y" ("a" `Apply` 95) "y"))
+    [embedALang|
+        let a = \i ->
+            let p = math/minus i 10 in
+            let x = math/lt p 0 in
+            let c = ohua.lang/ifThenElse x
+                        (\_1 -> p)
+                        (\_2 -> let r = ohua.lang/recur p in r) in
+            c in
+        let y = a 95 in
+        y
+               |]
+    -- (Let "a"
+    --      (Lambda
+    --           "i"
+    --           (Let "p"
+    --                (("math/minus" `Apply` "i") `Apply` 10)
+    --                (Let "x"
+    --                     (("math/lt" `Apply` "p") `Apply` 0)
+    --                     (Let "c"
+    --                          (Apply
+    --                               (Apply
+    --                                    (Apply (sf ALangRefs.ifThenElse) "x")
+    --                                    (Lambda "then" "p"))
+    --                               (Lambda
+    --                                    "else"
+    --                                    (Let "r" ((sf recur) `Apply` "p") "r")))
+    --                          "c"))))
+    --      (Let "y" ("a" `Apply` 95) "y"))
 
 expectedRecWithExprOnRecurBranch :: Expression
 expectedRecWithExprOnRecurBranch =
-    (Let "a"
-         (Lambda
-              "i"
-              (Let "p"
-                   (("math/minus" `Apply` "i") `Apply` 10)
-                   (Let "x"
-                        (("math/lt" `Apply` "p") `Apply` 0)
-                        (Let "c"
-                             (Apply
-                                  (Apply
-                                       (Apply (sf ALangRefs.ifThenElse) "x")
-                                       (Lambda "then" "p"))
-                                  (Lambda
-                                       "else"
-                                       (Let "r" ((sf recur) `Apply` "p") "r")))
-                             "c"))))
-         (Let "y" ("a" `Apply` 95) "y"))
+    [embedALang|
+        let a = \i ->
+            let p = math/minus i 10 in
+            let x = math/lt p 0 in
+            let c = ohua.lang/ifThenElse x
+                        (\_1 -> p)
+                        (\_2 -> let r = ohua.lang/recur p in r) in
+            c in
+        let y = a 95 in
+        y
+               |]
+    -- (Let "a"
+    --      (Lambda
+    --           "i"
+    --           (Let "p"
+    --                (("math/minus" `Apply` "i") `Apply` 10)
+    --                (Let "x"
+    --                     (("math/lt" `Apply` "p") `Apply` 0)
+    --                     (Let "c"
+    --                          (Apply
+    --                               (Apply
+    --                                    (Apply (sf ALangRefs.ifThenElse) "x")
+    --                                    (Lambda "then" "p"))
+    --                               (Lambda
+    --                                    "else"
+    --                                    (Let "r" ((sf recur) `Apply` "p") "r")))
+    --                          "c"))))
+    --      (Let "y" ("a" `Apply` 95) "y"))
 
 expectedRecWithCallOnlyOnRecurBranch :: Expression
 expectedRecWithCallOnlyOnRecurBranch =
-    (Let "a"
-         (Lambda
-              "i"
-              (Let "p"
-                   (("math/minus" `Apply` "i") `Apply` 10)
-                   (Let "x"
-                        (("math/lt" `Apply` "p") `Apply` 0)
-                        (Let "c"
-                             (Apply
-                                  (Apply
-                                       (Apply (sf ALangRefs.ifThenElse) "x")
-                                       (Lambda "then" "p"))
-                                  (Lambda "else" ((sf recur) `Apply` "p")))
-                             "c"))))
-         (Let "y" ("a" `Apply` 95) "y"))
+    [embedALang|
+        let a = \i ->
+            let p = math/minus i 10 in
+            let x = math/lt p 0 in
+            let c = ohua.lang/ifThenElse x
+                        (\_1 -> p)
+                        (\_2 -> ohua.lang/recur p) in
+            c in
+        let y = a 95 in
+        y
+               |]
+    -- (Let "a"
+    --      (Lambda
+    --           "i"
+    --           (Let "p"
+    --                (("math/minus" `Apply` "i") `Apply` 10)
+    --                (Let "x"
+    --                     (("math/lt" `Apply` "p") `Apply` 0)
+    --                     (Let "c"
+    --                          (Apply
+    --                               (Apply
+    --                                    (Apply (sf ALangRefs.ifThenElse) "x")
+    --                                    (Lambda "then" "p"))
+    --                               (Lambda "else" ((sf recur) `Apply` "p")))
+    --                          "c"))))
+    --      (Let "y" ("a" `Apply` 95) "y"))
 
 notTailRecursive1 :: Expression
 notTailRecursive1 =
-    (Let "a"
-         (Lambda
-              "i"
-              (Let "p"
-                   (("math/minus" `Apply` "i") `Apply` 10)
-                   (Let "x"
-                        (("math/lt" `Apply` "p") `Apply` 0)
-                        (Let "c"
-                             (Apply
-                                  (Apply
-                                       (Apply (sf ALangRefs.ifThenElse) "x")
-                                       (Lambda "then" "p"))
-                                  (Lambda
-                                       "else"
-                                       (Let "g"
-                                            ((sf recur) `Apply` "p")
-                                            ("math/times10" `Apply` "g"))))
-                             "c"))))
-         (Let "y" ("a" `Apply` 95) "y"))
+    [embedALang|
+        let a = \i ->
+            let p = math/minus i 10 in
+            let x = math/lt p 0 in
+            let c = ohua.lang/ifThenElse x
+                        (\_1 -> p)
+                        (\_2 -> let g = ohua.lang/recur p in
+                                math/times10 g) in
+            c in
+        let y = a 95 in
+        y
+               |]
+    -- (Let "a"
+    --      (Lambda
+    --           "i"
+    --           (Let "p"
+    --                (("math/minus" `Apply` "i") `Apply` 10)
+    --                (Let "x"
+    --                     (("math/lt" `Apply` "p") `Apply` 0)
+    --                     (Let "c"
+    --                          (Apply
+    --                               (Apply
+    --                                    (Apply (sf ALangRefs.ifThenElse) "x")
+    --                                    (Lambda "then" "p"))
+    --                               (Lambda
+    --                                    "else"
+    --                                    (Let "g"
+    --                                         ((sf recur) `Apply` "p")
+    --                                         ("math/times10" `Apply` "g"))))
+    --                          "c"))))
+    --      (Let "y" ("a" `Apply` 95) "y"))
 
 notTailRecursive2 :: Expression
 notTailRecursive2 =
-    (Let "a"
-         (Lambda
-              "i"
-              (Let "p"
-                   (("math/minus" `Apply` "i") `Apply` 10)
-                   (Let "x"
-                        (("math/lt" `Apply` "p") `Apply` 0)
-                        (Let "c"
-                             (Apply
-                                  (Apply
-                                       (Apply (sf ALangRefs.ifThenElse) "x")
-                                       (Lambda "then" "p"))
-                                  (Lambda "else" ((sf recur) `Apply` "p")))
-                             ("math/times10" `Apply` "c")))))
-         (Let "y" ("a" `Apply` 95) "y"))
+    [embedALang|
+        let a = \i ->
+            let p = math/minus i 10 in
+            let x = math/lt p 0 in
+            let c = ohua.lang/ifThenElse x
+                        (\_1 -> p)
+                        (\_2 -> ohua.lang/recur p) in
+            math/times10 c in
+        let y = a 95 in
+        y
+               |]
+    -- (Let "a"
+    --      (Lambda
+    --           "i"
+    --           (Let "p"
+    --                (("math/minus" `Apply` "i") `Apply` 10)
+    --                (Let "x"
+    --                     (("math/lt" `Apply` "p") `Apply` 0)
+    --                     (Let "c"
+    --                          (Apply
+    --                               (Apply
+    --                                    (Apply (sf ALangRefs.ifThenElse) "x")
+    --                                    (Lambda "then" "p"))
+    --                               (Lambda "else" ((sf recur) `Apply` "p")))
+    --                          ("math/times10" `Apply` "c")))))
+    --      (Let "y" ("a" `Apply` 95) "y"))
 
 notTailRecursive3 :: Expression
 notTailRecursive3 =
-    (Let "a"
-         (Lambda
-              "i"
-              (Let "g"
-                   (Let "p"
-                        (("math/minus" `Apply` "i") `Apply` 10)
-                        (Let "x"
-                             (("math/lt" `Apply` "p") `Apply` 0)
-                             (Let "c"
-                                  (Apply
-                                       (Apply
-                                            (Apply (sf ALangRefs.ifThenElse) "x")
-                                            (Lambda "then" "p"))
-                                       (Lambda "else" ((sf recur) `Apply` "p")))
-                                  "c")))
-                   ("math/times10" `Apply` "g")))
-         (Let "y" ("a" `Apply` 95) "y"))
+    [embedALang|
+               let a = \i ->
+                   let g =
+                       let p = math/minus i 10 in
+                       let x = math/lt p 0 in
+                       let c = ohua.lang/ifThenElse x
+                                   (\_1 -> p)
+                                   (\_2 -> ohua.lang/recur p) in
+                       c in
+                   math/times10 g in
+               let y = a 95 in
+               y
+               |]
+    -- (Let "a"
+    --      (Lambda
+    --           "i"
+    --           (Let "g"
+    --                (Let "p"
+    --                     (("math/minus" `Apply` "i") `Apply` 10)
+    --                     (Let "x"
+    --                          (("math/lt" `Apply` "p") `Apply` 0)
+    --                          (Let "c"
+    --                               (Apply
+    --                                    (Apply
+    --                                         (Apply (sf ALangRefs.ifThenElse) "x")
+    --                                         (Lambda "then" "p"))
+    --                                    (Lambda "else" ((sf recur) `Apply` "p")))
+    --                               "c")))
+    --                ("math/times10" `Apply` "g")))
+    --      (Let "y" ("a" `Apply` 95) "y"))
 
 expectedHoferized :: Expression
 expectedHoferized =
-    (Let "a_0"
-         (Lambda
-              "i"
-              (Let "p"
-                   (("math/minus" `Apply` "i") `Apply` 10)
-                   (Let "x"
-                        (("math/lt" `Apply` "p") `Apply` 0)
-                        (Let "c"
-                             (Apply
-                                  (Apply
-                                       (Apply (sf ALangRefs.ifThenElse) "x")
-                                       (Lambda "then" "p"))
-                                  (Lambda "else" ((sf recur) `Apply` "p")))
-                             "c"))))
-         (Let "a" ((sf recur_hof) `Apply` "a_0") (Let "y" ("a" `Apply` 95) "y")))
+    [embedALang|
+        let a_0 = \i ->
+            let p = math/minus i 10 in
+            let x = math/lt p 0 in
+            let c = ohua.lang/ifThenElse x
+                        (\_1 -> p)
+                        (\_2 -> ohua.lang/recur p) in
+            c in
+        let a = ohua.lang/recur_hof a_0 in
+        let y = a 95 in
+        y
+        |]
+    -- Let "a_0"
+    --     (Lambda
+    --          "i"
+    --          (Let "p"
+    --               ("math/minus" `Apply` "i" `Apply` 10)
+    --               (Let "x"
+    --                    ("math/lt" `Apply` "p" `Apply` 0)
+    --                    (Let "c"
+    --                         (sf ALangRefs.ifThenElse `Apply` "x" `Apply`
+    --                          Lambda "then" "p" `Apply`
+    --                          Lambda "else" (sf recur `Apply` "p"))
+    --                         "c"))))
+    --     (Let "a" (sf recur_hof `Apply` "a_0") (Let "y" ("a" `Apply` 95) "y"))
 
 expectedRewritten :: Expression
 expectedRewritten =
-    (Let "y"
-         (((sf recur) `Apply`
-           (Lambda
-                "e"
-                (Let (Destructure [("i" :: Binding)])
-                     "e"
-                     (Let "p"
-                          (("math/minus" `Apply` "i") `Apply` 10)
-                          (Let "x"
-                               (("math/lt" `Apply` "p") `Apply` 0)
-                               (Let "c"
-                                    ((sf ALangRefs.ifThenElse) `Apply` "x" `Apply`
-                                     Lambda
-                                         "_0"
-                                         (Let "d"
-                                              (sf ALangRefs.mkTuple `Apply`
-                                               Lit (NumericLit 1) `Apply`
-                                               (sf ALangRefs.id `Apply` "p") "d")) `Apply`
-                                     Lambda
-                                         "_1"
-                                         (Let "b"
-                                              (sf ALangRefs.mkTuple `Apply`
-                                               Lit (NumericLit 0) `Apply`
-                                               ((sf array) `Apply` "p"))
-                                              "b")))
-                               "c"))))) `Apply`
-          ((sf array) `Apply` 95))
-         "y")
+    [embedALang|
+        let y = ohua.lang/recur
+                    (\e ->
+                        let (i,_) = e in
+                        let p = math/minus i 10 in
+                        let x = math/lt p 0 in
+                        let c = ohua.lang/ifThenElse x
+                                    (\_1 -> let d = (1, ohua.lang/id p) in d)
+                                    (\_2 -> let b = (0, ohua.lang/array p) in b) in
+                        c
+                        )
+                     (ohua.lang/array 95) in
+         y
+               |]
+    -- Let "y"
+    --     (sf recur `Apply`
+    --      (Lambda
+    --           "e"
+    --           (destructure
+    --                "e"
+    --                ["i"]
+    --                (Let "p"
+    --                     ("math/minus" `Apply` "i" `Apply` 10)
+    --                     (Let "x"
+    --                          ("math/lt" `Apply` "p" `Apply` 0)
+    --                          (Let "c"
+    --                               (sf ALangRefs.ifThenElse `Apply` "x" `Apply`
+    --                                Lambda
+    --                                    "_0"
+    --                                    (Let "d"
+    --                                         (sf ALangRefs.mkTuple `Apply`
+    --                                          Lit (NumericLit 1) `Apply`
+    --                                          (sf ALangRefs.id `Apply` "p") "d")) `Apply`
+    --                                Lambda
+    --                                    "_1"
+    --                                    (Let "b"
+    --                                         (sf ALangRefs.mkTuple `Apply`
+    --                                          Lit (NumericLit 0) `Apply`
+    --                                          (sf array `Apply` "p"))
+    --                                         "b")))
+    --                          "c")))) `Apply`
+    --      (sf array `Apply` 95))
+    --     "y"
 
 -- TODO It would be sooo nice, if I could write my test expressions like this!
 -- let y = ohua.lang/recur (\955 e ->
@@ -439,7 +552,7 @@ noTailRec expr expected =
     (errorCall expected)
 
 rewritePass expr expected =
-    runPass (hoferize >=> normalize >=> verifyTailRecursion >=> rewrite) expr >>=
+    runPass (hoferize >=> normalize >=> verifyTailRecursion >=> rewriteAll) expr >>=
     ((`shouldBe` (quickRender expected)) .
      quickRender . (fromRight (Var "test/failure")))
 
@@ -447,15 +560,9 @@ lower expr expected =
     runPass
         (hoferize >=>
          normalize >=>
-         verifyTailRecursion >=> rewrite >=> normalize >=> lowerALang)
+         verifyTailRecursion >=> rewriteAll >=> normalize >=> lowerALang)
         expr >>=
-    ((`shouldBe` expected) .
-     (\case
-          Left err ->
-              DFExpr
-                  [LetExpr 0 "i" (EmbedSf "test/failure") [] Nothing]
-                  (show err)
-          Right e -> e))
+    (`shouldBe` Right expected)
 
 passesSpec :: Spec
 passesSpec

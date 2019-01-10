@@ -237,8 +237,15 @@ loadTailRecPasses True passes@(CustomPasses { passBeforeNormalize = bn
 -- at the backend.
 recur = ALangRefs.recur -- allows me to use it in binding position
 
+-- This is a compiler-internal higher-order function.
+recur_hof :: QualifiedBinding
+recur_hof = "ohua.lang/recur_hof"
+
 recur_sf :: Expression
-recur_sf = PureFunction ALangRefs.recur Nothing
+recur_sf = PureFunction recur Nothing
+
+recur_hof_sf :: Expression
+recur_hof_sf = PureFunction recur_hof Nothing
 
 -- The Y combinator from Haskell Curry
 y :: QualifiedBinding
@@ -253,15 +260,19 @@ recurFun = "ohua.lang/recurFun"
 recurFunPureFunction :: Expression
 recurFunPureFunction = PureFunction recurFun Nothing
 
-idPureFunction = Lit $ FunRefLit $ FunRef "ohua.lang/id" Nothing
+idPureFunction = PureFunction "ohua.lang/id" Nothing
 
 -- Phase 1:
-findTailRecs :: (Monad m, MonadGenBnd m) => Bool -> Expression -> m Expression
+findTailRecs ::
+       (Monad m, MonadGenBnd m, MonadError Error m)
+    => Bool
+    -> Expression
+    -> m Expression
 findTailRecs enabled e =
     snd <$> (flip runReaderT enabled . flip findRecCall HS.empty) e
 
 findRecCall ::
-       (Monad m, MonadGenBnd m)
+       (Monad m, MonadGenBnd m, MonadError Error m)
     => Expression
     -> HS.HashSet Binding
     -> ReaderT Bool m (HS.HashSet Binding, Expression)
@@ -286,52 +297,58 @@ findRecCall (Apply (Var binding) a) algosInScope
      -- no recursion here because if the expression is correct then these can be only nested APPLY statements
      = do
         enabledTR <- ask
-        if enabledTR
-            then return (HS.insert binding HS.empty, Apply recur_sf a)
-            else error $
-                 "Detected recursion although tail recursion support is not enabled!"
-       -- else error $ "Detected recursion (" ++ (show binding) ++ ") although tail recursion support is not enabled!"
+        unlessM ask $
+            throwErrorDebugS
+                "Detected recursion although tail recursion support is not enabled!"
+        return (HS.insert binding HS.empty, Apply recur_sf a)
+            -- else error $ "Detected recursion (" ++ (show binding) ++ ") although tail recursion support is not enabled!"
 findRecCall (Apply a b) algosInScope = do
     (aFound, aExpr) <- findRecCall a algosInScope
     (bFound, bExpr) <- findRecCall b algosInScope
     return (HS.union aFound bFound, Apply aExpr bExpr)
 findRecCall (Lambda a e) algosInScope = do
     (eFound, eExpr) <- findRecCall e algosInScope
-    return $
-        if HS.size eFound == 0
-            then (eFound, Lambda a eExpr)
-            else (eFound, Lambda a eExpr)
+    return (eFound, Lambda a eExpr)
 findRecCall other _ = return (HS.empty, other)
 
+-- Phase 2:
+hoferize :: (Monad m, MonadGenBnd m) => Expression -> m Expression
+hoferize (Let b expr other)
+    | b `elem` [b' | Var b' <- universe expr] = do
+        f' <- generateBindingWith b
+        expr' <- hoferize expr
+        Let f' expr' . Let b (Apply recur_hof_sf (Var f')) <$> hoferize other
+hoferize other = embed <$> traverse hoferize (project other)
+
 -- performed after normalization
-verifyTailRecursion :: (Monad m, MonadGenBnd m) => Expression -> m Expression
+verifyTailRecursion ::
+       (Monad m, MonadGenBnd m, MonadError Error m)
+    => Expression
+    -> m Expression
 verifyTailRecursion e
     | isCall y e = (performChecks $ snd $ fromApplyToList e) >> return e
   where
     performChecks ((Lambda a e):_) = traverseToLastCall checkIf e
     performChecks (e:_) =
-        error $ T.pack $ "Recursion is not inside a lambda but: " ++ (show e)
+        throwErrorDebugS $ "Recursion is not inside a lambda but: " <> show e
     traverseToLastCall check (Let v e ie)
         | isLastStmt ie = check e
     traverseToLastCall check (Let v e ie) =
         failOnRecur e >> traverseToLastCall check ie
     traverseToLastCall _ e =
-        error $
-        T.pack $
-        "Invariant broken! Found expression: " ++ (show $ quickRender e)
+        throwErrorDebugS $ "Invariant broken! Found expression: " <> show (quickRender e)
     -- failOnRecur (Let _ e ie) | isCall recur e || isCall recur ie = error "Recursion is not tail recursive!"
     failOnRecur (Let _ e ie) = failOnRecur e >> failOnRecur ie
     failOnRecur (Lambda v e) = failOnRecur e -- TODO maybe throw a better error message when this happens
     failOnRecur (Apply (PureFunction recur _) _) =
         error "Recursion is not tail recursive!"
     failOnRecur (Apply a b) = return ()
-    failOnRecur e =
-        error $ T.pack $ "Invariant broken! Found pattern: " ++ (show e)
+    failOnRecur e = error $ "Invariant broken! Found pattern: " <> show e
     checkIf e
         | isCall "ohua.lang/if" e
       -- assumes well-structured if
          = do
-            let (_:(tBranch:(fBranch:_))) = snd $ fromApplyToList e
+            let (_:tBranch:fBranch:_) = snd $ fromApplyToList e
             let (Lambda v et) = tBranch
             let (Lambda v ef) = fBranch
             let lastFnOnBranch =
@@ -341,30 +358,28 @@ verifyTailRecursion e
                          fst . fromApplyToList)
             tFn <- lastFnOnBranch et
             fFn <- lastFnOnBranch ef
-            if tFn == recur
-                then if fFn == recur
-                         then error
-                                  "Endless loop detected: Tail recursion does not have a non-recursive branch!"
-                         else return ()
-                else if fFn == recur
-                         then return ()
-                         else error $
-                              T.pack $
-                              "We currently do not support recursive calls that are located on" ++
-                              "nested conditional branches (#conditional branches > 1) or in" ++
-                              "Lambdas to other higher-order functions! Found: " ++
-                              (show fFn) ++ " : " ++ (show tFn)
+            when (tFn == recur) $ do
+                when (fFn == recur) $
+                    throwErrorDebugS
+                        "Endless loop detected: Tail recursion does not have a non-recursive branch!"
+            unless (fFn == recur) $
+                throwErrorDebugS $
+                "We currently do not support recursive calls that are located on" <>
+                "nested conditional branches (#conditional branches > 1) or in" <>
+                "Lambdas to other higher-order functions! Found: " <>
+                show fFn <>
+                " : " <>
+                show tFn
     checkIf e =
-        error $
-        T.pack $
-        "Recursion is not tail recursive! Last stmt: " ++ (show $ quickRender e)
+        throwErrorDebugS $
+        "Recursion is not tail recursive! Last stmt: " <> show (quickRender e)
     isLastStmt (Var _) = True
     isLastStmt _ = False
 verifyTailRecursion e@(Let v expr inExpr) =
     verifyTailRecursion expr >> verifyTailRecursion inExpr >> return e
 verifyTailRecursion e@(Var _) = return e
 verifyTailRecursion e =
-    error $ T.pack $ "Invariant broken! Found stmt: " ++ (show e)
+    throwErrorDebugS $ "Invariant broken! Found stmt: " <> show e
 
 -- Phase 3:
 rewriteAll :: (MonadGenBnd m, MonadError Error m) => Expression -> m Expression
@@ -405,7 +420,7 @@ rewriteCallExpr e = do
     ctrls <- generateBindingWith "ctrls"
     return $
         Let ctrls (fromListToApply (FunRef recurFun Nothing) callArgs) $
-        mkDestructured ([recurCtrl] ++ recurVars) ctrls l''
+        mkDestructured (recurCtrl : recurVars) ctrls l''
   where
     rewriteLastCond :: Expression -> Expression
     rewriteLastCond (Let v e o@(Var _)) = (\e' -> Let v e' o) $ rewriteCond e
