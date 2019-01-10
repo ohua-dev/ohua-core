@@ -2,7 +2,7 @@ import Ohua.Prelude
 
 import qualified DFLowering
 
--- import qualified TailRecSpec
+import qualified TailRecSpec
 -- FIXME
 import           PassesSpec
 import Test.Hspec
@@ -12,15 +12,12 @@ import qualified TestAesonConvert
 main :: IO ()
 main =
     hspec $
-       -- FIXME
-       -- passesSpec
      do
         passesSpec
         DFLowering.generalLowering
         DFLowering.ifSpec
         DFLowering.seqSpec
         DFLowering.smapSpec
-        --ALangVerify.currying
         TestALangUtils.spec
         TestAesonConvert.spec
-        -- TailRecSpec.passesSpec
+        TailRecSpec.passesSpec

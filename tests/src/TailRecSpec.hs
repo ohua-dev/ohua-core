@@ -11,13 +11,18 @@ import Ohua.ALang.PPrint (quickRender)
 import Ohua.ALang.Passes (normalize)
 import Ohua.ALang.Passes.TailRec (findTailRecs, recur, verifyTailRecursion)
 import qualified Ohua.ALang.Refs as ALangRefs
+import qualified Ohua.ParseTools.Refs as ALangRefs
 import Ohua.DFLang.Lang
 import Ohua.DFLang.Passes (lowerALang)
 import Ohua.Unit
 
-import Ohua.Test (embedALang)
+import Ohua.Test (embedALang, embedDFLang)
 
 import Test.Hspec
+
+array = "ohua.lang/array"
+
+sf s = Lit (FunRefLit $ FunRef s Nothing)
 
 -- -- FIXME copied from PassesSpec. put this in a test module.
 -- instance Num ResolvedSymbol where
@@ -52,11 +57,11 @@ recWithExprOnTerminalBranch
     --      (Let "y" ("a" `Apply` 95) "y"))
  =
     [embedALang|
-        let a = (\i -> let p = math/- i 10 in
-                       let x = math/< p 0 in
-                       let c = ohua.lang/if x
-                                            (\then -> let t = ohua.lang/id p in t)
-                                            (\else -> let r = a p in r) in
+        let a = (\i -> let p = math/minus i 10 in
+                       let x = math/lt p 0 in
+                       let c = if x then
+                                            let t = ohua.lang/id p in t
+                                            else let r = a p in r in
                         c
                 ) in
         let y = a 95 in
@@ -82,11 +87,11 @@ recWithVarOnlyOnTerminalBranch
     --      (Let "y" ("a" `Apply` 95) "y"))
  =
     [embedALang|
-      let a = (\i -> let p = math/- i 10 in
-                     let x = math/< p 0 in
+      let a = (\i -> let p = math/minus i 10 in
+                     let x = math/lt p 0 in
                      let c = ohua.lang/if x
-                                          (\then -> p)
-                                          (\else -> let r = a p in r) in
+                                          (\_1 -> p)
+                                          (\_2 -> let r = a p in r) in
                       c
               ) in
       let y = a 95 in
@@ -112,11 +117,11 @@ recWithExprOnRecurBranch
     --      (Let "y" ("a" `Apply` 95) "y"))
  =
     [embedALang|
-         let a = (\i -> let p = math/- i 10 in
-                        let x = math/< p 0 in
+         let a = (\i -> let p = math/minus i 10 in
+                        let x = math/lt p 0 in
                         let c = ohua.lang/if x
-                                             (\then -> p)
-                                             (\else -> let r = a p in r) in
+                                             (\_1 -> p)
+                                             (\_2 -> let r = a p in r) in
                          c
                  ) in
          let y = a 95 in
@@ -142,11 +147,11 @@ recWithCallOnlyOnRecurBranch
     --      (Let "y" ("a" `Apply` 95) "y"))
  =
     [embedALang|
-         let a = (\i -> let p = math/- i 10 in
-                        let x = math/< p 0 in
+         let a = (\i -> let p = math/minus i 10 in
+                        let x = math/lt p 0 in
                         let c = ohua.lang/if x
-                                             (\then -> p)
-                                             (\else -> a p) in
+                                             (\_1 -> p)
+                                             (\_2 -> a p) in
                          c
                  ) in
          let y = a 95 in
@@ -155,13 +160,13 @@ recWithCallOnlyOnRecurBranch
 
 expectedRecWithExprOnTerminalBranch :: Expression
 expectedRecWithExprOnTerminalBranch =
-    (Let (Recursive ("a" :: Binding))
+    (Let "a"
          (Lambda
               "i"
               (Let "p"
-                   (("math/-" `Apply` "i") `Apply` 10)
+                   (("math/minus" `Apply` "i") `Apply` 10)
                    (Let "x"
-                        (("math/<" `Apply` "p") `Apply` 0)
+                        (("math/lt" `Apply` "p") `Apply` 0)
                         (Let "c"
                              (Apply
                                   (Apply
@@ -179,13 +184,13 @@ expectedRecWithExprOnTerminalBranch =
 
 expectedRecWithVarOnlyOnTerminalBranch :: Expression
 expectedRecWithVarOnlyOnTerminalBranch =
-    (Let (Recursive ("a" :: Binding))
+    (Let "a"
          (Lambda
               "i"
               (Let "p"
-                   (("math/-" `Apply` "i") `Apply` 10)
+                   (("math/minus" `Apply` "i") `Apply` 10)
                    (Let "x"
-                        (("math/<" `Apply` "p") `Apply` 0)
+                        (("math/lt" `Apply` "p") `Apply` 0)
                         (Let "c"
                              (Apply
                                   (Apply
@@ -199,13 +204,13 @@ expectedRecWithVarOnlyOnTerminalBranch =
 
 expectedRecWithExprOnRecurBranch :: Expression
 expectedRecWithExprOnRecurBranch =
-    (Let (Recursive ("a" :: Binding))
+    (Let "a"
          (Lambda
               "i"
               (Let "p"
-                   (("math/-" `Apply` "i") `Apply` 10)
+                   (("math/minus" `Apply` "i") `Apply` 10)
                    (Let "x"
-                        (("math/<" `Apply` "p") `Apply` 0)
+                        (("math/lt" `Apply` "p") `Apply` 0)
                         (Let "c"
                              (Apply
                                   (Apply
@@ -219,13 +224,13 @@ expectedRecWithExprOnRecurBranch =
 
 expectedRecWithCallOnlyOnRecurBranch :: Expression
 expectedRecWithCallOnlyOnRecurBranch =
-    (Let (Recursive ("a" :: Binding))
+    (Let "a"
          (Lambda
               "i"
               (Let "p"
-                   (("math/-" `Apply` "i") `Apply` 10)
+                   (("math/minus" `Apply` "i") `Apply` 10)
                    (Let "x"
-                        (("math/<" `Apply` "p") `Apply` 0)
+                        (("math/lt" `Apply` "p") `Apply` 0)
                         (Let "c"
                              (Apply
                                   (Apply
@@ -237,13 +242,13 @@ expectedRecWithCallOnlyOnRecurBranch =
 
 notTailRecursive1 :: Expression
 notTailRecursive1 =
-    (Let (Recursive ("a" :: Binding))
+    (Let "a"
          (Lambda
               "i"
               (Let "p"
-                   (("math/-" `Apply` "i") `Apply` 10)
+                   (("math/minus" `Apply` "i") `Apply` 10)
                    (Let "x"
-                        (("math/<" `Apply` "p") `Apply` 0)
+                        (("math/lt" `Apply` "p") `Apply` 0)
                         (Let "c"
                              (Apply
                                   (Apply
@@ -259,13 +264,13 @@ notTailRecursive1 =
 
 notTailRecursive2 :: Expression
 notTailRecursive2 =
-    (Let (Recursive ("a" :: Binding))
+    (Let "a"
          (Lambda
               "i"
               (Let "p"
-                   (("math/-" `Apply` "i") `Apply` 10)
+                   (("math/minus" `Apply` "i") `Apply` 10)
                    (Let "x"
-                        (("math/<" `Apply` "p") `Apply` 0)
+                        (("math/lt" `Apply` "p") `Apply` 0)
                         (Let "c"
                              (Apply
                                   (Apply
@@ -277,14 +282,14 @@ notTailRecursive2 =
 
 notTailRecursive3 :: Expression
 notTailRecursive3 =
-    (Let (Recursive ("a" :: Binding))
+    (Let "a"
          (Lambda
               "i"
               (Let "g"
                    (Let "p"
-                        (("math/-" `Apply` "i") `Apply` 10)
+                        (("math/minus" `Apply` "i") `Apply` 10)
                         (Let "x"
-                             (("math/<" `Apply` "p") `Apply` 0)
+                             (("math/lt" `Apply` "p") `Apply` 0)
                              (Let "c"
                                   (Apply
                                        (Apply
@@ -297,13 +302,13 @@ notTailRecursive3 =
 
 expectedHoferized :: Expression
 expectedHoferized =
-    (Let (Direct ("a_0" :: Binding))
+    (Let "a_0"
          (Lambda
               "i"
               (Let "p"
-                   (("math/-" `Apply` "i") `Apply` 10)
+                   (("math/minus" `Apply` "i") `Apply` 10)
                    (Let "x"
-                        (("math/<" `Apply` "p") `Apply` 0)
+                        (("math/lt" `Apply` "p") `Apply` 0)
                         (Let "c"
                              (Apply
                                   (Apply
@@ -322,35 +327,26 @@ expectedRewritten =
                 (Let (Destructure [("i" :: Binding)])
                      "e"
                      (Let "p"
-                          (("math/-" `Apply` "i") `Apply` 10)
+                          (("math/minus" `Apply` "i") `Apply` 10)
                           (Let "x"
-                               (("math/<" `Apply` "p") `Apply` 0)
+                               (("math/lt" `Apply` "p") `Apply` 0)
                                (Let "c"
-                                    (Apply
-                                         (Apply
-                                              (Apply
-                                                   (sf ALangRefs.ifThenElse)
-                                                   "x")
-                                              (Lambda
-                                                   "then"
-                                                   (Let "d"
-                                                        (((sf ALangRefs.mkTuple) `Apply`
-                                                          ((sf ALangRefs.false) `Apply`
-                                                           unitExpr)) `Apply`
-                                                         ((sf ALangRefs.id) `Apply`
-                                                          "p"))
-                                                        "d")))
-                                         (Lambda
-                                              "else"
-                                              (Let "b"
-                                                   (((sf ALangRefs.mkTuple) `Apply`
-                                                     ((sf ALangRefs.true) `Apply`
-                                                      unitExpr)) `Apply`
-                                                    ((sf ALangRefs.array) `Apply`
-                                                     "p"))
-                                                   "b")))
-                                    "c")))))) `Apply`
-          ((sf ALangRefs.array) `Apply` 95))
+                                    ((sf ALangRefs.ifThenElse) `Apply` "x" `Apply`
+                                     Lambda
+                                         "_0"
+                                         (Let "d"
+                                              (sf ALangRefs.mkTuple `Apply`
+                                               Lit (NumericLit 1) `Apply`
+                                               (sf ALangRefs.id `Apply` "p") "d")) `Apply`
+                                     Lambda
+                                         "_1"
+                                         (Let "b"
+                                              (sf ALangRefs.mkTuple `Apply`
+                                               Lit (NumericLit 0) `Apply`
+                                               ((sf array) `Apply` "p"))
+                                              "b")))
+                               "c"))))) `Apply`
+          ((sf array) `Apply` 95))
          "y")
 
 -- TODO It would be sooo nice, if I could write my test expressions like this!
@@ -369,46 +365,62 @@ expectedRewritten =
 --                         (ohua.lang/array $95)
 -- in y
 expectedLowered =
-    DFExpr
-        [ LetExpr 1 "f" (EmbedSf "ohua.lang/array") [DFEnvVar 95] Nothing
-        , LetExpr 3 ["i"] (EmbedSf "ohua.lang/id") [DFVar "e"] Nothing
-        , LetExpr 4 "p" (EmbedSf "math/-") [DFVar "i", DFEnvVar 10] Nothing
-        , LetExpr 5 "x" (EmbedSf "math/<") [DFVar "p", DFEnvVar 0] Nothing
-        , LetExpr
-              13
-              ["then", "else"]
-              (EmbedSf "ohua.lang/bool")
-              [DFVar "x"]
-              Nothing
-        , LetExpr 14 ["p_0"] (DFFunction "ohua.lang/scope") [DFVar "p"] $
-          Just "then"
-        , LetExpr 7 "g" (EmbedSf "ohua.lang/id") [DFVar "p_0"] Nothing
-        , LetExpr 8 "h" (EmbedSf "ohua.lang/false") [dfVarUnit] $ Just "then"
-        , LetExpr 9 "d" (EmbedSf "ohua.lang/(,)") [DFVar "h", DFVar "g"] Nothing
-        , LetExpr 15 ["p_1"] (DFFunction "ohua.lang/scope") [DFVar "p"] $
-          Just "else"
-        , LetExpr 10 "j" (EmbedSf "ohua.lang/array") [DFVar "p_1"] Nothing
-        , LetExpr 11 "k" (EmbedSf "ohua.lang/true") [dfVarUnit] $ Just "else"
-        , LetExpr
-              12
-              "b"
-              (EmbedSf "ohua.lang/(,)")
-              [DFVar "k", DFVar "j"]
-              Nothing
-        , LetExpr
-              16
-              "c"
-              (DFFunction "ohua.lang/select")
-              [DFVar "then", DFVar "d", DFVar "b"]
-              Nothing
-        , LetExpr
-              17
-              ["y", "e"]
-              (DFFunction "ohua.lang/recur")
-              [DFVar "f", DFVar "c"]
-              Nothing
-        ]
-        "y"
+    [embedDFLang|
+                let (f) = ohua.lang/array<1>($95) in
+                let (i) = ohua.lang/id<3>(e) in
+                let (p) = math/minus<4>(i, $10) in
+                let (x) = math/lt<5>(p, $0) in
+                let (_0, _1) = ohua.lang/bool<13>(x) in
+                let (p_0) = ohua.lang/scope<14>(p) in
+                let (g) = ohua.lang/id<7>(p_0) in
+                let (d) = ohua.lang/mkTuple<9>(0, g) in
+                let (p_1) = ohua.lang/scope<15>(p) in
+                let (j) = ohua.lang/array<10>(p_1) in
+                let (b) = ohua.lang/mkTuple<12>(1,j) in
+                let (c) = ohua.lang/select<16>(_1, d, b) in
+                let (y, e) = ohua.lang/recur<17>(f, c) in
+                y
+                |]
+    -- DFExpr
+    --     [ LetExpr 1 "f" (EmbedSf "ohua.lang/array") [DFEnvVar 95] Nothing
+    --     , LetExpr 3 ["i"] (EmbedSf "ohua.lang/id") [DFVar "e"] Nothing
+    --     , LetExpr 4 "p" (EmbedSf "math/minus") [DFVar "i", DFEnvVar 10] Nothing
+    --     , LetExpr 5 "x" (EmbedSf "math/lt") [DFVar "p", DFEnvVar 0] Nothing
+    --     , LetExpr
+    --           13
+    --           ["then", "else"]
+    --           (EmbedSf "ohua.lang/bool")
+    --           [DFVar "x"]
+    --           Nothing
+    --     , LetExpr 14 ["p_0"] (DFFunction "ohua.lang/scope") [DFVar "p"] $
+    --       Just "then"
+    --     , LetExpr 7 "g" (EmbedSf "ohua.lang/id") [DFVar "p_0"] Nothing
+    --     , LetExpr 8 "h" (EmbedSf "ohua.lang/false") [dfVarUnit] $ Just "then"
+    --     , LetExpr 9 "d" (EmbedSf "ohua.lang/(,)") [DFVar "h", DFVar "g"] Nothing
+    --     , LetExpr 15 ["p_1"] (DFFunction "ohua.lang/scope") [DFVar "p"] $
+    --       Just "else"
+    --     , LetExpr 10 "j" (EmbedSf "ohua.lang/array") [DFVar "p_1"] Nothing
+    --     , LetExpr 11 "k" (EmbedSf "ohua.lang/true") [dfVarUnit] $ Just "else"
+    --     , LetExpr
+    --           12
+    --           "b"
+    --           (EmbedSf "ohua.lang/(,)")
+    --           [DFVar "k", DFVar "j"]
+    --           Nothing
+    --     , LetExpr
+    --           16
+    --           "c"
+    --           (DFFunction "ohua.lang/select")
+    --           [DFVar "then", DFVar "d", DFVar "b"]
+    --           Nothing
+    --     , LetExpr
+    --           17
+    --           ["y", "e"]
+    --           (DFFunction "ohua.lang/recur")
+    --           [DFVar "f", DFVar "c"]
+    --           Nothing
+    --     ]
+    --     "y"
 
 -- Runs:
 detect_recursion recExpr expectedExpr =
