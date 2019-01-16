@@ -18,7 +18,7 @@ import Ohua.DFLang.Lang
 import Ohua.DFLang.PPrint
 import Ohua.DFLang.Passes
 import qualified Ohua.DFLang.Refs as Refs
-import Ohua.Test (embedALang, embedDFLang)
+import Ohua.Test (embedALang, embedDFLang, showWithPretty)
 import Ohua.Test.DFGraph
 
 shouldSatisfyRet :: Show a => IO a -> (a -> Bool) -> Expectation
@@ -39,7 +39,7 @@ shouldLowerTo input expected = do
     lowered <- runLowering input
     -- traceM $ "expected:\n" <> (show $ prettyDFExpr expected)
     -- traceM $ "got:\n" <> (show $ prettyDFExpr lowered)
-    lowered `shouldBe` expected
+    showWithPretty lowered `shouldBe` showWithPretty expected
     -- let gr1 = (toFGLGraph . toGraph) lowered
     -- let gr2 = toFGLGraph $ toGraph expected
     -- (matchAndReport `on` unGr) gr1 gr2

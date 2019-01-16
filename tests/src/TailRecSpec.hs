@@ -17,14 +17,10 @@ import Ohua.ALang.Passes.TailRec
     , rewriteAll
     , verifyTailRecursion
     )
-import Ohua.ALang.Util
-import qualified Ohua.ALang.Refs as ALangRefs
-import qualified Ohua.ParseTools.Refs as ALangRefs
-import Ohua.DFLang.Lang
 import Ohua.DFLang.Passes (lowerALang)
-import Ohua.Unit
+import Ohua.DFLang.PPrint ()
 
-import Ohua.Test (embedALang, embedDFLang)
+import Ohua.Test (embedALang, embedDFLang, showWithPretty)
 
 import Test.Hspec
 
@@ -544,8 +540,8 @@ runPass pass expr = runSilentLoggingT $ runFromExpr def pass expr
 hof :: Expression -> Expression -> Expectation
 hof expr expected =
     runPass hoferize expr >>=
-    ((`shouldBe` (quickRender expected)) .
-     quickRender . (fromRight (Var "test/failure")))
+    ((`shouldBe` Right (showWithPretty expected)) .
+     fmap showWithPretty)
 
 noTailRec expr expected =
     (runPass (hoferize >=> normalize >=> verifyTailRecursion) expr) `shouldThrow`
@@ -553,8 +549,8 @@ noTailRec expr expected =
 
 rewritePass expr expected =
     runPass (hoferize >=> normalize >=> verifyTailRecursion >=> rewriteAll) expr >>=
-    ((`shouldBe` (quickRender expected)) .
-     quickRender . (fromRight (Var "test/failure")))
+    ((`shouldBe` Right (showWithPretty expected)) .
+     fmap showWithPretty)
 
 lower expr expected =
     runPass
@@ -562,7 +558,7 @@ lower expr expected =
          normalize >=>
          verifyTailRecursion >=> rewriteAll >=> normalize >=> lowerALang)
         expr >>=
-    (`shouldBe` Right expected)
+    (\a -> fmap showWithPretty a `shouldBe` Right (showWithPretty expected))
 
 passesSpec :: Spec
 passesSpec
