@@ -14,18 +14,20 @@ module Ohua.DFLang.Passes where
 
 import Ohua.Prelude
 
+import Control.Lens (at, non)
 import Control.Monad (msum)
+import Control.Monad.Tardis
 import Control.Monad.Writer (MonadWriter, runWriterT, tell)
 import qualified Data.HashMap.Strict as HM
 import qualified Data.HashSet as HS
+import qualified Data.IntMap.Strict as IM
 import Data.Sequence (Seq)
+import qualified Data.Sequence as Seq
 
 import Ohua.ALang.Lang
 import Ohua.ALang.PPrint
 
-import Ohua.DFLang.Lang (DFExpr(..), DFFnRef(..), DFVar(..), LetExpr(..))
-import Ohua.DFLang.Passes.Control
-import Ohua.DFLang.Passes.If
+import Ohua.DFLang.Lang
 import qualified Ohua.DFLang.Refs as Refs
 import Ohua.DFLang.Util
 import Ohua.Stage
@@ -35,11 +37,13 @@ type Pass m
 
 runCorePasses :: (MonadOhua m, Pretty DFExpr) => DFExpr -> m DFExpr
 runCorePasses expr = do
-    let ctrlOptimized = optimizeCtrl expr
+    let ctrlOptimized = collapseNth (== nodeRef Refs.ctrl) expr
     stage "ctrl-optimization" ctrlOptimized
-    let ifOptimized = optimizeIf ctrlOptimized
+    let ifOptimized = collapseNth (== nodeRef Refs.ifFun) ctrlOptimized
     stage "if-optimization" ifOptimized
-    return ifOptimized
+    let smapOptimized = collapseNth (== nodeRef Refs.smapFun) ifOptimized
+    stage "smap-optimized" smapOptimized
+    return smapOptimized
 
 -- | Check that a sequence of let expressions does not redefine bindings.
 checkSSA :: (Container c, Element c ~ LetExpr, MonadOhua m) => c -> m ()
@@ -96,8 +100,8 @@ handleDefinitionalExpr assign l@(Apply _ _) cont = do
     tell $ pure e {stateArgument = s}
     cont
 handleDefinitionalExpr _ e _ =
-    failWith $
-    "Definitional expressions in a let can only be 'apply' but got: " <> show e
+    failWith $ "Definitional expressions in a let can only be 'apply' but got: " <>
+    show e
 
 -- | Lower any not specially treated function type.
 lowerDefault ::
@@ -149,8 +153,8 @@ handleApplyExpr l@(Apply _ _) = go [] l
                         show (pretty other)
             Apply fn arg -> go (arg : args) fn
             x ->
-                failWith $
-                "Expected Apply or Var but got: " <> show (x :: Expression)
+                failWith $ "Expected Apply or Var but got: " <>
+                show (x :: Expression)
 handleApplyExpr (PureFunction fn fnId) =
     (fn, , Nothing, []) <$> maybe generateId return fnId
                                                                                  -- what is this?
@@ -168,3 +172,39 @@ expectVar (Var bnd) = pure $ DFVar bnd
 expectVar (Lit l) = pure $ DFEnvVar l
 expectVar a =
     failWith $ "Argument must be local binding or literal, was " <> show a
+
+collapseNth :: (QualifiedBinding -> Bool) -> DFExpr -> DFExpr
+collapseNth selectionFunction e =
+    e
+        { letExprs =
+              Seq.fromList $ catMaybes $
+              evalTardis (traverse go $ toList $ letExprs e) (mempty, mempty)
+        }
+  where
+    go e@LetExpr {output = [oldOut], functionRef = DFFnRef _ fun}
+        | selectionFunction fun = do
+            removedVals <- requestRemoval oldOut
+              -- TODO do error handling here. Make sure no index is missing
+            let newOuts = IM.elems removedVals
+            return $
+                Just
+                    e {output = newOuts, functionRef = DFFnRef OperatorNode fun}
+        | [DFEnvVar (NumericLit index), _len, DFVar source] <- callArguments e = do
+            toRemove <- getPast
+            ifM
+                (queryRemoval source)
+                (recordRemoval source oldOut index >> return Nothing)
+                (return $ Just e)
+    go e = return $ Just e
+    requestRemoval bnd = do
+        modifyForwards $ HS.insert bnd
+        getsFuture $ view $ at bnd . non mempty
+    queryRemoval = getsPast . HS.member
+    recordRemoval ::
+           MonadTardis (HM.HashMap Binding (IM.IntMap Binding)) any m
+        => Binding
+        -> Binding
+        -> Integer
+        -> m ()
+    recordRemoval source produced (fromInteger -> index) =
+        modifyBackwards $ at source . non mempty . at index .~ Just produced

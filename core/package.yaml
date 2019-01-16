@@ -32,6 +32,7 @@ dependencies:
 #- deepseq
 - data-default-class
 - universum >= 1.0
+- tardis
 default-extensions:
 - OverloadedStrings
 - OverloadedLists
@@ -95,8 +96,6 @@ library:
   - Ohua.DFLang.Refs
   - Ohua.DFLang.Util
   - Ohua.DFLang.Passes
-  - Ohua.DFLang.Passes.Control
-  - Ohua.DFLang.Passes.If
   - Ohua.DFLang.PPrint
   - Ohua.DFGraph
   - Ohua.DFGraph.Show
