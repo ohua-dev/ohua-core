@@ -9,6 +9,7 @@ import PassesSpec
 import Test.Hspec
 import qualified TestALangUtils
 import qualified TestAesonConvert
+import qualified DFPassesSpec
 
 main :: IO ()
 main =
@@ -22,3 +23,4 @@ main =
         TestALangUtils.spec
         TestAesonConvert.spec
         TailRecSpec.passesSpec
+        DFPassesSpec.spec

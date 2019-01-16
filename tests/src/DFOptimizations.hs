@@ -7,9 +7,11 @@ import Test.Hspec
 import Ohua.DFLang.Lang
 import Ohua.DFLang.PPrint
 import Ohua.DFLang.Passes
-import Ohua.DFLang.Passes.Control (optimizeCtrl)
 import Ohua.Test (embedDFLang, showWithPretty)
 import Ohua.Test.DFGraph
+import qualified Ohua.DFLang.Refs as Refs
+
+optimizeCtrl = collapseNth (== nodeRef Refs.ctrl)
 
 shouldOptimizeTo :: DFExpr -> DFExpr -> Expectation
 shouldOptimizeTo input expected = do
