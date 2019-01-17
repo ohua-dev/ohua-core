@@ -126,11 +126,12 @@ instance FromJSON Lit where
     parseJSON = genericParseJSON baseOptions
 
 instance ToJSON QualifiedBinding where
-    toEncoding = genericToEncoding baseOptions
-    toJSON = genericToJSON baseOptions
+    toJSON b = object ["namespace" .= (b ^. namespace), "name" .= (b ^. name)]
 
 instance FromJSON QualifiedBinding where
-    parseJSON = genericParseJSON baseOptions
+    parseJSON =
+        withObject "Expected object" $ \o ->
+            QualifiedBinding <$> o .: "namespace" <*> o .: "name"
 
 instance ToJSON Binding where
     toEncoding = unwrapToEncoding
