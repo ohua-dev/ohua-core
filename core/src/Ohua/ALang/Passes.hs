@@ -198,6 +198,37 @@ removeUnusedBindings = fst . runWriter . cata go
                 pure $ Let b val' inner
     go e = embed <$> sequence e
 
+newtype MonoidCombineHashMap k v =
+    MonoidCombineHashMap (HashMap k v)
+    deriving (Show, Eq, Ord)
+
+instance (Semigroup v, Eq k, Hashable k) =>
+         Semigroup (MonoidCombineHashMap k v) where
+    MonoidCombineHashMap m1 <> MonoidCombineHashMap m2 =
+        MonoidCombineHashMap $ HM.unionWith (<>) m1 m2
+instance (Semigroup v, Eq k, Hashable k) =>
+         Monoid (MonoidCombineHashMap k v) where
+    mempty = MonoidCombineHashMap mempty
+
+data WasTouched = No | Yes deriving (Show, Eq, Ord)
+
+instance Semigroup WasTouched where
+    (<>) = max
+instance Monoid WasTouched where
+    mempty = No
+
+type TouchMap = MonoidCombineHashMap Binding (WasTouched, WasTouched)
+
+wasTouchedAsFunction :: Binding -> TouchMap
+wasTouchedAsFunction bnd = MonoidCombineHashMap $ HM.singleton bnd (Yes, No)
+
+wasTouchedAsValue :: Binding -> TouchMap
+wasTouchedAsValue bnd = MonoidCombineHashMap $ HM.singleton bnd (No, Yes)
+
+lookupTouchState :: Binding -> TouchMap -> (WasTouched, WasTouched)
+lookupTouchState bnd (MonoidCombineHashMap m) =
+    fromMaybe mempty $ HM.lookup bnd m
+
 -- | Reduce curried expressions.  aka `let f = some/sf a in f b`
 -- becomes `some/sf a b`.  It both inlines the curried function and
 -- removes the binding site.  Recursively calls it self and therefore
@@ -214,19 +245,16 @@ removeCurrying ::
 removeCurrying e = fst <$> evalRWST (para inlinePartials e) mempty ()
   where
     inlinePartials (LetF bnd (_, val) (_, body)) = do
-        val' <-
-            val >>= \case
-                v@(Var bnd') ->
-                    asks (HM.lookup bnd') >>=
-                    maybe (pure v) (\e' -> tell (HS.singleton bnd') >> pure e')
-                other0 -> pure other0
+        val' <- val
         (body', touched) <- listen $ local (HM.insert bnd val') body
-        pure $
-            if bnd `HS.member` touched
-                then body'
-                else Let bnd val' body'
+        case lookupTouchState bnd touched of
+            (Yes, Yes) ->
+                throwErrorDebugS $
+                "Binding was used as function and value " <> show bnd
+            (Yes, _) -> pure body'
+            _ -> pure $ Let bnd val' body'
     inlinePartials (ApplyF (Var bnd, _) (_, arg)) = do
-        tell $ HS.singleton bnd
+        tell $ wasTouchedAsFunction bnd
         val <- asks (HM.lookup bnd)
         Apply <$>
             (maybe
@@ -234,6 +262,7 @@ removeCurrying e = fst <$> evalRWST (para inlinePartials e) mempty ()
                  pure
                  val) <*>
             arg
+    inlinePartials (VarF bnd) = tell (wasTouchedAsValue bnd) >> pure (Var bnd)
     inlinePartials innerExpr = embed <$> traverse snd innerExpr
 
 -- | Ensures the expression is a sequence of let statements terminated
@@ -308,12 +337,27 @@ liftApplyToApply =
 --         BindState _ _ -> throwError "State bind target must be a pure function reference"
 --         _ -> pure Nothing
 
+dumpNormalizeDebug = False
+putStrLnND :: (Print str, MonadIO m) => str -> m ()
+putStrLnND = if dumpNormalizeDebug then putStrLn else const $ return ()
+printND :: (Show a, MonadIO m) => a -> m ()
+printND = if dumpNormalizeDebug then print else const $ return ()
 -- The canonical composition of the above transformations to create a
 -- program with the invariants we expect.
 normalize :: MonadOhua m => Expression -> m Expression
 normalize e =
-    reduceLambdas (letLift e) >>= removeCurrying >>= liftApplyToApply >>=
-    ensureFinalLet . inlineReassignments . letLift >>=
+    reduceLambdas (letLift e) >>=
+    (\a ->
+         putStrLnND ("Reduced lamdas" :: Text) >> printND (pretty a) >> return a) >>=
+    inlineReassignments >>=
+    removeCurrying >>=
+    (\a ->
+         putStrLnND ("Removed Currying" :: Text) >> printND (pretty a) >>
+         return a) >>=
+    liftApplyToApply >>=
+    (\a -> putStrLnND ("App to App" :: Text) >> printND (pretty a) >> return a) .
+    letLift >>=
+    ensureFinalLet . inlineReassignments >>=
     ensureAtLeastOneCall
     -- we repeat this step until a fix point is reached.
     -- this is necessary as lambdas may be input to lambdas,
