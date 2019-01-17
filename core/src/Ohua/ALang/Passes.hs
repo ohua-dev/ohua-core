@@ -134,9 +134,12 @@ inlineReassignments :: Expression -> Expression
 inlineReassignments = flip runReader HM.empty . cata go
   where
     go (LetF bnd val body) =
-        val >>= \case
-            v@(Var _) -> local (HM.insert bnd v) body
-            v -> Let bnd v <$> body
+        val >>= \v ->
+            let requestReplace = local (HM.insert bnd v) body
+             in case v of
+                    Var {} -> requestReplace
+                    Lit {} -> requestReplace
+                    _ -> Let bnd v <$> body
     go (VarF val) = asks (fromMaybe (Var val) . HM.lookup val)
     go e = embed <$> sequence e
 
