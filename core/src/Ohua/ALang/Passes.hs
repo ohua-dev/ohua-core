@@ -349,7 +349,7 @@ normalize e =
     reduceLambdas (letLift e) >>=
     (\a ->
          putStrLnND ("Reduced lamdas" :: Text) >> printND (pretty a) >> return a) >>=
-    inlineReassignments >>=
+    return . inlineReassignments >>=
     removeCurrying >>=
     (\a ->
          putStrLnND ("Removed Currying" :: Text) >> printND (pretty a) >>
