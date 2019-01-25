@@ -18,6 +18,7 @@ import Ohua.Types
 import Control.Comonad
 import Data.Functor.Foldable (embed, para)
 import qualified Data.HashSet as HS
+import qualified Data.List as L
 import qualified Data.Text as T
 
 substitute :: Binding -> Expression -> Expression -> Expression
@@ -51,7 +52,7 @@ lambdaLifting ::
        (Monad m, MonadGenBnd m) => Expression -> m (Expression, [Expression])
 lambdaLifting e = do
     (e', actuals) <- go findFreeVariables renameVar bindingFromVar e
-    (e'', actuals') <- go findLiterals replaceLit bindingFromLit e'
+    (e'', actuals') <- go findLonelyLiterals replaceLit bindingFromLit e'
     return (e'', actuals ++ actuals')
   where
     go :: (Monad m, MonadGenBnd m)
@@ -135,6 +136,30 @@ findLiterals e =
               NumericLit _ -> [l]
               EnvRefLit _ -> [l]
               _ -> []
+    ]
+
+-- | A literal is lonely if it does not accompany a var in the argument list to a call.
+findLonelyLiterals :: Expression -> [Expression]
+findLonelyLiterals e =
+    [ Lit lit
+    -- this assumes a normalized version of the expression
+    -- (because it will never check the final statement. it assumes it is just a var.)
+    | Let x f@(Apply a b) y <- universe e
+    , lit <-
+          let (_, args) = fromApplyToList f
+              vars =
+                  flip find args $ \case
+                      Lit _ -> False
+                      _ -> True
+           in case vars of
+                  Nothing ->
+                      let (Lit l) = L.head args
+                       in case l of
+                              UnitLit -> [l]
+                              NumericLit _ -> [l]
+                              EnvRefLit _ -> [l]
+                              _ -> []
+                  Just _ -> []
     ]
 
 mkApply :: Expr -> [Expr] -> Expr
