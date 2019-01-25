@@ -130,14 +130,17 @@ ifRewrite (Apply (Apply (Apply (Lit (FunRefLit (FunRef "ohua.lang/if" Nothing)))
     -- traceM $ "true branch: " <> (show trueBranch)
     -- traceM $ "false branch: " <> (show falseBranch)
  = do
+    trueBranch' <- ifRewrite trueBranch
+    falseBranch' <- ifRewrite falseBranch
+    -- post traversal transformation:
     ctrlTrue <- generateBindingWith "ctrlTrue"
     ctrlFalse <- generateBindingWith "ctrlFalse"
-    trueBranch' <- liftIntoCtrlCtxt ctrlTrue trueBranch
-    falseBranch' <- liftIntoCtrlCtxt ctrlFalse falseBranch
+    trueBranch'' <- liftIntoCtrlCtxt ctrlTrue trueBranch'
+    falseBranch'' <- liftIntoCtrlCtxt ctrlFalse falseBranch'
     -- now these can become normal expressions
     -- TODO match against "()" - unit symbol for args
-    let ((_:[]), trueBranch'') = lambdaArgsAndBody trueBranch'
-    let ((_:[]), falseBranch'') = lambdaArgsAndBody falseBranch'
+    let ((_:[]), trueBranch''') = lambdaArgsAndBody trueBranch''
+    let ((_:[]), falseBranch''') = lambdaArgsAndBody falseBranch''
     -- return $
     --     [ohualang|
     --       let ($var:ctrlTrue, $var:ctrlFalse) = ohua.lang/ifFun $var:cond in
@@ -153,8 +156,8 @@ ifRewrite (Apply (Apply (Apply (Lit (FunRefLit (FunRef "ohua.lang/if" Nothing)))
     return $
         Let ctrls (Apply ifFunSf cond) $
         mkDestructured [ctrlTrue, ctrlFalse] ctrls $
-        Let trueResult trueBranch'' $
-        Let falseResult falseBranch'' $
+        Let trueResult trueBranch''' $
+        Let falseResult falseBranch''' $
         Let
             result
             (Apply (Apply (Apply selectSf cond) $ Var trueResult) $

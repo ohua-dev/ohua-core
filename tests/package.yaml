@@ -74,6 +74,7 @@ tests:
     - TestAesonConvert
     - TailRecSpec
     - DFPassesSpec
+    - ControlPasses
     dependencies:
     - ohua-core
     - hspec

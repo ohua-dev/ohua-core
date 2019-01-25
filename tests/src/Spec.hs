@@ -3,13 +3,13 @@ import Ohua.Prelude
 import qualified DFLowering
 import qualified DFOptimizations
 
-import qualified TailRecSpec
--- FIXME
+import qualified ControlPasses
+import qualified DFPassesSpec
 import PassesSpec
+import qualified TailRecSpec
 import Test.Hspec
 import qualified TestALangUtils
 import qualified TestAesonConvert
-import qualified DFPassesSpec
 
 main :: IO ()
 main =
@@ -24,3 +24,4 @@ main =
         TestAesonConvert.spec
         TailRecSpec.passesSpec
         DFPassesSpec.spec
+        ControlPasses.passesSpec
