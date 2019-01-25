@@ -11,7 +11,6 @@ import Ohua.ALang.PPrint (quickRender)
 import Ohua.ALang.Passes (normalize)
 import Ohua.ALang.Passes.TailRec
     ( findTailRecs
-    , hoferize
     , recur
     , recur_hof
     , rewriteAll
@@ -537,24 +536,18 @@ detect_recursion recExpr expectedExpr =
 
 runPass pass expr = runSilentLoggingT $ runFromExpr def pass expr
 
-hof :: Expression -> Expression -> Expectation
-hof expr expected =
-    runPass hoferize expr >>=
-    ((`shouldBe` Right (showWithPretty expected)) .
-     fmap showWithPretty)
-
 noTailRec expr expected =
-    (runPass (hoferize >=> normalize >=> verifyTailRecursion) expr) `shouldThrow`
+    (runPass (normalize >=> verifyTailRecursion) expr) `shouldThrow`
     (errorCall expected)
 
 rewritePass expr expected =
-    runPass (hoferize >=> normalize >=> verifyTailRecursion >=> rewriteAll) expr >>=
+    runPass (normalize >=> verifyTailRecursion >=> rewriteAll) expr >>=
     ((`shouldBe` Right (showWithPretty expected)) .
      fmap showWithPretty)
 
 lower expr expected =
     runPass
-        (hoferize >=>
+        (
          normalize >=>
          verifyTailRecursion >=> rewriteAll >=> normalize >=> lowerALang)
         expr >>=
@@ -580,9 +573,6 @@ passesSpec
     --             recWithCallOnlyOnRecurBranch
     --             expectedRecWithCallOnlyOnRecurBranch
  = do
-    describe "Phase 2: hoferizing rec" $ do
-        it "hoferizes correct recursion" $
-            hof expectedRecWithCallOnlyOnRecurBranch expectedHoferized
     describe "Verification:" $ do
         it "no tail recursion 1" $
             noTailRec notTailRecursive1 "Recursion is not tail recursive!"
@@ -596,7 +586,7 @@ passesSpec
                 "Recursion is not tail recursive! Last stmt: \"math/times10 g\""
     describe "Phase 3: final ALang rewrite" $ do
         it "rewrites correct recursion" $
-            rewritePass expectedRecWithCallOnlyOnRecurBranch expectedRewritten
+            rewritePass recWithCallOnlyOnRecurBranch expectedRewritten
     describe "Phase 4: DF lowering" $ do
         it "lowers correct recursion" $
             lower expectedRecWithCallOnlyOnRecurBranch expectedLowered
