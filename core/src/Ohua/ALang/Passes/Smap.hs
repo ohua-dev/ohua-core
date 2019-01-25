@@ -41,9 +41,11 @@ smapRewrite :: (Monad m, MonadGenBnd m) => Expression -> m Expression
 smapRewrite (Let v a b) = Let v <$> smapRewrite a <*> smapRewrite b
 smapRewrite (Lambda v e) = Lambda v <$> smapRewrite e
 smapRewrite e@(Apply (Apply (Lit (FunRefLit (FunRef "ohua.lang/smap" Nothing))) lamExpr) dataGen) = do
+    lamExpr' <- smapRewrite lamExpr
+    -- post traversal optimization
     ctrlVar <- generateBindingWith "ctrl"
-    lamExpr' <- liftIntoCtrlCtxt ctrlVar lamExpr
-    let ((inBnd:[]), expr) = lambdaArgsAndBody lamExpr'
+    lamExpr'' <- liftIntoCtrlCtxt ctrlVar lamExpr'
+    let ((inBnd:[]), expr) = lambdaArgsAndBody lamExpr''
     d <- generateBindingWith "d"
     let expr' = renameVar expr (Var inBnd, d)
   --   [ohualang|
