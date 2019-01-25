@@ -188,26 +188,28 @@ passesSpec = do
                 "coll0"
     describe "remove currying pass" $ do
         let runRemoveCurrying =
+                fmap (fmap showWithPretty) .
                 runSilentLoggingT .
                 flip (runFromBindings def) mempty .
-                Ohua.ALang.Passes.removeCurrying
+                (Ohua.ALang.Passes.removeCurrying . inlineReassignments)
+        let isSuccess = Right . showWithPretty
         it "inlines curring" $
             runRemoveCurrying
                 (Let "a" ("mod/fun" `Apply` "b") ("a" `Apply` "c")) `shouldReturn`
-            Right ("mod/fun" `Apply` "b" `Apply` "c")
+            isSuccess ("mod/fun" `Apply` "b" `Apply` "c")
         it "inlines curring 2" $
             runRemoveCurrying
                 (Let "a" ("mod/fun" `Apply` "b") $ Let "x" ("a" `Apply` "c") "x") `shouldReturn`
-            Right (Let "x" ("mod/fun" `Apply` "b" `Apply` "c") "x")
+            isSuccess (Let "x" ("mod/fun" `Apply` "b" `Apply` "c") "x")
         it "removes currying even for redefintions" $
             runRemoveCurrying
                 (Let "a" "some/sf" $ Let "b" "a" $ "b" `Apply` "c") `shouldReturn`
-            Right ("some/sf" `Apply` "c")
+            isSuccess ("some/sf" `Apply` "c")
         it "inlines multiple layers of currying" $
             runRemoveCurrying
                 (Let "f" (Apply "some-ns/fn-with-3-args" "a") $
                  Let "f'" (Apply "f" "b") $ Let "x" (Apply "f'" "c") "x") `shouldReturn`
-            Right
+            isSuccess
                 (Let "x"
                      ("some-ns/fn-with-3-args" `Apply` "a" `Apply` "b" `Apply`
                       "c")

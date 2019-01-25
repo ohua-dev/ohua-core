@@ -96,19 +96,19 @@ ifLowering =
                   let (a) = ohua.lang/id<1> (0)  in
                   let (b) = ohua.lang/id<2> (1)  in
                   let (c) = ohua.lang/id<3> (2)  in
-                  let (ctrls_0) = dataflow ohua.lang/ifFun<4> (c)  in
+                  let (ctrls_0) = ohua.lang/ifFun<4> (c)  in
                   let (ctrlTrue_0) = ohua.lang/nth<5> (0, 2, ctrls_0)  in
                   let (ctrlFalse_0) = ohua.lang/nth<6> (1, 2, ctrls_0)  in
                   let (ctrl_0) = dataflow ohua.lang/ctrl<7> (ctrlTrue_0, a, b)  in
                   let (a_0) = ohua.lang/nth<8> (0, 2, ctrl_0)  in
                   let (b_0) = ohua.lang/nth<9> (1, 2, ctrl_0)  in
-                  let (trueResult_0) = someNs/plus<10> (a_0, b_0)  in
+                  let (f) = someNs/plus<10> (a_0, b_0)  in
                   let (ctrl_1) = dataflow ohua.lang/ctrl<11> (ctrlFalse_0, a, b)  in
                   let (a_1) = ohua.lang/nth<12> (0, 2, ctrl_1)  in
                   let (b_1) = ohua.lang/nth<13> (1, 2, ctrl_1)  in
-                  let (falseResult_0) = someNs/minus<14> (a_1, b_1)  in
-                  let (z) = dataflow ohua.lang/select<15> (c, trueResult_0, falseResult_0)  in
-                  z
+                  let (f0) = someNs/minus<14> (a_1, b_1)  in
+                  let (result_0) = dataflow ohua.lang/select<15> (c, f, f0)  in
+                  result_0
                 |]
         lowerAndValidate sourceExpr targetExpr "if"
 
@@ -156,8 +156,8 @@ seqSpec = do
               let (ctrl_0) = ohua.lang/seqFun<2> (y)  in
               let (ctrl_1) = dataflow ohua.lang/ctrl<3> (ctrl_0, 1)  in
               let (lit_1_0) = ohua.lang/nth<4> (0, 1, ctrl_1)  in
-              let (x) = some/function<5> (lit_1_0)  in
-                x
+              let (p) = some/function<5> (lit_1_0)  in
+                p
             |]
         it
             "lowers a seq with a lambda and an independent function with a unit as input" $
@@ -171,8 +171,8 @@ seqSpec = do
               let (ctrl_0) = ohua.lang/seqFun<2> (y)  in
               let (ctrl_1) = dataflow ohua.lang/ctrl<3> (ctrl_0, ())  in
               let (lit_unit_0) = ohua.lang/nth<4> (0, 1, ctrl_1)  in
-              let (x) = some/function<5> (lit_unit_0)  in
-              x
+              let (p) = some/function<5> (lit_unit_0)  in
+              p
             |]
 
 matchAndReport :: (Eq a, Ord b, Show a, Show b) => Gr a b -> Gr a b -> IO ()

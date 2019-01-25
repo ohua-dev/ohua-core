@@ -311,14 +311,6 @@ findRecCall (Lambda a e) algosInScope = do
     return (eFound, Lambda a eExpr)
 findRecCall other _ = return (HS.empty, other)
 
--- Phase 2:
-hoferize :: (Monad m, MonadGenBnd m) => Expression -> m Expression
-hoferize (Let b expr other)
-    | b `elem` [b' | Var b' <- universe expr] = do
-        f' <- generateBindingWith b
-        expr' <- hoferize expr
-        Let f' expr' . Let b (Apply recur_hof_sf (Var f')) <$> hoferize other
-hoferize other = embed <$> traverse hoferize (project other)
 
 -- performed after normalization
 verifyTailRecursion ::
@@ -443,14 +435,14 @@ rewriteCallExpr e = do
                             Left _ -> error "invariant broken"
                             Right bnds -> bnds
                     Right bnds -> bnds
-         in fromListToApply (FunRef "ohua.lang/recurFun" Nothing) $
+         in fromListToApply (FunRef recurFun Nothing) $
             [cond, fixRef] ++ recurVars
     rewriteCond _ =
         error
             "invariant broken: recursive function does not have the proper structure."
     rewriteBranch :: Expression -> Either Expression [Expression]
     -- normally this is "fix" instead of `id`
-    rewriteBranch (Let v (Apply (PureFunction "ohua.lang/id" _) result) _) = Left result
+    rewriteBranch (Let v (Apply (PureFunction f _) result) _) | f == ALangRefs.id = Left result
     rewriteBranch (Let v e _)
         | isCall recur e = (Right . snd . fromApplyToList) e
     rewriteBranch _ = error "invariant broken"
