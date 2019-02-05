@@ -296,6 +296,7 @@ findRecCall (Apply (Var binding) a) algosInScope
     | HS.member binding algosInScope
      -- no recursion here because if the expression is correct then these can be only nested APPLY statements
      = do
+        enabledTR <- ask
         unlessM ask $
             throwErrorDebugS
                 "Detected recursion although tail recursion support is not enabled!"
@@ -327,7 +328,7 @@ verifyTailRecursion e
     traverseToLastCall check (Let v e ie) =
         failOnRecur e >> traverseToLastCall check ie
     traverseToLastCall _ e =
-        throwErrorDebugS $ "Invariant broken! Found expression: " <> show (quickRender e)
+        throwErrorDebugS $ "Invariant broken! Found expression: " <> quickRender e
     -- failOnRecur (Let _ e ie) | isCall recur e || isCall recur ie = error "Recursion is not tail recursive!"
     failOnRecur (Let _ e ie) = failOnRecur e >> failOnRecur ie
     failOnRecur (Lambda v e) = failOnRecur e -- TODO maybe throw a better error message when this happens
@@ -394,7 +395,7 @@ rewriteCallExpr e = do
     let (lam@(Lambda _ _):callArgs) = snd $ fromApplyToList e
     let (recurVars, expr) = lambdaArgsAndBody lam
     recurCtrl <- generateBindingWith "ctrl"
-    l' <- liftIntoCtrlCtxt recurCtrl lam
+    l' <- liftIntoCtrlCtxt recurCtrl expr
     let l'' = rewriteLastCond l'
   --   [ohualang|
   --     let (recurCtrl, b1 , ..., bn) = recurFun () () a1 ... an in
@@ -414,10 +415,8 @@ rewriteCallExpr e = do
         mkDestructured (recurCtrl : recurVars) ctrls l''
   where
     rewriteLastCond :: Expression -> Expression
-    --rewriteLastCond (Lambda v e) = Lambda v $ rewriteLastCond e
-    rewriteLastCond (Let v e o@(Var _)) = Let v (rewriteCond e) o
+    rewriteLastCond (Let v e o@(Var _)) = (\e' -> Let v e' o) $ rewriteCond e
     rewriteLastCond (Let v e ie) = Let v e $ rewriteLastCond ie
-    rewriteLastCond e = error $ quickRender e
     rewriteCond :: Expression -> Expression
     rewriteCond (Apply (Apply (Apply idPureFunction cond) (Lambda a trueB)) (Lambda b falseB)) =
         let trueB' = rewriteBranch trueB
@@ -436,14 +435,14 @@ rewriteCallExpr e = do
                             Left _ -> error "invariant broken"
                             Right bnds -> bnds
                     Right bnds -> bnds
-         in fromListToApply (FunRef recurFun Nothing) $
-            cond : fixRef : recurVars
+         in fromListToApply (FunRef "ohua.lang/recurFun" Nothing) $
+            [cond, fixRef] ++ recurVars
     rewriteCond _ =
         error
             "invariant broken: recursive function does not have the proper structure."
     rewriteBranch :: Expression -> Either Expression [Expression]
     -- normally this is "fix" instead of `id`
-    rewriteBranch (Let v (Apply (PureFunction f _) result) _) | f == ALangRefs.id = Left result
+    rewriteBranch (Let v (Apply (PureFunction "ohua.lang/id" _) result) _) = Left result
     rewriteBranch (Let v e _)
         | isCall recur e = (Right . snd . fromApplyToList) e
     rewriteBranch _ = error "invariant broken"

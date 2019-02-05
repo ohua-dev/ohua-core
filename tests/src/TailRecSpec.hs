@@ -290,14 +290,14 @@ expectedRecWithCallOnlyOnRecurBranch =
 notTailRecursive1 :: Expression
 notTailRecursive1 =
     [embedALang|
-        let a = \i ->
+        let a = ohua.lang/Y (\i ->
             let p = math/minus i 10 in
             let x = math/lt p 0 in
             let c = ohua.lang/ifThenElse x
                         (\_1 -> p)
                         (\_2 -> let g = ohua.lang/recur p in
                                 math/times10 g) in
-            c in
+            c) in
         let y = a 95 in
         y
                |]
@@ -324,13 +324,13 @@ notTailRecursive1 =
 notTailRecursive2 :: Expression
 notTailRecursive2 =
     [embedALang|
-        let a = \i ->
+        let a = ohua.lang/Y (\i ->
             let p = math/minus i 10 in
             let x = math/lt p 0 in
             let c = ohua.lang/ifThenElse x
                         (\_1 -> p)
                         (\_2 -> ohua.lang/recur p) in
-            math/times10 c in
+            math/times10 c) in
         let y = a 95 in
         y
                |]
@@ -353,7 +353,7 @@ notTailRecursive2 =
 notTailRecursive3 :: Expression
 notTailRecursive3 =
     [embedALang|
-               let a = \i ->
+               let a = ohua.lang/Y (\i ->
                    let g =
                        let p = math/minus i 10 in
                        let x = math/lt p 0 in
@@ -361,7 +361,7 @@ notTailRecursive3 =
                                    (\_1 -> p)
                                    (\_2 -> ohua.lang/recur p) in
                        c in
-                   math/times10 g in
+                   math/times10 g) in
                let y = a 95 in
                y
                |]
@@ -414,18 +414,16 @@ expectedHoferized =
 expectedRewritten :: Expression
 expectedRewritten =
     [embedALang|
-        let y = ohua.lang/recur
-                    (\e ->
-                        let (i,_) = e in
-                        let p = math/minus i 10 in
-                        let x = math/lt p 0 in
-                        let c = ohua.lang/ifThenElse x
-                                    (\_1 -> let d = (1, ohua.lang/id p) in d)
-                                    (\_2 -> let b = (0, ohua.lang/array p) in b) in
-                        c
-                        )
-                     (ohua.lang/array 95) in
-         y
+                 let y =
+                     let ctrls_0 = ohua.lang/recurFun 95 in
+                     let ctrl_0 = ohua.lang/nth 0 2 ctrls_0 in
+                     let i = ohua.lang/nth 1 2 ctrls_0 in
+                     let ctrl_1 = ohua.lang/ctrl ctrl_0 i in
+                     let i_0 = ohua.lang/nth 0 1 ctrl_1 in
+                     let p = math/minus i_0 10 in
+                     let x = math/lt p 0 in let c = ohua.lang/recurFun x p p in c in
+                 y
+
                |]
     -- Let "y"
     --     (sf recur `Apply`
