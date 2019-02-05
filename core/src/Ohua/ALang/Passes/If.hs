@@ -100,6 +100,7 @@ let cond :: Bool = ...
           result
 @
 -}
+{-# LANGUAGE CPP #-}
 module Ohua.ALang.Passes.If where
 
 import Ohua.Prelude
@@ -123,7 +124,49 @@ selectSf = Lit $ FunRefLit $ FunRef Refs.select Nothing
 ifFunSf :: Expression
 ifFunSf = Lit $ FunRefLit $ FunRef "ohua.lang/ifFun" Nothing
 
-ifRewrite :: (Monad m, MonadGenBnd m) => Expression -> m Expression
+#if 1
+-- This is a proposal for `ifRewrite` that uses plated to make sure the
+-- recursion is handled correctly. As far as I can tell the other version does
+-- not recurse properly onto the branches.
+ifRewrite :: (Monad m, MonadGenBnd m, MonadError Error m) => Expression -> m Expression
+ifRewrite = rewriteM $ \case
+    "ohua.lang/if" `Apply` cond `Apply` trueBranch `Apply` falseBranch
+        | Lambda trueIn trueBody <- trueBranch
+        , isUnit trueIn
+        , Lambda falseIn falseBody <- falseBranch
+        , isUnit falseIn -> do
+
+                ctrlTrue <- generateBindingWith "ctrlTrue"
+                ctrlFalse <- generateBindingWith "ctrlFalse"
+                trueBranch' <- liftIntoCtrlCtxt ctrlTrue trueBody
+                falseBranch' <- liftIntoCtrlCtxt ctrlFalse falseBody
+
+                ctrls <- generateBindingWith "ctrls"
+                trueResult <- generateBindingWith "trueResult"
+                falseResult <- generateBindingWith "falseResult"
+                result <- generateBindingWith "result"
+                return $ Just $
+                    Let ctrls (Apply ifFunSf cond) $
+                    mkDestructured [ctrlTrue, ctrlFalse] ctrls $
+                    Let trueResult trueBranch' $
+                    Let falseResult falseBranch' $
+                    Let
+                    result
+                    (Apply (Apply (Apply selectSf cond) $ Var trueResult) $
+                     Var falseResult) $
+                    Var result
+        | otherwise -> throwError $ "Found if with unexpected, non-unit-lambda branch(es)\ntrue:\n " <> show trueBranch <> "\nfalse:\n" <> show falseBranch
+      where
+        isUnit b = b == unitPat
+        unitPat = "_"
+        -- I think this is what this should look like but maybe it isn't right
+        -- now. For now this is what the test cases want.
+        --
+        -- unitPat = "()"
+    e -> pure Nothing
+
+#else
+
 ifRewrite (Let v a b) = Let v <$> ifRewrite a <*> ifRewrite b
 ifRewrite (Lambda v e) = Lambda v <$> ifRewrite e
 ifRewrite (Apply (Apply (Apply (Lit (FunRefLit (FunRef "ohua.lang/if" Nothing))) cond) trueBranch) falseBranch)
@@ -164,3 +207,4 @@ ifRewrite (Apply (Apply (Apply (Lit (FunRefLit (FunRef "ohua.lang/if" Nothing)))
              Var falseResult) $
         Var result
 ifRewrite e = return e
+#endif
