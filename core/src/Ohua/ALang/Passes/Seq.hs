@@ -33,10 +33,12 @@ seqRewrite :: (Monad m, MonadGenBnd m) => Expression -> m Expression
 seqRewrite (Let v a b) = Let v <$> seqRewrite a <*> seqRewrite b
 seqRewrite (Lambda v e) = Lambda v <$> seqRewrite e
 seqRewrite (Apply (Apply (Lit (FunRefLit (FunRef "ohua.lang/seq" Nothing))) dep) expr) = do
+    expr' <- seqRewrite expr
+    -- post traversal optimization
     ctrl <- generateBindingWith "ctrl"
-    expr' <- liftIntoCtrlCtxt ctrl expr
+    expr'' <- liftIntoCtrlCtxt ctrl expr'
     -- TODO verify that this arg is actually ()
-    let ((_:[]), expr'') = lambdaArgsAndBody expr'
+    let ((_:[]), expr''') = lambdaArgsAndBody expr''
     -- return $
     --     [ohualang|
     --       let $var:ctrl = ohua.lang/seqFun $var:dep in
@@ -44,5 +46,5 @@ seqRewrite (Apply (Apply (Lit (FunRefLit (FunRef "ohua.lang/seq" Nothing))) dep)
     --             result
     --                |]
     result <- generateBindingWith "result"
-    return $ Let ctrl (Apply seqFunSf dep) $ Let result expr'' $ Var result
+    return $ Let ctrl (Apply seqFunSf dep) $ Let result expr''' $ Var result
 seqRewrite e = return e
