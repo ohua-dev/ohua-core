@@ -68,9 +68,9 @@ smapLowering =
                   let (ctrl_0) = ohua.lang/nth<4> (1, 3, ctrls_0)  in
                   let (size_0) = ohua.lang/nth<5> (2, 3, ctrls_0)  in
                   let (ctrl_1) = dataflow ohua.lang/ctrl<6> (ctrl_0)  in
-                  let (result_0) = some.module/inc<7> (d_0)  in
-                  let (x) = dataflow ohua.lang/collect<8> (size_0, result_0)  in
-                    x
+                  let (z) = some.module/inc<7> (d_0)  in
+                  let (resultList_0) = dataflow ohua.lang/collect<8> (size_0, z)  in
+                    resultList_0
                 |]
         lowerAndValidate sourceExpr targetExpr "smap"
 

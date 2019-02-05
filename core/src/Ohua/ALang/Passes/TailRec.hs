@@ -296,7 +296,6 @@ findRecCall (Apply (Var binding) a) algosInScope
     | HS.member binding algosInScope
      -- no recursion here because if the expression is correct then these can be only nested APPLY statements
      = do
-        enabledTR <- ask
         unlessM ask $
             throwErrorDebugS
                 "Detected recursion although tail recursion support is not enabled!"
@@ -415,8 +414,10 @@ rewriteCallExpr e = do
         mkDestructured (recurCtrl : recurVars) ctrls l''
   where
     rewriteLastCond :: Expression -> Expression
-    rewriteLastCond (Let v e o@(Var _)) = (\e' -> Let v e' o) $ rewriteCond e
+    --rewriteLastCond (Lambda v e) = Lambda v $ rewriteLastCond e
+    rewriteLastCond (Let v e o@(Var _)) = Let v (rewriteCond e) o
     rewriteLastCond (Let v e ie) = Let v e $ rewriteLastCond ie
+    rewriteLastCond e = error $ quickRender e
     rewriteCond :: Expression -> Expression
     rewriteCond (Apply (Apply (Apply idPureFunction cond) (Lambda a trueB)) (Lambda b falseB)) =
         let trueB' = rewriteBranch trueB
@@ -436,7 +437,7 @@ rewriteCallExpr e = do
                             Right bnds -> bnds
                     Right bnds -> bnds
          in fromListToApply (FunRef recurFun Nothing) $
-            [cond, fixRef] ++ recurVars
+            cond : fixRef : recurVars
     rewriteCond _ =
         error
             "invariant broken: recursive function does not have the proper structure."

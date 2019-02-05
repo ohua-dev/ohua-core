@@ -537,17 +537,21 @@ detect_recursion recExpr expectedExpr =
 runPass pass expr = runSilentLoggingT $ runFromExpr def pass expr
 
 noTailRec expr expected =
-    (runPass (normalize >=> verifyTailRecursion) expr) `shouldThrow`
-    (errorCall expected)
+    (runPass (normalize >=> verifyTailRecursion) expr) `shouldReturn`
+    Left expected
 
 rewritePass expr expected =
-    runPass (normalize >=> verifyTailRecursion >=> rewriteAll) expr >>=
-    ((`shouldBe` Right (showWithPretty expected)) .
-     fmap showWithPretty)
+    runPass
+        (findTailRecs True >=>
+         normalize >=>
+         (\a -> print (showWithPretty a) >> pure a) >=>
+         verifyTailRecursion >=> rewriteAll)
+        expr >>=
+    ((`shouldBe` Right (showWithPretty expected)) . fmap showWithPretty)
 
 lower expr expected =
     runPass
-        (
+        (findTailRecs True >=>
          normalize >=>
          verifyTailRecursion >=> rewriteAll >=> normalize >=> lowerALang)
         expr >>=
