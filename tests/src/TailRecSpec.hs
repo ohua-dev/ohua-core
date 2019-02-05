@@ -15,9 +15,13 @@ import Ohua.ALang.Passes.TailRec
     , recur_hof
     , rewriteAll
     , verifyTailRecursion
+    , recurStartMarker
     )
-import Ohua.DFLang.Passes (lowerALang)
+import qualified Ohua.DFLang.Refs as Refs
+import Ohua.DFLang.Passes (lowerALang, collapseNth)
+import Ohua.DFLang.Passes.TailRec (recurLowering)
 import Ohua.DFLang.PPrint ()
+import Ohua.DFLang.Lang (nodeRef)
 
 import Ohua.Test (embedALang, embedDFLang, showWithPretty)
 
@@ -261,14 +265,13 @@ expectedRecWithExprOnRecurBranch =
 expectedRecWithCallOnlyOnRecurBranch :: Expression
 expectedRecWithCallOnlyOnRecurBranch =
     [embedALang|
+        let m = ohua.lang/id 95 in
         let a = \i ->
             let p = math/minus i 10 in
             let x = math/lt p 0 in
-            let c = ohua.lang/ifThenElse x
-                        (\_1 -> p)
-                        (\_2 -> ohua.lang/recur p) in
+            let c = if x then p else a p in
             c in
-        let y = a 95 in
+        let y = a m in
         y
                |]
     -- (Let "a"
@@ -415,13 +418,13 @@ expectedRewritten :: Expression
 expectedRewritten =
     [embedALang|
                  let y =
-                     let ctrls_0 = ohua.lang/recurFun 95 in
+                     let ctrls_0 = ohua.lang.marker/recur_start 95 in
                      let ctrl_0 = ohua.lang/nth 0 2 ctrls_0 in
                      let i = ohua.lang/nth 1 2 ctrls_0 in
                      let ctrl_1 = ohua.lang/ctrl ctrl_0 i in
                      let i_0 = ohua.lang/nth 0 1 ctrl_1 in
                      let p = math/minus i_0 10 in
-                     let x = math/lt p 0 in let c = ohua.lang/recurFun x p p in c in
+                     let x = math/lt p 0 in let c = ohua.lang.marker/recur_end x p p in c in
                  y
 
                |]
@@ -472,20 +475,13 @@ expectedRewritten =
 -- in y
 expectedLowered =
     [embedDFLang|
-                let (f) = ohua.lang/array<1>($95) in
-                let (i) = ohua.lang/id<3>(e) in
-                let (p) = math/minus<4>(i, $10) in
-                let (x) = math/lt<5>(p, $0) in
-                let (_0, _1) = ohua.lang/bool<13>(x) in
-                let (p_0) = ohua.lang/scope<14>(p) in
-                let (g) = ohua.lang/id<7>(p_0) in
-                let (d) = ohua.lang/mkTuple<9>(0, g) in
-                let (p_1) = ohua.lang/scope<15>(p) in
-                let (j) = ohua.lang/array<10>(p_1) in
-                let (b) = ohua.lang/mkTuple<12>(1,j) in
-                let (c) = ohua.lang/select<16>(_1, d, b) in
-                let (y, e) = ohua.lang/recur<17>(f, c) in
-                y
+                let (m) = ohua.lang/id<1> (95) in
+                let (ctrl_0, i, c) = dataflow ohua.lang/recurFun<2> (x, p, m, p) in
+                let (ctrl_1) = dataflow ohua.lang/ctrl<5> (ctrl_0, i) in
+                let (i_0) = ohua.lang/nth<6> (0, 1, ctrl_1) in
+                let (p) = math/minus<7> (i_0, 10) in
+                let (x) = math/lt<8> (p, 0) in
+                c
                 |]
     -- DFExpr
     --     [ LetExpr 1 "f" (EmbedSf "ohua.lang/array") [DFEnvVar 95] Nothing
@@ -542,7 +538,6 @@ rewritePass expr expected =
     runPass
         (findTailRecs True >=>
          normalize >=>
-         (\a -> print (showWithPretty a) >> pure a) >=>
          verifyTailRecursion >=> rewriteAll)
         expr >>=
     ((`shouldBe` Right (showWithPretty expected)) . fmap showWithPretty)
@@ -551,7 +546,14 @@ lower expr expected =
     runPass
         (findTailRecs True >=>
          normalize >=>
-         verifyTailRecursion >=> rewriteAll >=> normalize >=> lowerALang)
+         (\a -> print (showWithPretty a) >> pure a) >=>
+         --verifyTailRecursion >=>
+         rewriteAll >=>
+         normalize >=>
+         (\a -> print (showWithPretty a) >> pure a) >=>
+         lowerALang >=>
+         (\a -> print (showWithPretty a) >> pure a) >=>
+         return . recurLowering . (\a -> traceShow (showWithPretty a) a) . collapseNth (== recurStartMarker))
         expr >>=
     (\a -> fmap showWithPretty a `shouldBe` Right (showWithPretty expected))
 
@@ -577,7 +579,8 @@ passesSpec
  = do
     describe "Verification:" $ do
         it "no tail recursion 1" $
-            noTailRec notTailRecursive1 "Recursion is not tail recursive!"
+            noTailRec notTailRecursive1
+            "Recursion is not tail recursive! Last stmt: \"ohua.lang/ifThenElse x (\\955 _1 -> let d = ohua.lang/id p in d)\\n  (\\955 _2 -> let g = ohua.lang/recur p in let b = math/times10 g in b)\""
         it "no tail recursion 2" $
             noTailRec
                 notTailRecursive2
@@ -585,7 +588,7 @@ passesSpec
         it "no tail recursion 3" $
             noTailRec
                 notTailRecursive3
-                "Recursion is not tail recursive! Last stmt: \"math/times10 g\""
+                "Recursion is not tail recursive! Last stmt: \"math/times10 c\""
     describe "Phase 3: final ALang rewrite" $ do
         it "rewrites correct recursion" $
             rewritePass recWithCallOnlyOnRecurBranch expectedRewritten

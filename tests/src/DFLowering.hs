@@ -159,6 +159,7 @@ seqSpec = do
               let (p) = some/function<5> (lit_1_0)  in
                 p
             |]
+        -- Test case should be fixed with with #30
         it
             "lowers a seq with a lambda and an independent function with a unit as input" $
             [embedALang|

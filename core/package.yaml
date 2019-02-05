@@ -97,6 +97,7 @@ library:
   - Ohua.DFLang.Util
   - Ohua.DFLang.Passes
   - Ohua.DFLang.PPrint
+  - Ohua.DFLang.Passes.TailRec
   - Ohua.DFGraph
   - Ohua.DFGraph.Show
   - Ohua.Frontend.Lang

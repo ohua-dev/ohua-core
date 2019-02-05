@@ -247,6 +247,12 @@ recur_sf = PureFunction recur Nothing
 recur_hof_sf :: Expression
 recur_hof_sf = PureFunction recur_hof Nothing
 
+recurStartMarker :: QualifiedBinding
+recurStartMarker = "ohua.lang.marker/recur_start"
+
+recurEndMarker :: QualifiedBinding
+recurEndMarker = "ohua.lang.marker/recur_end"
+
 -- The Y combinator from Haskell Curry
 y :: QualifiedBinding
 y = "ohua.lang/Y"
@@ -380,7 +386,7 @@ rewriteAll e
 rewriteAll (Let v expr inExpr) = Let v <$> rewriteAll expr <*> rewriteAll inExpr
 rewriteAll (Apply a b) = Apply <$> rewriteAll a <*> rewriteAll b
 rewriteAll (Lambda a e) = Lambda a <$> rewriteAll e
-rewriteAll v@(Var _) = return v
+rewriteAll v = return v
 -- With `plated` this would be
 -- rewriteAll = transformM $ \e -> if isCall y e then rewriteCallExpr r else pure e
 
@@ -411,7 +417,7 @@ rewriteCallExpr e = do
   -- this breaks haddock |]
     ctrls <- generateBindingWith "ctrls"
     return $
-        Let ctrls (fromListToApply (FunRef recurFun Nothing) callArgs) $
+        Let ctrls (fromListToApply (FunRef recurStartMarker Nothing) callArgs) $
         mkDestructured (recurCtrl : recurVars) ctrls l''
   where
     rewriteLastCond :: Expression -> Expression
@@ -435,7 +441,7 @@ rewriteCallExpr e = do
                             Left _ -> error "invariant broken"
                             Right bnds -> bnds
                     Right bnds -> bnds
-         in fromListToApply (FunRef "ohua.lang/recurFun" Nothing) $
+         in fromListToApply (FunRef recurEndMarker Nothing) $
             [cond, fixRef] ++ recurVars
     rewriteCond _ =
         error
