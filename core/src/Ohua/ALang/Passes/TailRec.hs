@@ -380,15 +380,17 @@ verifyTailRecursion e =
     throwErrorDebugS $ "Invariant broken! Found stmt: " <> show e
 
 -- Phase 3:
+
+-- This is a reimplementation using `rewriteM` (ergo `plated`). The theory is
+-- that this should do the recursion properly and be future proof.
+--
+-- Its important here that we pattern match on `Let` because `rewriteM` is a
+-- bottom up traversal an hence `isCall` would match on partial applications on
+-- the `Y` combinator. By pattern matching on `Let` here that can be avoided.
 rewriteAll :: (MonadGenBnd m, MonadError Error m) => Expression -> m Expression
-rewriteAll e
-    | isCall y e = rewriteCallExpr e
-rewriteAll (Let v expr inExpr) = Let v <$> rewriteAll expr <*> rewriteAll inExpr
-rewriteAll (Apply a b) = Apply <$> rewriteAll a <*> rewriteAll b
-rewriteAll (Lambda a e) = Lambda a <$> rewriteAll e
-rewriteAll v = return v
--- With `plated` this would be
--- rewriteAll = transformM $ \e -> if isCall y e then rewriteCallExpr r else pure e
+rewriteAll = rewriteM $ \case
+    Let b e r | isCall y e -> (\e' -> Just $ Let b e' r) <$> rewriteCallExpr e
+    _ -> pure Nothing
 
 isCall f (Apply (PureFunction f' _) _)
     | f == f' = True
