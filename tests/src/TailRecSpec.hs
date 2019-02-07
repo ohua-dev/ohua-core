@@ -546,14 +546,11 @@ lower expr expected =
     runPass
         (findTailRecs True >=>
          normalize >=>
-         (\a -> print (showWithPretty a) >> pure a) >=>
          --verifyTailRecursion >=>
          rewriteAll >=>
          normalize >=>
-         (\a -> print (showWithPretty a) >> pure a) >=>
          lowerALang >=>
-         (\a -> print (showWithPretty a) >> pure a) >=>
-         return . recurLowering . (\a -> traceShow (showWithPretty a) a) . collapseNth (== recurStartMarker))
+         return . recurLowering . collapseNth (== recurStartMarker))
         expr >>=
     (\a -> fmap showWithPretty a `shouldBe` Right (showWithPretty expected))
 
