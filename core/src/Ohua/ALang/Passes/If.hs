@@ -117,6 +117,8 @@ import Ohua.ALang.Util
 import Ohua.Unit
 
 import Control.Monad (foldM)
+import Control.Category ((>>>))
+import qualified Data.Text as T
 
 selectSf :: Expression
 selectSf = Lit $ FunRefLit $ FunRef Refs.select Nothing
@@ -157,12 +159,8 @@ ifRewrite = rewriteM $ \case
                     Var result
         | otherwise -> throwError $ "Found if with unexpected, non-unit-lambda branch(es)\ntrue:\n " <> show trueBranch <> "\nfalse:\n" <> show falseBranch
       where
-        isUnit b = b == unitPat
-        unitPat = "_"
-        -- I think this is what this should look like but maybe it isn't right
-        -- now. For now this is what the test cases want.
-        --
-        -- unitPat = "()"
+        -- This test needs to improve
+        isUnit = unwrap >>> T.isPrefixOf "_"
     e -> pure Nothing
 
 #else
