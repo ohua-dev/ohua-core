@@ -33,6 +33,7 @@ dependencies:
 - data-default-class
 - universum >= 1.0
 - tardis
+- generic-lens >= 1.0.0.2
 default-extensions:
 - OverloadedStrings
 - OverloadedLists
@@ -62,6 +63,8 @@ default-extensions:
 - NoImplicitPrelude
 - RankNTypes
 - ViewPatterns
+- TypeApplications
+- DataKinds
 when:
 - condition: impl(ghc >= 8.4.0)
   ghc-options:
@@ -85,7 +88,6 @@ library:
   - Ohua.ALang.PPrint
   - Ohua.ALang.Passes
   - Ohua.ALang.Passes.SSA
-  - Ohua.ALang.Passes.TailRec
   - Ohua.ALang.Passes.If
   - Ohua.ALang.Passes.Smap
   - Ohua.ALang.Passes.Control
@@ -97,7 +99,6 @@ library:
   - Ohua.DFLang.Util
   - Ohua.DFLang.Passes
   - Ohua.DFLang.PPrint
-  - Ohua.DFLang.Passes.TailRec
   - Ohua.DFGraph
   - Ohua.DFGraph.Show
   - Ohua.Frontend.Lang
@@ -106,6 +107,9 @@ library:
   - Ohua.Stage
   - Ohua.Util
   - Ohua.Unit
+  - Ohua.Feature.TailRec
+  - Ohua.Feature.TailRec.Passes.ALang
+  - Ohua.Feature.TailRec.Passes.DFLang
   dependencies:
   - transformers
   - unordered-containers

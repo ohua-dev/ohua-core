@@ -9,7 +9,7 @@ import Ohua.Prelude
 import Ohua.ALang.Lang
 import Ohua.ALang.PPrint (quickRender)
 import Ohua.ALang.Passes (normalize)
-import Ohua.ALang.Passes.TailRec
+import Ohua.Feature.TailRec.Passes.ALang
     ( findTailRecs
     , recur
     , recur_hof
@@ -19,7 +19,7 @@ import Ohua.ALang.Passes.TailRec
     )
 import qualified Ohua.DFLang.Refs as Refs
 import Ohua.DFLang.Passes (lowerALang, collapseNth)
-import Ohua.DFLang.Passes.TailRec (recurLowering)
+import Ohua.Feature.TailRec.Passes.DFLang (recurLowering)
 import Ohua.DFLang.PPrint ()
 import Ohua.DFLang.Lang (nodeRef)
 

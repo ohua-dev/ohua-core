@@ -1,12 +1,12 @@
 {-# language PartialTypeSignatures #-}
-module Ohua.DFLang.Passes.TailRec where
+module Ohua.Feature.TailRec.Passes.DFLang where
 
 import Ohua.Prelude
 
 import Ohua.DFLang.Lang
 import Ohua.DFLang.Refs as Refs
 import Ohua.DFLang.Util
-import qualified Ohua.ALang.Passes.TailRec as ALangPass
+import qualified Ohua.Feature.TailRec.Passes.ALang as ALangPass
 
 import qualified Data.List.NonEmpty as NE
 import Data.Sequence as DS ((><), filter)
@@ -32,7 +32,8 @@ recurLowering (DFExpr letExprs returnVar)
                               -- true because these are the arguments to a call to the same
                               -- function, i.e, the recursion!
                               , callArguments =
-                                    fixRef : cond : callArguments recurStart <> recurArgs
+                                    fixRef :
+                                    cond : callArguments recurStart <> recurArgs
                               })
         letExprs
   where
@@ -43,4 +44,4 @@ recurLowering (DFExpr letExprs returnVar)
     findEnd e = findEnd $ allSuccessors e
     head (x:_) = x
     head _ = error "head"
-    allSuccessors = head . flip findUsages letExprs . head . output
+    allSuccessors = head . (flip findUsages letExprs <=< output)

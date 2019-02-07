@@ -1,6 +1,5 @@
 module Ohua.DFLang.Refs where
 
-import qualified Ohua.ALang.Passes.TailRec as TailRec
 import qualified Ohua.ALang.Refs as Refs
 import Ohua.DFLang.Lang
 import Ohua.Types
@@ -18,7 +17,7 @@ lowerBuiltinFunctions = flip HM.lookup builtInFunctions
             , (Refs.ifFun, ifFun)
             , (Refs.select, select)
             , (Refs.ctrl, ctrl)
-            , (TailRec.recurFun, recurFun)
+            , (recurFunBnd, recurFun)
             , (Refs.seqFun, seqFun)
             ]
 
@@ -37,8 +36,11 @@ select = DFFunction Refs.select
 ctrl :: DFFnRef
 ctrl = DFFunction Refs.ctrl
 
+recurFunBnd :: QualifiedBinding
+recurFunBnd = "ohua.lang/recurFun"
+
 recurFun :: DFFnRef
-recurFun = DFFunction TailRec.recurFun
+recurFun = DFFunction recurFunBnd
 
 seqFun :: DFFnRef
 seqFun = EmbedSf Refs.seqFun

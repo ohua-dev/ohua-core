@@ -20,6 +20,8 @@ module Ohua.Prelude
     , module Control.Lens
     , module Control.Lens.Plated
     , module Control.Lens.Tuple
+    , module Data.Generics.Sum
+    , module Data.Generics.Product
     , module Ohua.Types
     , module Ohua.LensClasses
     , module Ohua.Monad
@@ -60,6 +62,19 @@ import Control.Lens
     , view
     )
 import Control.Lens.Tuple
+
+import Data.Generics.Product
+    ( constraints
+    , constraints'
+    , field
+    , param
+    , position
+    , super
+    , the
+    , typed
+    , types
+    )
+import Data.Generics.Sum (_As, _Ctor, _Sub, _Typed)
 
 import Universum.Applicative
 import Universum.Base

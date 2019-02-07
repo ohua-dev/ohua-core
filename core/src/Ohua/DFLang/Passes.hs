@@ -173,13 +173,33 @@ expectVar (Lit l) = pure $ DFEnvVar l
 expectVar a =
     failWith $ "Argument must be local binding or literal, was " <> show a
 
+-- In this function I use the so called 'Tardis' monad, which is a special state
+-- monad. It has one state that travels "forward" in time, which is the same as
+-- the regular state monad, bu it also has a second state that uses lazyness to
+-- travel "backwards" in time, meaning that reading the state gives you the
+-- value you'll be setting later. This works fine so long as there are no cyclic
+-- dependencies between the states (which is fairly easy to get wrong).
+--
+-- Anyhow the way its used here is that when I find a target function (specified
+-- by the `selectionFunction`), I records its outputs in the forwards traveling
+-- state to signal that functions using it should be removed. I then look at the
+-- backwards traveling state to see which bindings the destructuring of this
+-- function created and I use them to compose its new output.
+--
+-- When I find an `nth` I look up its inputs in the forward traveling state. If
+-- I find an entry, then this `nth` belongs to a destructuring that should be
+-- collapsed. I remove the nth and I record the output binding and the index the
+-- nth got in the *backwards traveling state*.
+--
+-- In this way I can use the backwards traveling state to look into the future
+-- and immediately see the bindings that a function destructures into. This is
+-- what allows me to write this transformation with just a single DFLang pass.
 collapseNth :: (QualifiedBinding -> Bool) -> DFExpr -> DFExpr
-collapseNth selectionFunction e =
-    e
-        { letExprs =
-              Seq.fromList $ catMaybes $
-              evalTardis (traverse go $ toList $ letExprs e) (mempty, mempty)
-        }
+collapseNth selectionFunction =
+    field @"letExprs" %~ Seq.fromList . catMaybes .
+    flip evalTardis (mempty, mempty) .
+    traverse go .
+    toList
   where
     go e@LetExpr {output = [oldOut], functionRef = DFFnRef _ fun}
         | selectionFunction fun = do
@@ -196,10 +216,14 @@ collapseNth selectionFunction e =
                 (recordRemoval source oldOut index >> return Nothing)
                 (return $ Just e)
     go e = return $ Just e
-    requestRemoval bnd = do
+    requestRemoval bnd
+        -- Record the binding as source for removal
+     = do
         modifyForwards $ HS.insert bnd
+        -- Ask the future which bindings it was destructured into
         getsFuture $ view $ at bnd . non mempty
     queryRemoval = getsPast . HS.member
+    -- Tell the past that this binding was destructured at this index
     recordRemoval ::
            MonadTardis (HM.HashMap Binding (IM.IntMap Binding)) any m
         => Binding

@@ -20,7 +20,7 @@ import Control.Lens (view)
 import Ohua.ALang.Lang
 import Ohua.ALang.Passes
 import Ohua.ALang.Passes.SSA
-import Ohua.ALang.Passes.TailRec (loadTailRecPasses)
+import Ohua.Feature.TailRec (loadTailRecPasses)
 import Ohua.ALang.Passes.Verify
 import Ohua.ALang.Refs as Refs
 import Ohua.Compile.Configuration

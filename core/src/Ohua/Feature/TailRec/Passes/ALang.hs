@@ -198,7 +198,7 @@ The operator has two incoming arcs and two outgoing arcs:
 -}
 {-# LANGUAGE CPP #-}
 
-module Ohua.ALang.Passes.TailRec where
+module Ohua.Feature.TailRec.Passes.ALang where
 
 import Ohua.Prelude
 
@@ -218,20 +218,11 @@ import Ohua.ALang.Util
     , lambdaArgsAndBody
     , mkDestructured
     )
+import qualified Ohua.DFLang.Refs as DFRefs
 import Ohua.Compile.Configuration
 import Ohua.Unit
 
 --  ==== Implementation starts here
-loadTailRecPasses :: Bool -> CustomPasses env -> CustomPasses env
-loadTailRecPasses False passes@(CustomPasses {passBeforeNormalize = bn}) =
-    passes {passBeforeNormalize = (\e -> bn =<< (findTailRecs False e))}
-loadTailRecPasses True passes@(CustomPasses { passBeforeNormalize = bn
-                                            , passAfterNormalize = an
-                                            }) =
-    passes
-        { passBeforeNormalize = (\e -> bn =<< (findTailRecs True e))
-        , passAfterNormalize = (\e -> an =<< rewriteAll e)
-        }
 
 -- Currently not exposed by the frontend but only as the only part of recursion
 -- at the backend.
@@ -261,7 +252,7 @@ y_sf :: Expression
 y_sf = PureFunction y Nothing
 
 recurFun :: QualifiedBinding
-recurFun = "ohua.lang/recurFun"
+recurFun = DFRefs.recurFunBnd
 
 recurFunPureFunction :: Expression
 recurFunPureFunction = PureFunction recurFun Nothing
@@ -423,28 +414,31 @@ rewriteCallExpr e = do
         mkDestructured (recurCtrl : recurVars) ctrls l''
   where
     rewriteLastCond :: Expression -> Expression
-    rewriteLastCond (Let v e o@(Var _)) = (\e' -> Let v e' o) $ rewriteCond e
+    rewriteLastCond (Let v e o@(Var b))
+        | v == b = Let v (rewriteCond e) o
+        | otherwise = error "Value returned from recursive function was not last value bound, this is not tail recursive!"
     rewriteLastCond (Let v e ie) = Let v e $ rewriteLastCond ie
+
+
+    -- This whole rewriteCond and rewriteBranch algorithm is not correct. That
+    -- is to say it only works in the specific case where a single `if` is the
+    -- last expression in a recursive function. While the reason for this
+    -- assumption is obvious we must consider that also nested `if`'s
+    -- technically are valid tail recursive functions so long as there is at
+    -- least one branch that recurses and one branch that does not. I feel
+    -- implementing this correctly however is going to require some effort, thus
+    -- I think we should do so later.
     rewriteCond :: Expression -> Expression
-    rewriteCond (Apply (Apply (Apply idPureFunction cond) (Lambda a trueB)) (Lambda b falseB)) =
+    rewriteCond (Apply (Apply (Apply (PureFunction f0 _) cond) (Lambda a trueB)) (Lambda b falseB)) | f0 == ALangRefs.ifThenElse =
         let trueB' = rewriteBranch trueB
             falseB' = rewriteBranch falseB
-            fixRef =
-                case trueB' of
-                    Left f -> f
-                    Right _ ->
-                        case falseB' of
-                            Left f -> f
-                            Right _ -> error "invariant broken"
-            recurVars =
-                case trueB' of
-                    Left _ ->
-                        case falseB' of
-                            Left _ -> error "invariant broken"
-                            Right bnds -> bnds
-                    Right bnds -> bnds
+            (fixRef, recurVars) =
+                case (trueB', falseB') of
+                    (Left f, Right bnds) -> (f, bnds)
+                    (Right bnds, Left f) -> (f, bnds)
+                    _ -> error "invariant broken"
          in fromListToApply (FunRef recurEndMarker Nothing) $
-            [cond, fixRef] ++ recurVars
+            cond : fixRef : recurVars
     rewriteCond _ =
         error
             "invariant broken: recursive function does not have the proper structure."
@@ -453,4 +447,4 @@ rewriteCallExpr e = do
     rewriteBranch (Let v (Apply (PureFunction "ohua.lang/id" _) result) _) = Left result
     rewriteBranch (Let v e _)
         | isCall recur e = (Right . snd . fromApplyToList) e
-    rewriteBranch _ = error "invariant broken"
+    rewriteBranch e = error $ "invariant broken: " <> quickRender e
