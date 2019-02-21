@@ -67,7 +67,6 @@ smapLowering =
                   let (d_0) = ohua.lang/nth<3> (0, 3, ctrls_0)  in
                   let (ctrl_0) = ohua.lang/nth<4> (1, 3, ctrls_0)  in
                   let (size_0) = ohua.lang/nth<5> (2, 3, ctrls_0)  in
-                  let (ctrl_1) = dataflow ohua.lang/ctrl<6> (ctrl_0)  in
                   let (z) = some.module/inc<7> (d_0)  in
                   let (resultList_0) = dataflow ohua.lang/collect<8> (size_0, z)  in
                     resultList_0
