@@ -7,6 +7,7 @@
 -- Stability   : experimental
 -- Portability : portable
 -- This source code is licensed under the terms described in the associated LICENSE.TXT file
+{-# LANGUAGE CPP #-}
 module Ohua.ALang.Util where
 
 import Ohua.Prelude
@@ -16,6 +17,7 @@ import qualified Ohua.ALang.Refs as Refs (nth)
 import Ohua.Types
 
 import Control.Comonad
+import qualified Control.Lens as Lens (para)
 import Data.Functor.Foldable (embed, para)
 import qualified Data.HashSet as HS
 import qualified Data.List as L
@@ -37,7 +39,7 @@ substitute !var val =
 -- This is due to the fact that we often want to package the freeVars via a call to
 -- ohua.lang/array to make the backend implementation easier and I'm not sure whether
 -- this is always true.
--- This is also the readon why I keep this in Util into of making it an own pass.
+-- This is also the reason why I keep this in Util into of making it an own pass.
 destructure :: Expr -> [Binding] -> Expr -> Expr
 destructure source bnds =
     foldl (.) id $
@@ -51,35 +53,47 @@ destructure source bnds =
 lambdaLifting ::
        (Monad m, MonadGenBnd m) => Expression -> m (Expression, [Expression])
 lambdaLifting e = do
-    (e', actuals) <- go findFreeVariables renameVar bindingFromVar e
-    (e'', actuals') <- go findLonelyLiterals replaceLit bindingFromLit e'
+    (e', actuals) <- go findFreeVariables e
+    (e'', actuals') <- go findLonelyLiterals e'
     return (e'', actuals ++ actuals')
   where
     go :: (Monad m, MonadGenBnd m)
        => (Expression -> [Expression])
-       -> (Expression -> (Expression, Binding) -> Expression)
-       -> (Expression -> m Binding)
        -> Expression
        -> m (Expression, [Expression])
-    go findFreeExprs renameExpr toBinding expr =
+    go findFreeExprs expr =
         let (formalVars, b) =
                 case expr of
                     (Lambda _ _) -> lambdaArgsAndBody expr
                     _ -> ([], expr)
             actuals = findFreeExprs expr
+            renameExpr from to =
+                rewrite $ \e ->
+                    if e == from
+                        then Just to
+                        else Nothing
          in case actuals of
                 [] -> return (expr, [])
                 _ -> do
-                    newFormals <- mapM toBinding actuals
+                    newFormals <- mapM (bindingFromAny) actuals
                     let rewrittenExp =
-                            foldl renameExpr b $ zip actuals newFormals
+                            foldl
+                                (\e (from, to) -> renameExpr from (Var to) e)
+                                b
+                                (zip actuals newFormals)
                     return
                         ( mkLambda (formalVars ++ newFormals) rewrittenExp
                         , actuals)
-    bindingFromVar (Var v) = generateBindingWith v
-    bindingFromLit (Lit (NumericLit l)) =
-        generateBindingWith $ "lit_" <> (show l)
-    bindingFromLit (Lit UnitLit) = generateBindingWith "lit_unit"
+    bindingFromAny (Var v) = generateBindingWith v
+    bindingFromAny (Lit l) = generateBindingWith $ "lit_" <> litType
+      where
+        litType =
+            case l of
+                NumericLit l -> show l
+                UnitLit -> "unit"
+                FunRefLit ref -> bindifyFunRef ref
+    bindifyFunRef :: FunRef -> Binding
+    bindifyFunRef _ = "fun_ref" -- TODO
 
 mkLambda :: [Binding] -> Expression -> Expression
 mkLambda args expr = go expr $ reverse args
@@ -140,27 +154,23 @@ findLiterals e =
 
 -- | A literal is lonely if it does not accompany a var in the argument list to a call.
 findLonelyLiterals :: Expression -> [Expression]
-findLonelyLiterals e =
-    [ Lit lit
-    -- this assumes a normalized version of the expression
-    -- (because it will never check the final statement. it assumes it is just a var.)
-    | Let x f@(Apply a b) y <- universe e
-    , lit <-
-          let (_, args) = fromApplyToList f
-              vars =
-                  flip find args $ \case
-                      Lit _ -> False
-                      _ -> True
-           in case vars of
-                  Nothing ->
-                      let (Lit l) = L.head args
-                       in case l of
-                              UnitLit -> [l]
-                              NumericLit _ -> [l]
-                              EnvRefLit _ -> [l]
-                              _ -> []
-                  Just _ -> []
-    ]
+findLonelyLiterals =
+    Lens.para $ \case
+        f@Apply {} ->
+            const $
+            if areAllLits args
+                then args
+                -- We could also return `[]` in the else branch, because the
+                -- expression should be normalized, but this is cleaner
+                else args >>= findLonelyLiterals
+            where args = snd $ fromApplyToList f
+        _ -> join
+  where
+    areAllLits =
+        all $ \case
+            Lit _ -> True
+            _ -> False
+
 
 mkApply :: Expr -> [Expr] -> Expr
 mkApply f args = go $ reverse args

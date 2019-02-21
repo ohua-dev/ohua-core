@@ -175,17 +175,18 @@ import Ohua.Unit
 -- (if there are no independent function then this binding will never turn into an arc anyway.)
 liftIntoCtrlCtxt ::
        (Monad m, MonadGenBnd m) => Binding -> Expression -> m Expression
-liftIntoCtrlCtxt ctrlIn e = do
-    (lam', actuals) <- lambdaLifting e
-    if null actuals
+liftIntoCtrlCtxt ctrlIn e0 = do
+    (lam', actuals) <- lambdaLifting e0
+    let (originalFormals, _) = lambdaArgsAndBody e0
+    let (allFormals, e) = lambdaArgsAndBody lam'
+    ctrlOut <- generateBindingWith "ctrl"
+    let formals = reverse $ take (length actuals) $ reverse allFormals
+
+    if null formals
         then do
-            dAssertM $ lam' == e
+            dAssertM $ lam' == e0
             pure lam'
         else do
-            let (originalFormals, _) = lambdaArgsAndBody e
-            let (allFormals, e) = lambdaArgsAndBody lam'
-            ctrlOut <- generateBindingWith "ctrl"
-            let formals = reverse $ take (length actuals) $ reverse allFormals
             let actuals' = [Var ctrlIn] ++ actuals
             let ie = mkDestructured formals ctrlOut e
             return $
