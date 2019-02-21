@@ -35,6 +35,9 @@ module Ohua.Util
     , debugOr
     , whenDebug
     , unlessDebug
+    , dAssert
+    , dAssertM
+    , dAssertE
     , Mutator(..)
     , tellMut
     , HasCallStack
@@ -116,11 +119,25 @@ assertM = flip assert (pure ())
 
 -- | Similar to 'assertM' but throws a canonical 'Error' in the monad
 -- @m@ rather than an 'error'.
-assertE :: MonadError String m => Bool -> m ()
+assertE :: (IsString s, MonadError s m, HasCallStack, Monoid s) => Bool -> m ()
 assertE True  = return ()
 assertE False = throwErrorDebugS "AssertionError"
 {-# INLINE assertE #-}
 
+-- | Checks the condition only when debug flags are enabled.
+dAssert :: HasCallStack => Bool -> a -> a
+dAssert = assert `debugOr` flip const
+{-# INLINE dAssert #-}
+
+-- | Like 'assertM' but only checks the condition in debug builds.
+dAssertM :: (HasCallStack, Applicative m) => Bool -> m ()
+dAssertM = assertM `debugOr` const (pure ())
+{-# INLINE dAssertM #-}
+
+-- | Like 'assertE' but only checks the condition in debug builds.
+dAssertE :: (IsString s, MonadError s m, HasCallStack, Monoid s) => Bool -> m ()
+dAssertE = assertE `debugOr` const (pure ())
+{-# INLINE dAssertE #-}
 
 -- | Apply a function to the left value in an 'Either'
 mapLeft :: (a -> c) -> Either a b -> Either c b
