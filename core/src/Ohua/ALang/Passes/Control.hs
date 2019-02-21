@@ -177,15 +177,20 @@ liftIntoCtrlCtxt ::
        (Monad m, MonadGenBnd m) => Binding -> Expression -> m Expression
 liftIntoCtrlCtxt ctrlIn e = do
     (lam', actuals) <- lambdaLifting e
-    let (originalFormals, _) = lambdaArgsAndBody e
-    let (allFormals, e) = lambdaArgsAndBody lam'
-    ctrlOut <- generateBindingWith "ctrl"
-    let formals = reverse $ take (length actuals) $ reverse allFormals
-    let actuals' = [Var ctrlIn] ++ actuals
-    let ie = mkDestructured formals ctrlOut e
-    return $
-        mkLambda originalFormals $
-        Let
-            ctrlOut
-            (fromListToApply (FunRef "ohua.lang/ctrl" Nothing) actuals')
-            ie
+    if null actuals
+        then do
+            dAssertM $ lam' == e
+            pure lam'
+        else do
+            let (originalFormals, _) = lambdaArgsAndBody e
+            let (allFormals, e) = lambdaArgsAndBody lam'
+            ctrlOut <- generateBindingWith "ctrl"
+            let formals = reverse $ take (length actuals) $ reverse allFormals
+            let actuals' = [Var ctrlIn] ++ actuals
+            let ie = mkDestructured formals ctrlOut e
+            return $
+                mkLambda originalFormals $
+                Let
+                    ctrlOut
+                    (fromListToApply (FunRef "ohua.lang/ctrl" Nothing) actuals')
+                    ie
