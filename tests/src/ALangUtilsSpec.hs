@@ -1,6 +1,7 @@
 {-# LANGUAGE QuasiQuotes #-}
 
-module TestALangUtils where
+module ALangUtilsSpec where
+
 
 import Ohua.Prelude
 

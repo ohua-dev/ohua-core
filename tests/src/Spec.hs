@@ -1,27 +1,3 @@
-import Ohua.Prelude
-
-import qualified DFLowering
-import qualified DFOptimizations
-
-import qualified ControlPasses
-import qualified DFPassesSpec
-import PassesSpec
-import qualified TailRecSpec
-import Test.Hspec
-import qualified TestALangUtils
-import qualified TestAesonConvert
-
-main :: IO ()
-main =
-    hspec $ do
-        passesSpec
-        DFLowering.generalLowering
-        DFLowering.ifSpec
-        DFLowering.seqSpec
-        DFLowering.smapSpec
-        DFOptimizations.optimizations
-        TestALangUtils.spec
-        TestAesonConvert.spec
-        TailRecSpec.passesSpec
-        DFPassesSpec.spec
-        ControlPasses.passesSpec
+{-# OPTIONS_GHC -F -pgmF hspec-discover #-}
+-- This makes it so it automatically includes all files that end in `Spec.hs`.
+-- From each of those files it always links the binding called `spec`.

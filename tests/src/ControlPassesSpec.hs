@@ -1,4 +1,6 @@
-module ControlPasses where
+module ControlPassesSpec where
+
+
 
 import Ohua.Prelude
 
@@ -17,8 +19,8 @@ transformInto pass expr expected =
     runPass (normalize >=> pass) expr >>=
     ((`shouldBe` Right (showWithPretty expected)) . fmap showWithPretty)
 
-passesSpec :: Spec
-passesSpec = do
+spec :: Spec
+spec = do
     describe "conditionals" $ do
         it "nested-if" $
             transformInto

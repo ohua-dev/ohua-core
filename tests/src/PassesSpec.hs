@@ -16,7 +16,7 @@
 {-# OPTIONS_GHC -fno-warn-unused-top-binds #-}
 #endif
 module PassesSpec
-    ( passesSpec
+    ( spec
     ) where
 
 import Ohua.Prelude
@@ -128,8 +128,8 @@ lambda_with_app_as_arg :: Expression
 lambda_with_app_as_arg =
     Apply "some/func" $ Apply (Lambda "a" (Lambda "b" "a")) $ 10
 
-passesSpec :: Spec
-passesSpec = do
+spec :: Spec
+spec = do
     describe "normalization" $
         -- Add these tests back once we have a good generation for random programs
         -- prop "creates ir with the right invariants" prop_passes

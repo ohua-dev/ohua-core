@@ -1,4 +1,5 @@
-module DFOptimizations where
+module DFOptimizationsSpec where
+
 
 import Ohua.Prelude
 
@@ -59,3 +60,7 @@ optimizations =
                   result_0
                 |]
         optimizeAndValidate sourceExpr targetExpr "ctrl"
+
+spec :: Spec
+spec =
+    optimizations

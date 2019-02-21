@@ -1,7 +1,7 @@
 {-# LANGUAGE LambdaCase #-}
 
 module TailRecSpec
-    ( passesSpec
+    ( spec
     ) where
 
 import Ohua.Prelude
@@ -554,8 +554,8 @@ lower expr expected =
         expr >>=
     (\a -> fmap showWithPretty a `shouldBe` Right (showWithPretty expected))
 
-passesSpec :: Spec
-passesSpec
+spec :: Spec
+spec
     -- describe "Phase 1: rec detection" $ do
     --     it "recursion with expression (let + id) on terminal branch" $
     --         detect_recursion

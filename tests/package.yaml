@@ -66,15 +66,6 @@ tests:
   ohua-tests:
     main: Spec.hs
     source-dirs: src
-    other-modules:
-    - DFLowering
-    - DFOptimizations
-    - PassesSpec
-    - TestALangUtils
-    - TestAesonConvert
-    - TailRecSpec
-    - DFPassesSpec
-    - ControlPasses
     dependencies:
     - ohua-core
     - hspec

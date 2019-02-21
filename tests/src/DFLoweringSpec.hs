@@ -1,6 +1,8 @@
 {-# OPTIONS_GHC -fno-warn-orphans -fno-warn-missing-methods #-}
 
-module DFLowering where
+module DFLoweringSpec where
+
+
 
 import Ohua.Prelude
 
@@ -235,3 +237,10 @@ matchAndReport gr1 gr2
                     ]
   where
     prettify0 = toText . prettify
+
+spec :: Spec
+spec = do
+    smapSpec
+    ifSpec
+    generalLowering
+    seqSpec
