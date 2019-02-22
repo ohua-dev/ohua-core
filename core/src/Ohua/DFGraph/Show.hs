@@ -15,7 +15,7 @@ import Ohua.DFGraph
 
 -- | TODO show return arc
 asTable :: OutGraph -> T.Text
-asTable (OutGraph ops (Arcs direct compound state) _) =
+asTable (OutGraph ops Arcs {..} _) =
     T.pack $
     render $
     vsep
@@ -28,13 +28,6 @@ asTable (OutGraph ops (Arcs direct compound state) _) =
               4
               top
               [sourceList direct sourceToBox, targetList direct targetToBox]
-        , text "Compound Arcs"
-        , hsep
-              4
-              top
-              [ sourceList compound $ hsep 1 left . map targetToBox
-              , targetList compound targetToBox
-              ]
         , text "State Arcs"
         , hsep
               4
@@ -42,6 +35,8 @@ asTable (OutGraph ops (Arcs direct compound state) _) =
               [ sourceList state sourceToBox
               , targetList state $ text . show . unwrap
               ]
+        , text "Dead Arcs"
+        , hsep 4 top [sourceList dead $ targetToBox]
         ]
   where
     idList =

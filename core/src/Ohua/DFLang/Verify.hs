@@ -18,22 +18,6 @@ verify = sequence_ . sequenceA checks
     checks :: [DFExpr -> m ()]
     checks = [checkBuiltinArities]
 
-checkDFVarList :: MonadError Error m => DFExpr -> m ()
-checkDFVarList e = for_ (letExprs e) check
-  where
-    check l@(LetExpr {functionRef, callArguments})
-        | hasVarArgList callArguments =
-            case functionRef of
-                DFFunction _ -> pure ()
-                _ ->
-                    error $
-                    "Invariant broken: Only dataflow operators can have var lists! " <>
-                    "This is not a dataflow function: " <>
-                    (show l)
-    hasVarArgList (DFVarList _:_) = True
-    hasVarArgList (_:[]) = False
-    hasVarArgList (_:args) = hasVarArgList args
-
 checkBuiltinArities :: MonadError Error m => DFExpr -> m ()
 checkBuiltinArities e =
     for_ (letExprs e) $ \LetExpr {functionRef, callArguments} ->

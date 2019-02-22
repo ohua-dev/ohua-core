@@ -11,6 +11,7 @@ module Ohua.DFGraph where
 import Ohua.Prelude
 
 import qualified Data.HashMap.Strict as HM
+import qualified Data.HashSet as HS
 import Ohua.DFLang.Lang
 
 data Operator = Operator
@@ -26,8 +27,8 @@ data Target = Target
 
 data Arcs envExpr = Arcs
     { direct :: ![DirectArc envExpr]
-    , compound :: ![CompoundArc]
     , state :: ![StateArc envExpr]
+    , dead :: ![DeadArc]
     } deriving (Eq, Generic, Show)
 
 data Arc target source = Arc
@@ -35,11 +36,13 @@ data Arc target source = Arc
     , source :: !source
     } deriving (Eq, Show, Generic)
 
-type CompoundArc = Arc Target [Target]
-
 type DirectArc envExpr = Arc Target (Source envExpr)
-
 type StateArc envExpr = Arc FnId (Source envExpr)
+-- | A dead arc is a binding created in DFLang that is unused. Hence its
+-- 'target' field is the constant '()' and the 'source' is some operator at some
+-- index. Mostly this is used when dataflow operators that implement the
+-- argument dispatch themselves have one of their outputs be unused.
+type DeadArc = Arc () Target
 
 data Source envExpr
     = LocalSource !Target
@@ -94,17 +97,12 @@ toGraph (DFExpr lets r) = OutGraph ops grArcs (getSource r)
             | (var, idx) <- zip (output l) [0 ..]
             ]
     grArcs =
-        let (compounds, directs) =
-                partitionEithers
-                    [ case v of
-                        DFVarList l -> Left $ arc $ map getSource l
-                        _ -> Right $ arc $ varToSource v
-                    | LetExpr {..} <- toList lets
-                    , (idx, v) <- zip [0 ..] callArguments
-                    , let arc :: source -> Arc Target source
-                          arc = Arc $ Target callSiteId idx
-                    ]
-         in Arcs directs compounds states
+        let directs =
+                [ Arc (Target callSiteId idx) $ varToSource v
+                | LetExpr {..} <- toList lets
+                , (idx, v) <- zip [0 ..] callArguments
+                ]
+         in Arcs directs states deads
     getSource v =
         fromMaybe
             (error $
@@ -115,6 +113,12 @@ toGraph (DFExpr lets r) = OutGraph ops grArcs (getSource r)
         \case
             DFVar v -> LocalSource $ getSource v
             DFEnvVar envExpr -> EnvSource envExpr
-            DFVarList _ -> error "Invariant Broken!"
+    deads =
+        map (Arc () . getSource) $
+        HS.toList $ allBindings `HS.difference` usedBindings
+      where
+        allBindings = HS.fromList $ toList lets >>= output
+        usedBindings =
+            HS.fromList $ [v | l <- toList lets, DFVar v <- callArguments l]
 -- spliceEnv :: (Int -> a) -> OutGraph -> AbstractOutGraph a
 -- spliceEnv lookupExpr = fmap f where f i = lookupExpr $ unwrap i

@@ -52,7 +52,7 @@ data DFFnRef = DFFnRef
 instance Hashable DFFnRef
 
 pattern DFFunction :: QualifiedBinding -> DFFnRef
-pattern DFFunction b = DFFnRef OperatorNode b 
+pattern DFFunction b = DFFnRef OperatorNode b
 
 pattern EmbedSf :: QualifiedBinding -> DFFnRef
 pattern EmbedSf b = DFFnRef FunctionNode b
@@ -71,7 +71,6 @@ instance NFData NodeType
 data DFVar
     = DFEnvVar !Lit
     | DFVar !Binding
-    | DFVarList ![Binding]
     deriving (Eq, Show, Lift, Generic)
 
 instance Hashable DFVar

@@ -55,7 +55,7 @@ spec = describe "encode . decode == id" $ do
     prop "for targets" (testConvert :: Target -> Result)
     prop "for direct arcs" (testConvert :: DirectArc Lit -> Result)
     prop "for state arcs" (testConvert :: StateArc Lit -> Result)
-    prop "for compound arcs" (testConvert :: CompoundArc -> Result)
+    prop "for compound arcs" (testConvert :: DeadArc -> Result)
     prop "for sources" (testConvert :: Source HostExpr -> Result)
     prop "for fn names" (testConvert :: Binding -> Result)
     prop "for fn ids" (testConvert :: FnId -> Result)

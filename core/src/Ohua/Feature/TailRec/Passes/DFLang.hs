@@ -8,8 +8,7 @@ import Ohua.DFLang.Refs as Refs
 import Ohua.DFLang.Util
 import qualified Ohua.Feature.TailRec.Passes.ALang as ALangPass
 
-import qualified Data.List.NonEmpty as NE
-import Data.Sequence as DS ((><), filter)
+import Data.Sequence as DS (filter)
 
 recurLowering :: DFExpr -> DFExpr
 recurLowering (DFExpr letExprs returnVar)

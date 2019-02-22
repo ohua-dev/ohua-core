@@ -29,7 +29,6 @@ import Ohua.ALang.PPrint
 
 import Ohua.DFLang.Lang
 import qualified Ohua.DFLang.Refs as Refs
-import Ohua.DFLang.Util
 import Ohua.Stage
 
 type Pass m
@@ -209,8 +208,7 @@ collapseNth selectionFunction =
             return $
                 Just
                     e {output = newOuts, functionRef = DFFnRef OperatorNode fun}
-        | [DFEnvVar (NumericLit index), _len, DFVar source] <- callArguments e = do
-            toRemove <- getPast
+        | [DFEnvVar (NumericLit index), _len, DFVar source] <- callArguments e =
             ifM
                 (queryRemoval source)
                 (recordRemoval source oldOut index >> return Nothing)

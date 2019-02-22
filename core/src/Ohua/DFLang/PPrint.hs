@@ -34,7 +34,6 @@ prettyDFVar :: DFVar -> Doc a
 prettyDFVar = \case
     DFEnvVar he -> pretty he
     DFVar b -> pretty b
-    DFVarList bnds -> PP.list $ map pretty bnds
 
 instance Pretty DFVar where
     pretty = prettyDFVar
