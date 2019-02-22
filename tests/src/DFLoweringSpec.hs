@@ -171,10 +171,9 @@ seqSpec = do
             [embedDFLang|
                  let (y) = ohua.lang/id<1> (0) in
                  let (ctrl_0) = ohua.lang/seqFun<2> (y) in
-                 let (ctrl_1) = dataflow ohua.lang/ctrl<3> (ctrl_0, some/function, ()) in
-                 let (lit_fun_ref_0) = ohua.lang/nth<4> (0, 2, ctrl_1) in
-                 let (lit_unit_0) = ohua.lang/nth<5> (1, 2, ctrl_1) in
-                 let (p) = ohua.lang/unitFn<6> (lit_fun_ref_0, lit_unit_0) in
+                 let (ctrl_1) = dataflow ohua.lang/ctrl<3> (ctrl_0, ()) in
+                 let (lit_unit_0) = ohua.lang/nth<4> (0, 1, ctrl_1) in
+                 let (p) = ohua.lang/unitFn<5> (some/function, lit_unit_0) in
                  p
             |]
 

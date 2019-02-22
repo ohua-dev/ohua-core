@@ -530,9 +530,11 @@ detect_recursion recExpr expectedExpr =
 
 runPass pass expr = runSilentLoggingT $ runFromExpr def pass expr
 
-noTailRec expr expected =
-    (runPass (normalize >=> verifyTailRecursion) expr) `shouldReturn`
-    Left expected
+noTailRec expr expected = do
+    res <- (runPass (normalize >=> verifyTailRecursion) expr)
+    res `shouldSatisfy` isLeft
+    let Left msg = res
+    toString msg `shouldStartWith` expected
 
 rewritePass expr expected =
     runPass
