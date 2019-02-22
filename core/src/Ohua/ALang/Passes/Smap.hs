@@ -38,16 +38,17 @@ collectSf :: Expression
 collectSf = Lit $ FunRefLit $ FunRef Refs.collect Nothing
 
 smapRewrite :: (Monad m, MonadGenBnd m) => Expression -> m Expression
-smapRewrite (Let v a b) = Let v <$> smapRewrite a <*> smapRewrite b
-smapRewrite (Lambda v e) = Lambda v <$> smapRewrite e
-smapRewrite e@(Apply (Apply (Lit (FunRefLit (FunRef "ohua.lang/smap" Nothing))) lamExpr) dataGen) = do
-    lamExpr' <- smapRewrite lamExpr
+smapRewrite =
+    rewriteM $ \case
+        PureFunction op _ `Apply` lamExpr `Apply` dataGen
+            | op == Refs.smap -> Just <$> do
+                lamExpr' <- smapRewrite lamExpr
     -- post traversal optimization
-    ctrlVar <- generateBindingWith "ctrl"
-    lamExpr'' <- liftIntoCtrlCtxt ctrlVar lamExpr'
-    let ((inBnd:[]), expr) = lambdaArgsAndBody lamExpr''
-    d <- generateBindingWith "d"
-    let expr' = renameVar expr (Var inBnd, d)
+                ctrlVar <- generateBindingWith "ctrl"
+                lamExpr'' <- liftIntoCtrlCtxt ctrlVar lamExpr'
+                let ((inBnd:[]), expr) = lambdaArgsAndBody lamExpr''
+                d <- generateBindingWith "d"
+                let expr' = renameVar expr (Var inBnd, d)
   --   [ohualang|
   --     let (d, $var:ctrlVar, size) = ohua.lang/smapFun $var:dataGen in
   --      let (a,b,c) = ctrl $var:ctrlVar a b c in
@@ -55,14 +56,16 @@ smapRewrite e@(Apply (Apply (Lit (FunRefLit (FunRef "ohua.lang/smap" Nothing))) 
   --        let resultList = collect size result in
   --          resultList
   -- (this breaks haddock) |]
-    size <- generateBindingWith "size"
-    ctrls <- generateBindingWith "ctrls"
-    result <- generateBindingWith "result"
-    resultList <- generateBindingWith "resultList"
-    return $
-        Let ctrls (Apply smapSfFun dataGen) $
-        mkDestructured [d, ctrlVar, size] ctrls $
-        Let result expr' $
-        Let resultList (Apply (Apply collectSf $ Var size) $ Var result) $
-        Var resultList
-smapRewrite e = return e
+                size <- generateBindingWith "size"
+                ctrls <- generateBindingWith "ctrls"
+                result <- generateBindingWith "result"
+                resultList <- generateBindingWith "resultList"
+                return $
+                    Let ctrls (Apply smapSfFun dataGen) $
+                    mkDestructured [d, ctrlVar, size] ctrls $
+                    Let result expr' $
+                    Let
+                        resultList
+                        (Apply (Apply collectSf $ Var size) $ Var result) $
+                    Var resultList
+        _ -> pure Nothing

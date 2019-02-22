@@ -162,7 +162,7 @@ handleApplyExpr g = failWith $ "Expected apply but got: " <> show g
 
 -- | Inspect an expression expecting something which can be captured
 -- in a DFVar otherwise throws appropriate errors.
-expectVar :: MonadError Error m => Expression -> m DFVar
+expectVar :: (HasCallStack, MonadError Error m) => Expression -> m DFVar
 expectVar (Var bnd) = pure $ DFVar bnd
 -- TODO currently only allowed for the unitFn function
 -- expectVar r@PureFunction {} =
@@ -171,7 +171,7 @@ expectVar (Var bnd) = pure $ DFVar bnd
 --     show (pretty r)
 expectVar (Lit l) = pure $ DFEnvVar l
 expectVar a =
-    failWith $ "Argument must be local binding or literal, was " <> show a
+    throwErrorS $ "Argument must be local binding or literal, was " <> show a
 
 -- In this function I use the so called 'Tardis' monad, which is a special state
 -- monad. It has one state that travels "forward" in time, which is the same as
