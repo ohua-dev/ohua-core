@@ -104,6 +104,7 @@ Lit :: { Lit }
     : int { NumericLit $1 }
     | env_ref { EnvRefLit $1 }
     | unit { UnitLit }
+    | qualid { FunRefLit $ FunRef $1 Nothing }
 
 FnRef :: { DFFnRef }
 FnRef : opt(dataflow) qualid { maybe EmbedSf (const DFFunction) $1 $2 }

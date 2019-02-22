@@ -69,8 +69,8 @@ smapLowering =
                   let (d_0) = ohua.lang/nth<3> (0, 3, ctrls_0)  in
                   let (ctrl_0) = ohua.lang/nth<4> (1, 3, ctrls_0)  in
                   let (size_0) = ohua.lang/nth<5> (2, 3, ctrls_0)  in
-                  let (z) = some.module/inc<7> (d_0)  in
-                  let (resultList_0) = dataflow ohua.lang/collect<8> (size_0, z)  in
+                  let (z) = some.module/inc<6> (d_0)  in
+                  let (resultList_0) = dataflow ohua.lang/collect<7> (size_0, z)  in
                     resultList_0
                 |]
         lowerAndValidate sourceExpr targetExpr "smap"
@@ -169,12 +169,13 @@ seqSpec = do
                   x
               |] `shouldLowerTo`
             [embedDFLang|
-              let (y) = ohua.lang/id<1> (0)  in
-              let (ctrl_0) = ohua.lang/seqFun<2> (y)  in
-              let (ctrl_1) = dataflow ohua.lang/ctrl<3> (ctrl_0, ())  in
-              let (lit_unit_0) = ohua.lang/nth<4> (0, 1, ctrl_1)  in
-              let (p) = some/function<5> (lit_unit_0)  in
-              p
+                 let (y) = ohua.lang/id<1> (0) in
+                 let (ctrl_0) = ohua.lang/seqFun<2> (y) in
+                 let (ctrl_1) = dataflow ohua.lang/ctrl<3> (ctrl_0, some/function, ()) in
+                 let (lit_fun_ref_0) = ohua.lang/nth<4> (0, 2, ctrl_1) in
+                 let (lit_unit_0) = ohua.lang/nth<5> (1, 2, ctrl_1) in
+                 let (p) = ohua.lang/unitFn<6> (lit_fun_ref_0, lit_unit_0) in
+                 p
             |]
 
 matchAndReport :: (Eq a, Ord b, Show a, Show b) => Gr a b -> Gr a b -> IO ()
