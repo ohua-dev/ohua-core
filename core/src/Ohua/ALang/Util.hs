@@ -158,7 +158,13 @@ findLonelyLiterals =
         f@Apply {} ->
             const $
             if areAllLits args
-                then args
+                then take 1 $
+                     -- HACK see #34
+                     filter
+                         (\case
+                              Lit (FunRefLit _) -> False
+                              _ -> True)
+                         args
                 -- We could also return `[]` in the else branch, because the
                 -- expression should be normalized, but this is cleaner
                 else args >>= findLonelyLiterals
