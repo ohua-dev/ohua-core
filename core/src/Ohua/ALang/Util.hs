@@ -61,29 +61,27 @@ lambdaLifting e = do
        => (Expression -> [Expression])
        -> Expression
        -> m (Expression, [Expression])
-    go findFreeExprs expr =
-        let (formalVars, b) =
-                case expr of
-                    (Lambda _ _) -> lambdaArgsAndBody expr
-                    _ -> ([], expr)
-            actuals = findFreeExprs expr
-            renameExpr from to =
-                rewrite $ \e ->
-                    if e == from
-                        then Just to
-                        else Nothing
-         in case actuals of
-                [] -> return (expr, [])
-                _ -> do
-                    newFormals <- mapM (bindingFromAny) actuals
-                    let rewrittenExp =
-                            foldl
-                                (\e (from, to) -> renameExpr from (Var to) e)
-                                b
-                                (zip actuals newFormals)
-                    return
-                        ( mkLambda (formalVars ++ newFormals) rewrittenExp
-                        , actuals)
+    go findFreeExprs expr
+        | null actuals = (expr, [])
+        | otherwise = do
+            newFormals <- mapM (bindingFromAny) actuals
+            let rewrittenExp =
+                    foldl
+                        (\e (from, to) -> renameExpr from (Var to) e)
+                        b
+                        (zip actuals newFormals)
+            return (mkLambda (formalVars ++ newFormals) rewrittenExp, actuals)
+      where
+        (formalVars, b) =
+            case expr of
+                (Lambda _ _) -> lambdaArgsAndBody expr
+                _ -> ([], expr)
+        actuals = findFreeExprs expr
+        renameExpr from to =
+            rewrite $ \e ->
+                if e == from
+                    then Just to
+                    else Nothing
     bindingFromAny (Var v) = generateBindingWith v
     bindingFromAny (Lit l) = generateBindingWith $ "lit_" <> litType
       where
@@ -92,6 +90,7 @@ lambdaLifting e = do
                 NumericLit l -> show l
                 UnitLit -> "unit"
                 FunRefLit ref -> bindifyFunRef ref
+                EnvRefLit l -> "env_" <> show l
     bindifyFunRef :: FunRef -> Binding
     bindifyFunRef _ = "fun_ref" -- TODO
 
