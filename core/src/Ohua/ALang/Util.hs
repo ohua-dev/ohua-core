@@ -62,7 +62,7 @@ lambdaLifting e = do
        -> Expression
        -> m (Expression, [Expression])
     go findFreeExprs expr
-        | null actuals = (expr, [])
+        | null actuals = pure (expr, [])
         | otherwise = do
             newFormals <- mapM (bindingFromAny) actuals
             let rewrittenExp =
