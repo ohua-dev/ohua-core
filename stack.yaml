@@ -1,4 +1,6 @@
-flags: {}
+flags:
+  ohua-core:
+    debug: true
 extra-package-dbs: []
 packages:
 - ./core

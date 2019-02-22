@@ -135,3 +135,8 @@ library:
   when:
   - condition: flag(debug)
     cpp-options: -DDEBUG=1
+
+flags:
+  debug:
+    manual: true
+    default: false
