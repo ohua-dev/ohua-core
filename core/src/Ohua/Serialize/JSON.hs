@@ -21,12 +21,16 @@ module Ohua.Serialize.JSON
 
 import Ohua.Prelude hiding (Options)
 
+import GHC.Generics
+
 import Data.Aeson
 import Data.Aeson.Types
-import Data.List
+import Data.List (stripPrefix)
 
 import Ohua.DFGraph
 import Ohua.DFLang.Lang (NodeType(..))
+
+import Data.Generics.Product
 
 baseOptions :: Options
 baseOptions =
@@ -49,6 +53,32 @@ operatorOptions =
               fieldLabelModifier baseOptions .
               fromMaybe (error "no prefix") . stripPrefix "operator"
         }
+
+-- ############## Begin Disgusting Workaround ##############
+
+-- This is because we need 'FunRef' literals as env inputs sometimes and rust
+-- does not like the default way that a 'FunRef' with a 'Nothing' value as id is
+-- serialized. So we need this until we move the function id to some other
+-- place.
+
+data PrivateFunRefLitWrapper
+    = FunRefLit QualifiedBinding
+    | OtherLit Lit
+    deriving (Generic)
+
+instance ToJSON PrivateFunRefLitWrapper where
+    toJSON (Ohua.Serialize.JSON.FunRefLit l) =
+        genericToJSON baseOptions {unwrapUnaryRecords = False} l
+    toJSON (OtherLit o) = toJSON o
+
+instance FromJSON PrivateFunRefLitWrapper where
+    parseJSON v =
+        (do l@Ohua.Serialize.JSON.FunRefLit {} <-
+                genericParseJSON baseOptions {unwrapUnaryRecords = False} v
+            pure l) <|>
+        (OtherLit <$> parseJSON v)
+
+-- ############## End Disgusting Workaround ##############
 
 makeInJSON :: Make t => SourceType t -> Parser t
 makeInJSON = either (fail . toString) pure . make
@@ -97,12 +127,31 @@ instance ToJSON a => ToJSON (Source a) where
 instance FromJSON a => FromJSON (Source a) where
     parseJSON = genericParseJSON sourceOptions
 
+mapArcsLit :: Traversal (Arcs a) (Arcs b) a b
+mapArcsLit f (Arcs a b c) = Arcs <$> envSource f a <*> envSource f b <*> pure c
+  where
+    envSource :: Traversal [Arc a (Source b)] [Arc a (Source c)] b c
+    envSource = traverse @[] . param @0 . param @0
+
+mapOutGraphLit :: Traversal (AbstractOutGraph a) (AbstractOutGraph b) a b
+mapOutGraphLit = field @"arcs" . mapArcsLit
+
 instance ToJSON OutGraph where
-    toEncoding = genericToEncoding baseOptions
-    toJSON = genericToJSON baseOptions
+    toJSON =
+        genericToJSON baseOptions .
+        (mapOutGraphLit %~ (\case
+             Ohua.Prelude.FunRefLit (FunRef l _) ->
+                 Ohua.Serialize.JSON.FunRefLit l
+             other -> OtherLit other))
 
 instance FromJSON OutGraph where
-    parseJSON = genericParseJSON baseOptions
+    parseJSON =
+        fmap
+            (mapOutGraphLit %~ \case
+                 Ohua.Serialize.JSON.FunRefLit l ->
+                     Ohua.Prelude.FunRefLit (FunRef l Nothing)
+                 OtherLit l -> l) .
+        genericParseJSON baseOptions
 
 instance ToJSON HostExpr where
     toEncoding = unwrapToEncoding
