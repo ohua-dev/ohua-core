@@ -29,6 +29,7 @@ import Ohua.DFLang.PPrint ()
 import Ohua.DFLang.Passes
 import qualified Ohua.DFLang.Verify
 import Ohua.Stage
+import Ohua.Feature.TailRec.Passes.ALang (y)
 
 forceLog :: (MonadLogger m, NFData a) => Text -> a -> m ()
 forceLog msg a = a `deepseq` logDebugN msg
@@ -79,7 +80,7 @@ compile opts passes exprs = do
         liftIO (runLoggingT (runFromExpr opts (pipeline passes') exprs) logFn)
 
 hofNames :: HashSet QualifiedBinding
-hofNames = HS.fromList [Refs.smap, Refs.ifThenElse, Refs.seq, Refs.recur]
+hofNames = HS.fromList [Refs.smap, Refs.ifThenElse, Refs.seq, Refs.recur, y]
 
 -- | Verify that only higher order functions have lambdas as arguments
 checkHigherOrderFunctionSupport :: MonadOhua m => Expression -> m ()
