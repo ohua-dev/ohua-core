@@ -67,14 +67,12 @@ data PrivateFunRefLitWrapper
     deriving (Generic)
 
 instance ToJSON PrivateFunRefLitWrapper where
-    toJSON (Ohua.Serialize.JSON.FunRefLit l) =
-        genericToJSON baseOptions {unwrapUnaryRecords = False} l
+    toJSON l@(Ohua.Serialize.JSON.FunRefLit _) = genericToJSON baseOptions l
     toJSON (OtherLit o) = toJSON o
 
 instance FromJSON PrivateFunRefLitWrapper where
     parseJSON v =
-        (do l@Ohua.Serialize.JSON.FunRefLit {} <-
-                genericParseJSON baseOptions {unwrapUnaryRecords = False} v
+        (do l@Ohua.Serialize.JSON.FunRefLit {} <- genericParseJSON baseOptions v
             pure l) <|>
         (OtherLit <$> parseJSON v)
 
