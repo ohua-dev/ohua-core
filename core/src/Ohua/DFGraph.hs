@@ -119,6 +119,6 @@ toGraph (DFExpr lets r) = OutGraph ops grArcs (getSource r)
       where
         allBindings = HS.fromList $ toList lets >>= output
         usedBindings =
-            HS.fromList $ [v | l <- toList lets, DFVar v <- callArguments l]
+            HS.fromList $ r : [v | l <- toList lets, DFVar v <- callArguments l]
 -- spliceEnv :: (Int -> a) -> OutGraph -> AbstractOutGraph a
 -- spliceEnv lookupExpr = fmap f where f i = lookupExpr $ unwrap i
