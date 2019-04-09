@@ -59,12 +59,12 @@ import Ohua.Types
 
 -- | An expression in the algorithm language.
 data Expr
-    = Var Binding
-    | Lit Lit
-    | Let Binding Expr Expr
-    | Apply Expr Expr
-    | Lambda Binding Expr
-    | BindState Expr Expr
+    = Var Binding -- ^ Reference to a value via binding: @x@ -> @Var "x"@
+    | Lit Lit -- ^ A literal: @2@, @ns/func@ etc -> @Lit (NumericLit 2)@
+    | Let Binding Expr Expr -- ^ Create and assign a binding: @let bnd = val in expr@ -> @Let "bnd" val expr@
+    | Apply Expr Expr -- ^ Function application: @function arg@ -> @Apply function arg@
+    | Lambda Binding Expr -- ^ A lambda function: @\\arg -> body@ -> @Lambda "arg" body@
+    | BindState Expr Expr -- ^ Binding a state value @state#method@ -> @BindState state method@
     deriving (Show, Eq, Lift, Generic)
 
 type AExpr = Expr
