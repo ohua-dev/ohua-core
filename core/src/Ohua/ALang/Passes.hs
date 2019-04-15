@@ -22,6 +22,7 @@ module Ohua.ALang.Passes where
 
 import Ohua.Prelude
 
+import Control.Comonad (extract)
 import Control.Monad.RWS.Lazy (evalRWST)
 import Control.Monad.Writer (listen, runWriter, tell)
 import Data.Functor.Foldable
@@ -152,12 +153,29 @@ ensureFinalLet = ensureFinalLetInLambdas >=> ensureFinalLet'
 
 -- | Transforms the final expression into a let expression with the result variable as body.
 ensureFinalLet' :: MonadOhua m => Expression -> m Expression
-ensureFinalLet' (Let a e b) = Let a e <$> ensureFinalLet' b
-ensureFinalLet' v@(Var _) = return v
+ensureFinalLet' =
+    para $ \case
+        LetF b (oldV, _) (_, recB) -> Let b oldV <$> recB -- Recurse only into let body, not the bound value
+        any
+            | isVarOrLambdaF any -> embed <$> traverse snd any -- Don't rebind a lambda or var. Continue or terminate
+            | otherwise -> do -- Rebind anything else
+                newBnd <- generateBinding
+                pure $ Let newBnd (embed $ fmap fst any) (Var newBnd)
+  where
+    isVarOrLambdaF =
+        \case
+            VarF _ -> True
+            LambdaF {} -> True
+            _ -> False
+
+-- | Obsolete, will be removed soon. Replaced by `ensureFinalLet'`
+ensureFinalLet'' :: MonadOhua m => Expression -> m Expression
+ensureFinalLet'' (Let a e b) = Let a e <$> ensureFinalLet' b
+ensureFinalLet'' v@(Var _) = return v
     -- I'm not 100% sure about this case, perhaps this ought to be in
     -- `ensureFinalLetInLambdas` instead
-ensureFinalLet' (Lambda b body) = Lambda b <$> ensureFinalLet' body
-ensureFinalLet' a = do
+ensureFinalLet'' (Lambda b body) = Lambda b <$> ensureFinalLet' body
+ensureFinalLet'' a = do
     newBnd <- generateBinding
     return $ Let newBnd a (Var newBnd)
 
