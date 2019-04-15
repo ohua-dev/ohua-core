@@ -154,6 +154,9 @@ ensureFinalLet = ensureFinalLetInLambdas >=> ensureFinalLet'
 ensureFinalLet' :: MonadOhua m => Expression -> m Expression
 ensureFinalLet' (Let a e b) = Let a e <$> ensureFinalLet' b
 ensureFinalLet' v@(Var _) = return v
+    -- I'm not 100% sure about this case, perhaps this ought to be in
+    -- `ensureFinalLetInLambdas` instead
+ensureFinalLet' (Lambda b body) = Lambda b <$> ensureFinalLet' body
 ensureFinalLet' a = do
     newBnd <- generateBinding
     return $ Let newBnd a (Var newBnd)
