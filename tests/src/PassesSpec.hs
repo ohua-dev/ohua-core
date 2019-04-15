@@ -25,6 +25,7 @@ import Control.Comonad
 import Data.Functor.Foldable (para)
 import qualified Data.Text as T
 import Test.Hspec
+import Test.Hspec.QuickCheck
 import Test.QuickCheck
 import Test.QuickCheck.Property as P
 
@@ -214,6 +215,13 @@ spec = do
                      ("some-ns/fn-with-3-args" `Apply` "a" `Apply` "b" `Apply`
                       "c")
                      "x")
+    prop "ensureFinalLet" $ \a -> ioProperty $
+        let run =
+                fmap (fmap showWithPretty) .
+                runSilentLoggingT .
+                flip (runFromBindings def) mempty
+        in
+            (===) <$> run (ensureFinalLet' a) <*> run ( ensureFinalLet'' a )
     describe "removing destructuring" $ do
         let mkNth0 objBnd i total =
                 PureFunction ALangRefs.nth Nothing `Apply` Lit (NumericLit i) `Apply`
