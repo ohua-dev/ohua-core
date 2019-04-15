@@ -227,14 +227,19 @@ instance (Semigroup v, Eq k, Hashable k) =>
          Semigroup (MonoidCombineHashMap k v) where
     MonoidCombineHashMap m1 <> MonoidCombineHashMap m2 =
         MonoidCombineHashMap $ HM.unionWith (<>) m1 m2
+
 instance (Semigroup v, Eq k, Hashable k) =>
          Monoid (MonoidCombineHashMap k v) where
     mempty = MonoidCombineHashMap mempty
 
-data WasTouched = No | Yes deriving (Show, Eq, Ord)
+data WasTouched
+    = No
+    | Yes
+    deriving (Show, Eq, Ord)
 
 instance Semigroup WasTouched where
     (<>) = max
+
 instance Monoid WasTouched where
     mempty = No
 
@@ -357,12 +362,20 @@ liftApplyToApply =
 --                         pure $ Just $ Let b e2 (BindState e1 (Var b))
 --         BindState _ _ -> throwError "State bind target must be a pure function reference"
 --         _ -> pure Nothing
-
 dumpNormalizeDebug = False
+
 putStrLnND :: (Print str, MonadIO m) => str -> m ()
-putStrLnND = if dumpNormalizeDebug then putStrLn else const $ return ()
+putStrLnND =
+    if dumpNormalizeDebug
+        then putStrLn
+        else const $ return ()
+
 printND :: (Show a, MonadIO m) => a -> m ()
-printND = if dumpNormalizeDebug then print else const $ return ()
+printND =
+    if dumpNormalizeDebug
+        then print
+        else const $ return ()
+
 -- The canonical composition of the above transformations to create a
 -- program with the invariants we expect.
 normalize :: MonadOhua m => Expression -> m Expression
