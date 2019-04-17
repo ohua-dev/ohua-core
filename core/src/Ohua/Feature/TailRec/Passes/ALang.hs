@@ -436,7 +436,7 @@ rewriteCallExpr e = do
             falseB' = rewriteBranch falseB
             (fixRef, recurVars) =
                 case (trueB', falseB') of
-                    (Left f, Right bnds) -> error $ "I am sorry, but for now the recursion is required to be on the first (`then`) branch of the final condition. This is a bug of the implementation and will be fixed in the future. (Issue #36)\n\nYour code violating this invariant was\n" <> show (PP.indent 4 $ PP.pretty fullExpr) -- (f, bnds)
+                    (Left f, Right bnds) -> errorD $ flexText "I am sorry, but for now the recursion is required to be on the first (`then`) branch of the final condition. This is a bug of the implementation and will be fixed in the future. (Issue #36)\n\nYour code violating this invariant was\n" <> (PP.indent 4 $ PP.pretty fullExpr) -- (f, bnds)
                     (Right bnds, Left f) -> (f, bnds)
                     _ -> error "invariant broken"
          in fromListToApply (FunRef recurEndMarker Nothing) $
