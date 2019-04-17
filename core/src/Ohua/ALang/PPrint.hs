@@ -129,12 +129,6 @@ instance Pretty SomeBinding where
     pretty (Qual q) = pretty q
     pretty (Unqual b) = pretty b
 
-ohuaDefaultLayoutOpts :: LayoutOptions
-ohuaDefaultLayoutOpts =
-    defaultLayoutOptions {layoutPageWidth = AvailablePerLine 100 1.0}
-
-quickRender :: Pretty a => a -> Text
-quickRender = renderStrict . layoutSmart ohuaDefaultLayoutOpts . pretty
 
 prettyNS :: (decl -> Doc a) -> Namespace decl -> Doc a
 prettyNS prettyDecl ns =

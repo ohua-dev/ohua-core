@@ -47,6 +47,10 @@ module Ohua.Util
     , throwErrorDebugS
     , (<&>)
     , SemigroupConstraint
+    , flexText
+    , quickRender
+    , ohuaDefaultLayoutOpts
+    , errorD
     ) where
 
 import Universum
@@ -55,6 +59,8 @@ import Control.Monad.Writer (MonadWriter, tell)
 import Control.Monad.Error.Class
 import Control.Exception.Safe
 import qualified Data.Text as T
+import qualified Data.Text.Prettyprint.Doc as PP
+import qualified Data.Text.Prettyprint.Doc.Render.Text as PP
 
 #if !NEW_CALLSTACK_API
 import GHC.Stack
@@ -224,3 +230,37 @@ throwErrorS msg = throwError $ msg <> "\n" <> fromString cs
 throwErrorDebugS :: (HasCallStack, MonadError s m, IsString s, SemigroupConstraint s) => s -> m a
 throwErrorDebugS = throwErrorS `debugOr` throwError
 {-# INLINE throwErrorDebugS #-}
+
+-- | Throw a canonical compiler error with a callstack appended.
+throwErrorSD :: (HasCallStack, MonadError Text m) => PP.Doc ann -> m a
+throwErrorSD msg = throwError $ ohuaDefaultLayoutDoc $ PP.vcat [msg, fromString cs]
+  where
+    cs = callStackToStr callStack
+
+throwErrorD :: MonadError Text m => PP.Doc ann -> m a
+throwErrorD = throwError . ohuaDefaultLayoutDoc
+
+-- | Throws a canonical compiler error which, in case of a debug build, has a
+-- call stack attached.
+throwErrorDebugSD :: (HasCallStack, MonadError Text m)  => PP.Doc ann -> m a
+throwErrorDebugSD = throwErrorSD `debugOr` throwErrorD
+{-# INLINE throwErrorDebugSD #-}
+
+ohuaDefaultLayoutOpts :: PP.LayoutOptions
+ohuaDefaultLayoutOpts =
+    PP.defaultLayoutOptions {PP.layoutPageWidth = PP.AvailablePerLine 100 1.0}
+
+ohuaDefaultLayoutDoc :: PP.Doc ann -> Text
+ohuaDefaultLayoutDoc = PP.renderStrict . PP.layoutSmart ohuaDefaultLayoutOpts
+
+quickRender :: PP.Pretty a => a -> Text
+quickRender = ohuaDefaultLayoutDoc . PP.pretty
+
+-- | Throws an error with a document as message
+errorD :: PP.Doc ann -> a
+errorD = error . ohuaDefaultLayoutDoc
+
+-- | Takes a text and converts it to a doc that preserves line breaks, but also
+-- concatenates words such that lines that are too long will automatically break.
+flexText :: Text -> PP.Doc ann
+flexText = PP.vsep . map (PP.fillSep . map PP.pretty . words) . lines
