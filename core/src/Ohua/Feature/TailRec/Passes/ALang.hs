@@ -202,6 +202,8 @@ module Ohua.Feature.TailRec.Passes.ALang where
 
 import Ohua.Prelude
 
+import qualified Data.Text.Prettyprint.Doc as PP
+
 import Control.Monad.Writer
 import Data.Functor.Foldable
 import qualified Data.HashSet as HS
@@ -429,13 +431,13 @@ rewriteCallExpr e = do
     -- implementing this correctly however is going to require some effort, thus
     -- I think we should do so later.
     rewriteCond :: Expression -> Expression
-    rewriteCond (Apply (Apply (Apply (PureFunction f0 _) cond) (Lambda a trueB)) (Lambda b falseB)) | f0 == ALangRefs.ifThenElse =
+    rewriteCond fullExpr@(Apply (Apply (Apply (PureFunction f0 _) cond) (Lambda a trueB)) (Lambda b falseB)) | f0 == ALangRefs.ifThenElse =
         let trueB' = rewriteBranch trueB
             falseB' = rewriteBranch falseB
             (fixRef, recurVars) =
                 case (trueB', falseB') of
                     (Left f, Right bnds) -> (f, bnds)
-                    (Right bnds, Left f) -> (f, bnds)
+                    (Right bnds, Left f) -> error $ "I am sorry, but for now the recursion is required to be on the first (`then`) branch of the final condition. This is a bug of the implementation and will be fixed in the future. (Issue #36)\n\nYour code violating this invariant was\n" <> show (PP.indent 4 $ PP.pretty fullExpr) -- (f, bnds)
                     _ -> error "invariant broken"
          in fromListToApply (FunRef recurEndMarker Nothing) $
             cond : fixRef : recurVars
