@@ -2,15 +2,17 @@ module Ohua.DFLang.Util where
 
 import Ohua.Prelude
 
+import qualified Data.Foldable as F
 import qualified Data.HashMap.Strict as HM
 import qualified Data.HashSet as HS
-import Data.Sequence as DS
+import qualified Data.Sequence as DS
+import Data.Sequence (Seq, (|>))
 
 import Ohua.DFLang.Lang
 
 -- | Find the usages of a binding
-findUsages :: Binding -> Seq LetExpr -> [LetExpr]
-findUsages binding = toList . DS.filter (elem (DFVar binding) . callArguments)
+findUsages :: Foldable f => Binding -> f LetExpr -> [LetExpr]
+findUsages binding = filter (elem (DFVar binding) . callArguments) . F.toList
 
 -- | Find the definition of a binding
 findDefinition :: Binding -> Seq LetExpr -> Maybe LetExpr
