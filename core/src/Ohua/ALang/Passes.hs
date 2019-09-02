@@ -353,13 +353,13 @@ liftApplyToApply =
 -- normalizeBind :: (MonadError Error m, MonadGenBnd m) => Expression -> m Expression
 -- normalizeBind =
 --     rewriteM $ \case
---         BindState e1@(PureFunction _ _) e2 ->
+--         BindState e2 e1@(PureFunction _ _) ->
 --             case e2 of
 --                 Var _ -> pure Nothing
 --                 Lit _ -> pure Nothing
 --                 _ ->
 --                     generateBinding >>= \b ->
---                         pure $ Just $ Let b e2 (BindState e1 (Var b))
+--                         pure $ Just $ Let b e2 (BindState (Var b) e1)
 --         BindState _ _ -> throwError "State bind target must be a pure function reference"
 --         _ -> pure Nothing
 dumpNormalizeDebug = False

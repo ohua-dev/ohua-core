@@ -82,7 +82,7 @@ prettyExpr = fst . histo worker
                         (sep [ sep (map pretty (assign : assigns) <> ["->"])
                              , discardParens e
                              ])
-            BindStateF (extract -> fun) (extract -> state) ->
+            BindStateF (extract -> state) (extract -> fun) ->
                 needParens BindPrec $
                 hsep [discardParens fun, "with", discardParens state]
     collectLambdas =

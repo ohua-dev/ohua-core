@@ -47,7 +47,7 @@ data Expr
     | MapE Expr
            Expr
     | BindE Expr
-            Expr -- ^ Bind a state value to a function
+            Expr -- ^ @BindE state function@ binds @state@ to be operated on by @function@
     | StmtE Expr
             Expr -- ^ An expression with the return value ignored
     | SeqE Expr

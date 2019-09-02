@@ -92,10 +92,10 @@ pattern PureFunctionF :: QualifiedBinding -> Maybe FnId -> ExprF a
 pattern PureFunctionF bnd id = LitF (FunRefLit (FunRef bnd id))
 
 pattern StatefulFunction :: QualifiedBinding -> Maybe FnId -> Expr -> Expr
-pattern StatefulFunction bnd id expr = BindState (Lit (FunRefLit (FunRef bnd id))) expr
+pattern StatefulFunction bnd id expr = BindState expr (Lit (FunRefLit (FunRef bnd id)))
 
 pattern StatefulFunctionF :: QualifiedBinding -> Maybe FnId -> Expr -> ExprF Expr
-pattern StatefulFunctionF bnd id expr = BindStateF (Lit (FunRefLit (FunRef bnd id))) expr
+pattern StatefulFunctionF bnd id expr = BindStateF expr (Lit (FunRefLit (FunRef bnd id)))
 
 -------------------- Additional type class instances --------------------
 
