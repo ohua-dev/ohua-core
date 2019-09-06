@@ -31,3 +31,7 @@ class Unwrap t where
 -- | Unsafe version of 'make'. Constructs the type skipping the checks.
 class UnsafeMake t where
     unsafeMake :: SourceType t -> t
+
+
+unwrapped :: (Make t, Unwrap s) => Lens s t (SourceType s) (SourceType t)
+unwrapped f s = makeThrow <$> f (unwrap s)

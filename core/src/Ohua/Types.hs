@@ -63,6 +63,7 @@ module Ohua.Types
     , Make(make)
     , makeThrow
     , Unwrap(unwrap)
+    , unwrapped
     -- ** Unsafely creating values
     , UnsafeMake(unsafeMake)
     ) where
