@@ -31,6 +31,9 @@ import Ohua.Prelude
 import qualified Data.HashMap.Strict as HM
 import qualified Language.Haskell.TH as TH (Exp(VarE, AppE))
 import qualified Language.Haskell.TH.Syntax as TH (Lift, lift)
+import Control.Category ((>>>))
+import qualified Data.Text as T
+import qualified Data.Char as C
 
 data FunAnn tyExpr = FunAnn
     { argTypes :: [tyExpr]
@@ -40,16 +43,26 @@ data FunAnn tyExpr = FunAnn
 type Imports = [(NSRef, [Binding])]
 
 type Feature = Text
-data Pragma =
-    Feature Feature
+data Pragma
+    = Feature Feature
+    | Other Text Text
     deriving (Generic, Show, Eq, Ord, TH.Lift)
 
-parsePragma :: MonadError Error m => Text -> m Pragma
-parsePragma t =
-    case words t of
-        ["feature", f] -> pure $ Feature f
-        (x:_) -> throwErrorDebugS $ "Unknown Pragma \'" <> x <> "\'"
-        [] -> throwErrorDebugS $ "Pragma cannot be empty"
+pragmaChar :: Char
+pragmaChar = '#'
+
+parsePragma :: MonadError Text m => Text -> m Pragma
+parsePragma =
+    T.strip >>>
+    T.break C.isSpace >>> \case
+        (pname, T.stripStart -> t) ->
+            case pname of
+                "feature" -> pure $ Feature t
+                _
+                    | null pname ->
+                        throwError $
+                        "Pragma name should not be empty " <> show (pname, t)
+                    | otherwise -> pure $ Other pname t
 
 instance (TH.Lift k, TH.Lift v) => TH.Lift (HM.HashMap k v) where
   lift m = do
