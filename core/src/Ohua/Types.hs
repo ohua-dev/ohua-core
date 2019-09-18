@@ -64,6 +64,8 @@ module Ohua.Types
     , makeThrow
     , Unwrap(unwrap)
     , unwrapped
+
+    , Embed(embedE)
     -- ** Unsafely creating values
     , UnsafeMake(unsafeMake)
     ) where

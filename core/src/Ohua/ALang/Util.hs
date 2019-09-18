@@ -14,7 +14,6 @@ import Ohua.Prelude
 
 import Ohua.ALang.Lang
 import qualified Ohua.ALang.Refs as Refs (nth)
-import Ohua.Types
 
 import Control.Comonad
 import qualified Control.Lens as Lens (para)

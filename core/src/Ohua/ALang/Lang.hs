@@ -108,6 +108,19 @@ instance IsString AExpr where
 instance NFData Expr
 instance Plated Expr where plate = gplate
 
+instance Embed Expr Int where
+    embedE = embedE . fromIntegral @Int @Integer
+instance Embed Expr Integer where
+    embedE = embedE . NumericLit 
+instance Embed Expr Lit where
+    embedE = Lit
+instance Embed Expr Binding where
+    embedE = Var
+instance Embed Expr FunRef where
+    embedE = embedE . FunRefLit
+instance Embed Expr QualifiedBinding where
+    embedE = embedE . (`FunRef` Nothing)
+
 -------------------- Additional Traversals --------------------
 
 -- | Traverse an ALang expression from left to right and top down, building a new expression.

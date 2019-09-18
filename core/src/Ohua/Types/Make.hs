@@ -35,3 +35,7 @@ class UnsafeMake t where
 
 unwrapped :: (Make t, Unwrap s) => Lens s t (SourceType s) (SourceType t)
 unwrapped f s = makeThrow <$> f (unwrap s)
+
+
+class Embed into from where
+    embedE :: from -> into
