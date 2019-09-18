@@ -184,20 +184,14 @@ intentionally_not_implemented =
 -- for functions.  It changes 'mappend' to be '(.)'. This makes it
 -- possible to accumulate a chain of functions in a
 -- 'Control.Monad.Writer.MonadWriter'.
-newtype Mutator a = Mutator { mutAsFn :: a -> a }
+type Mutator = Endo
 
-instance Semigroup (Mutator a) where
-  Mutator m1 <> Mutator m2 = Mutator $ m1 . m2
-
-instance Monoid (Mutator a) where
-  mempty = Mutator identity
-  mappend = (<>)
-
+mutAsFn :: Mutator a -> a -> a
+mutAsFn = appEndo
 
 -- | Append a function to a chain in a writer.
-tellMut :: MonadWriter (Mutator a) m => (a -> a) -> m ()
-tellMut = tell . Mutator
-
+tellMut :: MonadWriter (Endo a) m => (a -> a) -> m ()
+tellMut = tell . Endo
 
 
 #if !NEW_CALLSTACK_API
