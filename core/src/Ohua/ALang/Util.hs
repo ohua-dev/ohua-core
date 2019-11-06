@@ -8,6 +8,7 @@
 -- Portability : portable
 -- This source code is licensed under the terms described in the associated LICENSE.TXT file
 {-# LANGUAGE CPP #-}
+
 module Ohua.ALang.Util where
 
 import Ohua.Prelude
@@ -151,7 +152,7 @@ findLiterals e =
     ]
 
 -- | A literal is lonely if it does not accompany a var in the argument list to a call.
-findLonelyLiterals :: Expression -> [Expression]
+findLonelyLiterals :: HasCallStack => Expression -> [Expression]
 findLonelyLiterals =
     Lens.para $ \case
         f@Apply {} ->
@@ -167,14 +168,13 @@ findLonelyLiterals =
                 -- We could also return `[]` in the else branch, because the
                 -- expression should be normalized, but this is cleaner
                 else args >>= findLonelyLiterals
-            where args = snd $ fromApplyToList f
+            where args = getFunctionArgs f --snd $ fromApplyToList f
         _ -> join
   where
     areAllLits =
         all $ \case
             Lit _ -> True
             _ -> False
-
 
 mkApply :: Expr -> [Expr] -> Expr
 mkApply f args = go $ reverse args
@@ -186,11 +186,32 @@ mkApply f args = go $ reverse args
 fromListToApply :: FunRef -> [Expr] -> Expr
 fromListToApply f = mkApply $ Lit $ FunRefLit f
 
-fromApplyToList :: Expr -> (FunRef, [Expr])
-fromApplyToList =
+getFunctionArgs :: HasCallStack => Expr -> [Expr]
+getFunctionArgs e = args
+  where
+    (_, _, args) = fromApplyToList' e
+
+fromApplyToList :: HasCallStack => Expr -> (FunRef, [Expr])
+fromApplyToList e =
+    case state of
+        Just s ->
+            error $ "Expected pure function, but found bound state: " <> show s
+        _ -> (f, args)
+  where
+    (f, state, args) = fromApplyToList' e
+
+fromApplyToList' :: HasCallStack => Expr -> (FunRef, Maybe Expr, [Expr])
+fromApplyToList' =
     para $ \case
-        ApplyF (extract -> (f, args)) (arg, _) -> (f, args ++ [arg])
-        LitF (FunRefLit f) -> (f, [])
+        ApplyF (extract -> (f, s, args)) (arg, _) -> (f, s, args ++ [arg])
+        LitF (FunRefLit f) -> (f, Nothing, [])
+        BindStateF (state, _) (method, _) ->
+            case method of
+                Lit (FunRefLit f) -> (f, Just state, [])
+                other ->
+                    error $
+                    "Expected state to be bound to function, found: " <>
+                    show other
         other ->
             error $
             "Expected apply or function reference, got: " <>
