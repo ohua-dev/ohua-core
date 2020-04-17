@@ -167,7 +167,7 @@ forceAndReport msg val = val `deepseq` liftIO (putStrLn msg)
 
 -- | Force the evaluation of a value and then print a message using 'trace'.
 forceTraceReport :: (Applicative f, NFData a) => String -> a -> f ()
-forceTraceReport msg val = val `deepseq` trace msg (pure ())
+forceTraceReport msg val = val `deepseq` trace (T.pack msg) (pure ())
 
 
 -- | An 'error' call to indicate a certain class method is

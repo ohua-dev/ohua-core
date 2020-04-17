@@ -97,7 +97,7 @@ reduceLetCWith f =
         e -> f e
 
 reduceLetC :: Expression -> Expression
-reduceLetC = reduceLetCWith identity
+reduceLetC = reduceLetCWith id
 
 reduceAppArgument :: Expression -> Expression
 reduceAppArgument =
@@ -126,7 +126,7 @@ letLift =
                 case e of
                     LetF _ _ _ -> reduceLetA
                     ApplyF _ _ -> reduceApplication
-                    _ -> identity
+                    _ -> id
          in f $ embed e
 
 -- -- | Inline all direct reassignments.

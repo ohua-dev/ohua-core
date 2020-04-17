@@ -22,7 +22,7 @@ class Make t where
 
 -- | Same as 'make' but instead throws an exception
 makeThrow :: Make t => SourceType t -> t
-makeThrow = either error identity . make
+makeThrow = either error id . make
 
 -- | Convert a value @t@ back to its source type @t@.
 class Unwrap t where

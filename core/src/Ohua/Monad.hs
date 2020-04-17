@@ -49,4 +49,4 @@ fromEnv l = view l <$> getEnvironment
 runHandleLoggingT :: Handle -> LoggingT m a -> m a
 runHandleLoggingT h = (`runLoggingT` output)
   where
-    output loc src level msg = hPutStr h $ fromLogStr $ defaultLogStr loc src level msg
+    output loc src level msg = Universum.hPutStr h $ fromLogStr $ defaultLogStr loc src level msg

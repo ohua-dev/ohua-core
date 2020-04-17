@@ -136,7 +136,7 @@ instance IsString QualifiedBinding where
         Unqual b -> error $ fromString $ "Encountered unqualified binding: " ++ (show b)
 
 instance IsString SomeBinding where
-    fromString = either error identity . symbolFromString . toText
+    fromString = either error id . symbolFromString . toText
 
 instance IsList NSRef where
     type Item NSRef = Binding
