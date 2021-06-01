@@ -38,7 +38,7 @@ import qualified Data.Char as C
 data FunAnn tyExpr = FunAnn
     { argTypes :: [tyExpr]
     , retType :: tyExpr
-    } deriving (Show, Eq, Functor, Foldable, Traversable, Generic)
+    } deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic, TH.Lift)
 
 type Imports = [(NSRef, [Binding])]
 

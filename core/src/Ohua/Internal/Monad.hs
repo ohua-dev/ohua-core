@@ -337,6 +337,17 @@ instance Monad m => MonadGenBnd (GenBndT m) where
     generateBinding = GenBndT $ generateBindingIn id
     generateBindingWith = GenBndT . generateBindingWithIn id
 
+instance MonadIO m => MonadIO (GenBndT m) where
+    liftIO = lift . liftIO
+
+instance ( MonadReadEnvironment m, Monad m ) => MonadReadEnvironment (GenBndT m)
+instance (MonadRecordEnvExpr m, Monad m) =>
+         MonadRecordEnvExpr (GenBndT m)
+instance HasEnvExpr (GenBndT m) where
+    type EnvExpr (GenBndT m) = EnvExpr m
+instance (MonadGenId m, Monad m) => MonadGenId (GenBndT m)
+instance MonadLogger m => MonadLogger (GenBndT m)
+
 runGenBndT :: MonadError Error m => HS.HashSet Binding -> GenBndT m a -> m a
 runGenBndT taken (GenBndT comp) = do
     ng <- initNameGen taken
