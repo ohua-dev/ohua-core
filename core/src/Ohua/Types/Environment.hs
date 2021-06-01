@@ -19,6 +19,7 @@ declareLenses [d|
         , callLocalFunction :: !(Maybe QualifiedBinding)
         , transformRecursiveFunctions :: Bool
         , stageHandling :: StageHandling
+        , skipCtrlTransformation :: Bool
         }
   |]
 

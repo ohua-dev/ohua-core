@@ -37,7 +37,7 @@ smapSfFun = Lit $ FunRefLit $ FunRef Refs.smapFun Nothing
 collectSf :: Expression
 collectSf = Lit $ FunRefLit $ FunRef Refs.collect Nothing
 
-smapRewrite :: (Monad m, MonadGenBnd m) => Expression -> m Expression
+smapRewrite :: (Monad m, MonadGenBnd m, MonadReadEnvironment m) => Expression -> m Expression
 smapRewrite =
     rewriteM $ \case
         PureFunction op _ `Apply` lamExpr `Apply` dataGen

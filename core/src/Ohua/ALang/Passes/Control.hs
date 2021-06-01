@@ -174,24 +174,26 @@ import Ohua.Unit
 --  3. provide independent functions with the unitVal that the `ctrl` operator always provides.
 -- (if there are no independent function then this binding will never turn into an arc anyway.)
 liftIntoCtrlCtxt ::
-       (Monad m, MonadGenBnd m) => Binding -> Expression -> m Expression
+       (Monad m, MonadGenBnd m, MonadReadEnvironment m) => Binding -> Expression -> m Expression
 liftIntoCtrlCtxt ctrlIn e0 = do
-    (lam', actuals) <- lambdaLifting e0
-    let (originalFormals, _) = lambdaArgsAndBody e0
-    let (allFormals, e) = lambdaArgsAndBody lam'
-    ctrlOut <- generateBindingWith "ctrl"
-    let formals = reverse $ take (length actuals) $ reverse allFormals
+    skip <- view (options . skipCtrlTransformation) <$> getEnvironment
+    if skip then return e0 else do
+        (lam', actuals) <- lambdaLifting e0
+        let (originalFormals, _) = lambdaArgsAndBody e0
+        let (allFormals, e) = lambdaArgsAndBody lam'
+        ctrlOut <- generateBindingWith "ctrl"
+        let formals = reverse $ take (length actuals) $ reverse allFormals
 
-    if null formals
-        then do
-            dAssertM $ lam' == e0
-            pure lam'
-        else do
-            let actuals' = [Var ctrlIn] ++ actuals
-            let ie = mkDestructured formals ctrlOut e
-            return $
-                mkLambda originalFormals $
-                Let
-                    ctrlOut
-                    (fromListToApply (FunRef "ohua.lang/ctrl" Nothing) actuals')
-                    ie
+        if null formals
+            then do
+                dAssertM $ lam' == e0
+                pure lam'
+            else do
+                let actuals' = [Var ctrlIn] ++ actuals
+                let ie = mkDestructured formals ctrlOut e
+                return $
+                    mkLambda originalFormals $
+                    Let
+                        ctrlOut
+                        (fromListToApply (FunRef "ohua.lang/ctrl" Nothing) actuals')
+                        ie

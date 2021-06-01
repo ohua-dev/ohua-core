@@ -380,7 +380,7 @@ verifyTailRecursion e =
 -- Its important here that we pattern match on `Let` because `rewriteM` is a
 -- bottom up traversal an hence `isCall` would match on partial applications on
 -- the `Y` combinator. By pattern matching on `Let` here that can be avoided.
-rewriteAll :: (MonadGenBnd m, MonadError Error m) => Expression -> m Expression
+rewriteAll :: (MonadGenBnd m, MonadError Error m, MonadReadEnvironment m) => Expression -> m Expression
 rewriteAll = rewriteM $ \case
     Let b e r | isCall y e -> (\e' -> Just $ Let b e' r) <$> rewriteCallExpr e
     _ -> pure Nothing
@@ -391,7 +391,7 @@ isCall f (Apply e@(Apply _ _) _) = isCall f e
 isCall _ _ = False
 
 rewriteCallExpr ::
-       (MonadGenBnd m, MonadError Error m) => Expression -> m Expression
+       (MonadGenBnd m, MonadError Error m, MonadReadEnvironment m) => Expression -> m Expression
 rewriteCallExpr e = do
     let (lam@(Lambda _ _):callArgs) = snd $ fromApplyToList e
     let (recurVars, expr) = lambdaArgsAndBody lam

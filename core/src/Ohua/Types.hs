@@ -39,6 +39,7 @@ module Ohua.Types
     , callLocalFunction
     , transformRecursiveFunctions
     , stageHandling
+    , skipCtrlTransformation
     , StageHandling
     , StageName
     , AbortCompilation

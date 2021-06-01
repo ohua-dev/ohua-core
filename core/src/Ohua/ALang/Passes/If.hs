@@ -130,7 +130,7 @@ ifFunSf = Lit $ FunRefLit $ FunRef "ohua.lang/ifFun" Nothing
 -- This is a proposal for `ifRewrite` that uses plated to make sure the
 -- recursion is handled correctly. As far as I can tell the other version does
 -- not recurse properly onto the branches.
-ifRewrite :: (Monad m, MonadGenBnd m, MonadError Error m) => Expression -> m Expression
+ifRewrite :: (Monad m, MonadGenBnd m, MonadError Error m, MonadReadEnvironment m) => Expression -> m Expression
 ifRewrite = rewriteM $ \case
     "ohua.lang/if" `Apply` cond `Apply` trueBranch `Apply` falseBranch
         | Lambda trueIn trueBody <- trueBranch

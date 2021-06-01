@@ -29,7 +29,7 @@ import Ohua.ALang.Util (lambdaArgsAndBody)
 seqFunSf :: Expression
 seqFunSf = Lit $ FunRefLit $ FunRef Refs.seqFun Nothing
 
-seqRewrite :: (Monad m, MonadGenBnd m) => Expression -> m Expression
+seqRewrite :: (Monad m, MonadGenBnd m, MonadReadEnvironment m) => Expression -> m Expression
 seqRewrite (Let v a b) = Let v <$> seqRewrite a <*> seqRewrite b
 seqRewrite (Lambda v e) = Lambda v <$> seqRewrite e
 seqRewrite (Apply (Apply (Lit (FunRefLit (FunRef "ohua.lang/seq" Nothing))) dep) expr) = do
