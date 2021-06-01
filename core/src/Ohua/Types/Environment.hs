@@ -20,6 +20,7 @@ declareLenses [d|
         , transformRecursiveFunctions :: Bool
         , stageHandling :: StageHandling
         , skipCtrlTransformation :: Bool
+        , higherOrderFunctions :: HS.HashSet QualifiedBinding
         }
   |]
 
@@ -69,6 +70,8 @@ instance Default Options where
             Nothing
             False -- for no we always disable this option
             (const (Don'tDump, False))
+            False
+            HS.empty
 
 instance Default Environment where
     def = Environment def

@@ -40,6 +40,7 @@ module Ohua.Types
     , transformRecursiveFunctions
     , stageHandling
     , skipCtrlTransformation
+    , higherOrderFunctions
     , StageHandling
     , StageName
     , AbortCompilation

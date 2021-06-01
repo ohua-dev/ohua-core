@@ -79,8 +79,8 @@ compile opts passes exprs = do
     either throwError pure =<<
         liftIO (runLoggingT (runFromExpr opts (pipeline passes') exprs) logFn)
 
-hofNames :: HashSet QualifiedBinding
-hofNames = HS.fromList [Refs.smap, Refs.ifThenElse, Refs.seq, Refs.recur, y]
+stdHofNames :: HashSet QualifiedBinding
+stdHofNames = HS.fromList [Refs.smap, Refs.ifThenElse, Refs.seq, Refs.recur, y]
 
 -- | Verify that only higher order functions have lambdas as arguments
 checkHigherOrderFunctionSupport :: MonadOhua m => Expression -> m ()
@@ -95,8 +95,11 @@ checkHigherOrderFunctionSupport (Let _ e rest) = do
             "Lambdas may only be input to higher order functions, not " <>
             show f
         pure True
-    checkNestedExpr (PureFunction n _) = pure $ HS.member n hofNames
+    checkNestedExpr (PureFunction n _)
+        | HS.member n stdHofNames = pure True
+        | otherwise = HS.member n . (view $ options . higherOrderFunctions) <$> getEnvironment
     checkNestedExpr (Var _) = pure False
+    checkNestedExpr (BindState _ m) = checkNestedExpr m
     checkNestedExpr a = failWith $ "Expected var or apply expr, got " <> show a
     isLambda (Lambda _ _) = True
     isLambda _ = False
